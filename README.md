@@ -1,0 +1,134 @@
+# Zion Med
+
+MVP para clínicas: formulários operacionais, assinatura digital, geração de PDF e fluxo de aprovação. Multi-clínica (tenancy por `clinic_id`).
+
+## Stack
+
+- **Laravel 12** (PHP 8.3+)
+- **Blade** + **Tailwind CSS**
+- **PostgreSQL** (produção) — migrations compatíveis com MySQL/SQLite
+- **barryvdh/laravel-dompdf** para PDF
+- Filas: driver `sync` no MVP (pronto para async)
+
+## Requisitos
+
+- PHP 8.3+
+- Composer
+- Node.js/npm (para Vite/Tailwind)
+- PostgreSQL (ou MySQL/SQLite para desenvolvimento)
+
+## Setup local
+
+```bash
+# Clone e entre na pasta
+cd zion_med
+
+# Dependências PHP
+composer install
+
+# Variáveis de ambiente
+cp .env.example .env
+php artisan key:generate
+
+# Banco: use PostgreSQL em produção. Para dev, no .env:
+# DB_CONNECTION=sqlite
+# DB_DATABASE=/caminho/para/database/database.sqlite
+# Ou DB_CONNECTION=pgsql e preencha DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+
+# Criar DB SQLite (se usar)
+touch database/database.sqlite
+
+# Migrations e seed (clínica demo + 3 templates)
+php artisan migrate --seed
+
+# Storage público (logos e anexos)
+php artisan storage:link
+
+# Frontend
+npm install
+npm run build
+```
+
+## Acesso após o seed
+
+- **URL:** `http://localhost:8000` (ou `php artisan serve`)
+- **Login:** `admin@demo.zionmed.com` / `senha123`
+- Perfil: **Owner** (acesso a clínica, usuários, templates, protocolos)
+
+## Fluxo básico
+
+1. **Login** → Dashboard (resumo de pendentes e templates).
+2. **Clínica > Configurações** (Owner): nome, logo, e-mail para notificações.
+3. **Usuários** (Owner): criar/editar/desativar; perfis: Owner, Manager, Staff.
+4. **Templates:** criar/editar, gerenciar campos (texto, textarea, número, data, select, radio, checkbox, arquivo, assinatura). Botão **Gerar link público** gera token e URL.
+5. **Formulário público:** acesse `/f/{token}` (sem login). Preencha, desenhe assinatura no canvas, anexe arquivos. Ao enviar, gera protocolo e (se configurado) envia e-mail para a clínica.
+6. **Protocolos:** listar (filtros por template, status, data), ver detalhes, aprovar/reprovar (Manager/Owner), baixar PDF, **Exportar CSV** (sem anexos).
+
+## Multi-clínica (tenancy)
+
+- Todas as tabelas principais têm `clinic_id`.
+- O **middleware SetClinic** define a clínica atual na sessão a partir do usuário logado (`user->clinic_id`).
+- **Global Scope** (opcional) em `FormTemplate` e `FormSubmission`: consultas ficam automaticamente filtradas por `session('current_clinic_id')`.
+- Para operações administrativas que precisem ver todas as clínicas, use `Model::withoutGlobalScopes()`.
+
+### Como criar uma nova clínica
+
+1. Inserir registro em `clinics` (nome, slug, notification_email).
+2. Criar ao menos um usuário em `users` com `clinic_id` apontando para essa clínica e `role = 'owner'`.
+3. Fazer login com esse usuário: o sistema define a clínica na sessão e o escopo passa a ser dessa clínica.
+
+Não há subdomínio no MVP: a clínica é definida pelo usuário logado. Para futuro com subdomínio (ex.: `clinica1.zionmed.com`), pode-se no middleware ler o subdomínio e definir `session('current_clinic_id')` a partir de uma tabela `clinics.subdomain` ou equivalente.
+
+## Perfis e permissões
+
+| Perfil   | Clínica | Usuários | Templates | Aprovar protocolos | Ver protocolos |
+|----------|---------|-----------|-----------|--------------------|----------------|
+| Owner    | Sim     | Sim       | Sim       | Sim                | Sim            |
+| Manager  | Não     | Não       | Sim       | Sim                | Sim            |
+| Staff    | Não     | Não       | Não       | Não                | Sim (somente leitura) |
+
+## Templates seedados
+
+1. **Anamnese (Básica)** — nome, data nascimento, CPF, queixa principal, histórico, alergias, assinatura.
+2. **Termo de Consentimento** — paciente, data, procedimento, declarações, assinatura.
+3. **Checklist de Sala** — data, responsável, itens de conferência, temperatura, observações, assinatura.
+
+## Comandos úteis
+
+```bash
+php artisan migrate --seed   # Recriar DB e seed
+php artisan storage:link      # Link público para storage
+php artisan test              # Testes (mín. 6 feature)
+npm run dev                   # Vite em desenvolvimento
+```
+
+## Testes
+
+Mínimo 6 testes feature:
+
+- Login (página carrega, credenciais válidas/inválidas, dashboard exige auth).
+- Formulário público (página com token válido, envio gera protocolo).
+- Escopo por clínica (usuário de uma clínica não vê protocolos de outra).
+- Export CSV (exige autenticação, retorna CSV para usuário logado).
+- Templates (exige autenticação, owner pode criar template).
+
+Execute: `php artisan test`
+
+## Segurança
+
+- CSRF em rotas web.
+- Rotas públicas protegidas por token (32+ caracteres).
+- Rate limit no endpoint público (`/f/{token}` POST).
+- Validação de upload (tamanho e MIME).
+- Auditoria (AuditService) para ações principais.
+- Gates/Policies para autorização por perfil e clínica.
+
+## Estrutura principal
+
+- **Models:** Clinic, User, FormTemplate, FormField, FormSubmission, SubmissionValue, SubmissionAttachment, SubmissionSignature, AuditLog.
+- **Services:** PdfService, AuditService, PublicLinkService, SubmissionService.
+- **Rotas em português:** dashboard, clinica.configuracoes, usuarios.*, templates.*, protocolos.*, formulario-publico.*.
+
+---
+
+**Zion Med** — formulários para clínicas, sem integração com prontuário. Focado em venda rápida para clínicas pequenas e médias.
