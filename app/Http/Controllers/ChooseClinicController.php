@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Role;
 use App\Models\Clinic;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,12 +12,14 @@ class ChooseClinicController extends Controller
 {
     /**
      * Exibe a tela para escolher a clínica (SuperAdmin ou primeiro acesso).
+     * SuperAdmin vê todas as clínicas; demais usuários com can_switch_clinic veem só clínicas do mesmo tenant.
      */
     public function show(Request $request): View
     {
         $this->authorizeClinicSwitch($request);
 
-        $clinics = Clinic::orderBy('name')->withCount('users')->get();
+        $user = $request->user();
+        $clinics = $this->clinicsAllowedForUser($user);
         $currentClinicId = session('current_clinic_id');
 
         return view('clinica.escolher', [
@@ -32,26 +35,64 @@ class ChooseClinicController extends Controller
     {
         $this->authorizeClinicSwitch($request);
 
+        $user = $request->user();
+        $allowedClinicIds = $this->clinicsAllowedForUser($user)->pluck('id')->all();
+
+        if (empty($allowedClinicIds)) {
+            abort(403, 'Nenhuma empresa disponível para seleção.');
+        }
+
         $validated = $request->validate([
-            'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
+            'clinic_id' => ['required', 'integer', 'in:' . implode(',', $allowedClinicIds)],
         ]);
 
         session(['current_clinic_id' => $validated['clinic_id']]);
 
         $redirectAfter = $request->input('redirect_after');
         if ($redirectAfter && $this->isSafeInternalRedirect($redirectAfter, $request)) {
-            return redirect()->to($redirectAfter)->with('success', 'Clínica alterada.');
+            return redirect()->to($redirectAfter)->with('success', 'Empresa alterada.');
         }
 
-        return redirect()->route('dashboard')->with('success', 'Clínica alterada.');
+        return redirect()->route('dashboard')->with('success', 'Empresa alterada.');
     }
 
+    /**
+     * Permite acesso se: SuperAdmin/can_switch_clinic OU se o tenant do usuário tem mais de uma clínica
+     * (ex.: plano Enterprise com várias empresas no grupo).
+     */
     private function authorizeClinicSwitch(Request $request): void
     {
         $user = $request->user();
-        if (! $user || ! $user->canSwitchClinic()) {
+        if (! $user) {
             abort(403);
         }
+        if ($user->canSwitchClinic()) {
+            return;
+        }
+        $clinic = $user->clinic;
+        if ($clinic?->tenant_id && Clinic::withoutGlobalScopes()->where('tenant_id', $clinic->tenant_id)->count() > 1) {
+            return;
+        }
+        abort(403);
+    }
+
+    /**
+     * Clínicas que o usuário pode escolher: SuperAdmin vê todas; demais veem só as do mesmo tenant.
+     */
+    private function clinicsAllowedForUser($user): \Illuminate\Database\Eloquent\Collection
+    {
+        if ($user->role === Role::SuperAdmin) {
+            return Clinic::orderBy('name')->withCount('users')->get();
+        }
+
+        $tenantId = $user->clinic?->tenant_id;
+        if ($tenantId === null) {
+            return $user->clinic_id
+                ? Clinic::where('id', $user->clinic_id)->withCount('users')->get()
+                : collect();
+        }
+
+        return Clinic::where('tenant_id', $tenantId)->orderBy('name')->withCount('users')->get();
     }
 
     /** Só redireciona para URL interna (relativa ou mesmo host), evitando voltar para login ou para a própria tela de escolher. */

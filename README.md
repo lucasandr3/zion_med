@@ -93,6 +93,47 @@ Não há subdomínio no MVP: a clínica é definida pelo usuário logado. Para f
 2. **Termo de Consentimento** — paciente, data, procedimento, declarações, assinatura.
 3. **Checklist de Sala** — data, responsável, itens de conferência, temperatura, observações, assinatura.
 
+## Integração ASAAS (Sandbox) e assinatura
+
+Pagamentos e trial são integrados ao **ASAAS** (ambiente Sandbox para testes).
+
+### Variáveis de ambiente (.env)
+
+```env
+ASAAS_BASE_URL=https://sandbox.asaas.com/api/v3
+ASAAS_API_KEY=SEU_TOKEN_SANDBOX
+ASAAS_WEBHOOK_SECRET=um-segredo-gerado
+ASAAS_TRIAL_DAYS=14
+ASAAS_GRACE_DAYS=7
+ASAAS_BLOCK_MODE=soft
+ASAAS_PRODUCT_NAME=ZionMed
+```
+
+- **ASAAS_BASE_URL:** use `https://sandbox.asaas.com/api/v3` para Sandbox.
+- **ASAAS_API_KEY:** token da API no [painel Sandbox ASAAS](https://sandbox.asaas.com/) (Integrações > API).
+- **ASAAS_WEBHOOK_SECRET:** valor definido ao criar o webhook no ASAAS; o endpoint verifica o header `asaas-access-token`.
+
+### Configurar webhook no Sandbox
+
+1. Acesse [Sandbox ASAAS](https://sandbox.asaas.com/) → Integrações → Webhooks.
+2. Cadastre a URL do seu ambiente (ex.: `https://seu-dominio.com/webhooks/asaas` ou via ngrok/Cloudflare Tunnel para localhost).
+3. Selecione os eventos: **PAYMENT_CREATED**, **PAYMENT_RECEIVED**, **PAYMENT_CONFIRMED**, **PAYMENT_OVERDUE**, **SUBSCRIPTION_CREATED**, **SUBSCRIPTION_UPDATED**, **SUBSCRIPTION_DELETED** (ou equivalentes).
+4. Defina um **Token de autenticação** e coloque o mesmo valor em `ASAAS_WEBHOOK_SECRET` no `.env`.
+
+### Simular pagamento no Sandbox
+
+- No painel Sandbox, use a opção de simular pagamento de cobrança (boleto/PIX).
+- Ou crie uma assinatura via app (menu **Assinatura** → escolher plano) e use o link de pagamento que o ASAAS envia por e-mail no Sandbox para marcar como pago.
+
+### Regras de trial e bloqueio
+
+- **Trial:** novas clínicas (seed ou criação) recebem `trial_ends_at = now() + ASAAS_TRIAL_DAYS`, `subscription_status = trial`, `billing_status = ok`.
+- **Fim do trial:** se não houver assinatura ativa, o sistema marca `subscription_status = inactive`, `billing_status = blocked` e bloqueia o acesso (redireciona para `/billing`).
+- **Inadimplência (past_due):** ao receber webhook de pagamento **OVERDUE**, o sistema define `subscription_status = past_due`, `billing_status = attention` e `grace_ends_at = now() + ASAAS_GRACE_DAYS`. O usuário continua acessando o app com um aviso; após `grace_ends_at`, o acesso é bloqueado e apenas `/billing` e `/logout` permanecem liberados.
+- **Pagamento recebido:** webhooks **PAYMENT_RECEIVED** / **CONFIRMED** reativam a clínica (`active`, `ok`) e limpam `grace_ends_at`.
+
+Rotas sempre permitidas (mesmo com bloqueio): `/billing`, `/billing/*`, `/logout`, `/webhooks/asaas`, `/f/*` (formulário público).
+
 ## Comandos úteis
 
 ```bash

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ComeceController;
 use App\Http\Controllers\ChooseClinicController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\IntegrationsController;
@@ -11,12 +13,16 @@ use App\Http\Controllers\LinkBioController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Webhook\AsaasWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('landing'))->name('home');
 
 Route::get('/privacidade', fn () => view('legal.privacidade'))->name('privacidade');
 Route::get('/termos-de-uso', fn () => view('legal.termos'))->name('termos');
+
+Route::get('/comece', [ComeceController::class, 'show'])->name('comece.show');
+Route::post('/comece', [ComeceController::class, 'store'])->name('comece.store');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -34,8 +40,16 @@ Route::prefix('f')->name('formulario-publico.')->group(function () {
     Route::post('/{token}', [PublicFormController::class, 'submit'])->name('submit');
 });
 
+Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])->name('webhooks.asaas');
+
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    Route::prefix('billing')->name('billing.')->group(function () {
+        Route::get('/', [BillingController::class, 'index'])->name('index');
+        Route::post('/checkout', [BillingController::class, 'checkout'])->name('checkout');
+    });
+
     Route::get('/links-publicos', [FormTemplateController::class, 'linksPublicos'])->name('links-publicos.index');
 
     Route::prefix('link-bio')->name('link-bio.')->group(function () {
@@ -51,6 +65,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/escolher', [ChooseClinicController::class, 'store'])->name('escolher.store');
         Route::get('/configuracoes', [ClinicSettingsController::class, 'edit'])->name('configuracoes.edit');
         Route::put('/configuracoes', [ClinicSettingsController::class, 'update'])->name('configuracoes.update');
+        Route::post('/empresas', [ClinicSettingsController::class, 'storeEmpresa'])->name('empresas.store');
         Route::get('/integracoes', [IntegrationsController::class, 'index'])->name('integracoes.index');
         Route::post('/integracoes/tokens', [IntegrationsController::class, 'createToken'])->name('integracoes.tokens.store');
         Route::delete('/integracoes/tokens/{token}', [IntegrationsController::class, 'revokeToken'])->name('integracoes.tokens.destroy');

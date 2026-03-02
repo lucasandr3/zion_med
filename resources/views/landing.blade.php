@@ -137,9 +137,9 @@
           class="btn-entrar rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-base-100 border border-base-200">
           Entrar
         </a>
-        <a href="#cta"
+        <a href="{{ route('comece.show') }}"
           class="btn-cta-primary inline-flex items-center justify-center rounded-lg bg-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:bg-accent-500">
-          Solicitar proposta
+          Começar trial
         </a>
       </div>
     </div>
@@ -168,13 +168,13 @@
 
           <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <a id="cta"
-              href="#demo"
+              href="{{ route('comece.show') }}"
               class="btn-cta-primary inline-flex items-center justify-center rounded-lg bg-accent-600 px-6 py-3 text-sm font-semibold text-white shadow-soft hover:bg-accent-500">
-              Agendar demonstração executiva
+              Começar trial grátis
             </a>
-            <a href="#solucao"
+            <a href="#precos"
               class="inline-flex items-center justify-center rounded-lg border border-base-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-base-100">
-              Entender a solução
+              Ver planos e preços
             </a>
           </div>
 
@@ -585,6 +585,7 @@
   </section>
 
   <!-- Pricing -->
+  @php $landingPlans = config('asaas.plans', []); @endphp
   <section id="precos" class="bg-base-50">
     <div class="mx-auto max-w-7xl px-4 py-16">
       <div class="max-w-3xl">
@@ -592,16 +593,15 @@
           Planos para clínicas com operação profissional.
         </h2>
         <p class="mt-4 text-base leading-relaxed text-slate-600">
-          Estrutura pensada para implantação com governança. Valores finais variam conforme número de unidades,
-          volume de documentos e necessidades de padronização.
+          Trial de {{ (int) config('asaas.trial_days', 14) }} dias. Cadastre sua empresa, escolha o plano e receba o boleto por e-mail.
         </p>
       </div>
 
       <div class="mt-10 grid gap-6 lg:grid-cols-3">
-        <!-- Plan 1 -->
+        <!-- Plan 1 Core -->
         <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-sm font-semibold text-slate-900">Core</div>
-          <div class="mt-2 text-3xl font-semibold">Sob consulta</div>
+          <div class="text-sm font-semibold text-slate-900">{{ $landingPlans['core']['name'] ?? 'Core' }}</div>
+          <div class="mt-2 text-3xl font-semibold">R$ {{ isset($landingPlans['core']['value']) ? number_format($landingPlans['core']['value'], 2, ',', '.') : '99,90' }}<span class="text-base font-medium text-slate-500">/mês</span></div>
           <div class="mt-1 text-sm text-slate-500">Para padronização inicial</div>
 
           <ul class="mt-6 space-y-3 text-sm text-slate-700">
@@ -611,18 +611,18 @@
             <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Integração com outros sistemas (API)</li>
           </ul>
 
-          <a href="#demo" class="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-base-200 bg-base-50 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-base-100">
-            Solicitar proposta
+          <a href="{{ route('comece.show', ['plan' => 'core']) }}" class="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-base-200 bg-base-50 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-base-100">
+            Começar trial
           </a>
         </div>
 
-        <!-- Plan 2 (recommended) -->
+        <!-- Plan 2 Executive (recommended) -->
         <div class="rounded-2xl border border-accent-600/30 bg-accent-600 p-6 text-white shadow-glow">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold">Executive</div>
+            <div class="text-sm font-semibold">{{ $landingPlans['executive']['name'] ?? 'Executive' }}</div>
             <span class="rounded-full bg-white/20 px-3 py-1 text-xs font-medium">Recomendado</span>
           </div>
-          <div class="mt-2 text-3xl font-semibold">Sob consulta</div>
+          <div class="mt-2 text-3xl font-semibold">R$ {{ isset($landingPlans['executive']['value']) ? number_format($landingPlans['executive']['value'], 2, ',', '.') : '199,90' }}<span class="text-base font-medium text-white/80">/mês</span></div>
           <div class="mt-1 text-sm text-white/80">Para clínicas com exigência de governança</div>
 
           <ul class="mt-6 space-y-3 text-sm text-white/90">
@@ -633,15 +633,15 @@
             <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-white/80"></span> Treinamento do time</li>
           </ul>
 
-          <a href="#demo" class="btn-cta-primary mt-8 inline-flex w-full items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-accent-600 hover:bg-white/95">
-            Agendar demonstração executiva
+          <a href="{{ route('comece.show', ['plan' => 'executive']) }}" class="btn-cta-primary mt-8 inline-flex w-full items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-accent-600 hover:bg-white/95">
+            Começar trial
           </a>
         </div>
 
-        <!-- Plan 3 -->
+        <!-- Plan 3 Enterprise -->
         <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-sm font-semibold text-slate-900">Enterprise</div>
-          <div class="mt-2 text-3xl font-semibold">Sob consulta</div>
+          <div class="text-sm font-semibold text-slate-900">{{ $landingPlans['enterprise']['name'] ?? 'Enterprise' }}</div>
+          <div class="mt-2 text-3xl font-semibold">R$ {{ isset($landingPlans['enterprise']['value']) ? number_format($landingPlans['enterprise']['value'], 2, ',', '.') : '399,90' }}<span class="text-base font-medium text-slate-500">/mês</span></div>
           <div class="mt-1 text-sm text-slate-500">Para múltiplas unidades</div>
 
           <ul class="mt-6 space-y-3 text-sm text-slate-700">
@@ -651,14 +651,14 @@
             <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> SLA de suporte</li>
           </ul>
 
-          <a href="#demo" class="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-base-200 bg-base-50 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-base-100">
-            Falar com especialista
+          <a href="{{ route('comece.show', ['plan' => 'enterprise']) }}" class="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-base-200 bg-base-50 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-base-100">
+            Começar trial
           </a>
         </div>
       </div>
 
       <div class="mt-8 text-sm text-slate-500">
-        * Recomendado para clínicas maiores: implantação (onboarding) + mensalidade recorrente. Valores dependem de escopo.
+        * Trial de {{ (int) config('asaas.trial_days', 14) }} dias. Após o cadastro você recebe o boleto por e-mail; o pagamento garante a continuidade após o trial.
       </div>
     </div>
   </section>

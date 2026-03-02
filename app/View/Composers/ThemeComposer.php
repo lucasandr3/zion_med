@@ -15,9 +15,11 @@ class ThemeComposer
         $clinicId = session('current_clinic_id');
         $clinic   = $clinicId ? Clinic::find($clinicId) : null;
 
-        $canSwitchClinic = request()->user()?->canSwitchClinic() ?? false;
-
         $user = request()->user();
+        $canSwitchClinic = $user?->canSwitchClinic() ?? false;
+        $hasMultipleClinicsInTenant = $clinic?->tenant_id
+            && Clinic::withoutGlobalScopes()->where('tenant_id', $clinic->tenant_id)->count() > 1;
+        $showTrocarEmpresa = $canSwitchClinic || $hasMultipleClinicsInTenant;
 
         $view->with([
             'themeBodyClasses'      => $this->themeService->getBodyClasses($clinic),
@@ -26,6 +28,7 @@ class ThemeComposer
             'isDarkMode'            => (bool) ($clinic?->dark_mode ?? false),
             'currentClinic'         => $clinic,
             'canSwitchClinic'       => $canSwitchClinic,
+            'showTrocarEmpresa'     => $showTrocarEmpresa,
             'unreadNotifications'   => $user ? $user->unreadNotifications()->count() : 0,
         ]);
     }

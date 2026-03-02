@@ -500,9 +500,9 @@
                             <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
                         </button>
 
-                        {{-- Solicitar acesso --}}
+                        {{-- Criar conta --}}
                         <p class="login-register">
-                            Ainda não tem conta? <a href="#">Solicitar acesso</a>
+                            Ainda não tem conta? <a href="{{ route('comece.show') }}">Começar trial</a>
                         </p>
 
                     </form>

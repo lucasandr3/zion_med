@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Escolher clínica')
+@section('title', 'Escolher empresa')
 
 @section('content')
 <style>
@@ -33,8 +33,8 @@
             </svg>
           </div>
           <div>
-            <h1 class="text-xl font-bold leading-tight" style="color: var(--c-text)">Escolher clínica</h1>
-            <p class="text-sm mt-0.5" style="color: var(--c-muted)">Selecione a clínica que deseja acessar. Você pode trocar a qualquer momento pelo menu.</p>
+            <h1 class="text-xl font-bold leading-tight" style="color: var(--c-text)">Escolher empresa</h1>
+            <p class="text-sm mt-0.5" style="color: var(--c-muted)">Selecione a empresa que deseja acessar. Você pode trocar a qualquer momento pelo menu.</p>
           </div>
         </div>
         <form method="POST" action="{{ route('logout') }}" class="shrink-0">
@@ -59,7 +59,7 @@
         <input
           id="search-clinics"
           type="text"
-          placeholder="Buscar clínica..."
+          placeholder="Buscar empresa..."
           class="w-full pr-4 py-2 text-sm rounded-xl transition-all form-input"
           style="border-radius: 0.75rem; padding-left: 2.5rem;"
         />

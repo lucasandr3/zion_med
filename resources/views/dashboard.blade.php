@@ -11,7 +11,7 @@
             <p class="text-sm font-medium" style="color:var(--c-text)">Selecione uma clínica para ver o resumo</p>
             <p class="text-xs mt-0.5" style="color:var(--c-muted)">Os números e atalhos do dashboard são exibidos por clínica.</p>
         </div>
-        <a href="{{ route('clinica.escolher') }}" class="btn-primary shrink-0">Escolher clínica</a>
+        <a href="{{ route('clinica.escolher') }}" class="btn-primary shrink-0">Escolher empresa</a>
     </div>
     @endif
 

@@ -64,7 +64,7 @@
             </div>
         </div>
 
-        {{-- Clínica atual (abaixo da logo, acima do menu) --}}
+        {{-- Empresa atual (abaixo da logo, acima do menu) --}}
         @if(!empty($currentClinic))
         <div class="sidebar-clinic px-2 py-2 shrink-0" style="border-bottom:1px solid var(--c-border)">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -143,9 +143,9 @@
             @can('manage-clinic')
             <a href="{{ route('clinica.configuracoes.edit') }}"
                class="nav-link {{ request()->routeIs('clinica.configuracoes.*') ? 'active' : '' }}"
-               data-tooltip="Clínica">
+               data-tooltip="Empresa">
                 <span class="material-symbols-outlined shrink-0" style="font-size:19px">business</span>
-                <span class="sidebar-label">Clínica</span>
+                <span class="sidebar-label">Empresa</span>
             </a>
             <a href="{{ route('link-bio.index') }}"
                class="nav-link {{ request()->routeIs('link-bio.*') ? 'active' : '' }}"
@@ -190,10 +190,10 @@
                 </button>
 
                 <div id="user-dropdown" class="user-dropdown hidden">
-                    @if(!empty($canSwitchClinic))
+                    @if(!empty($showTrocarEmpresa))
                     <a href="{{ route('clinica.escolher') }}">
                         <span class="material-symbols-outlined" style="font-size:16px">swap_horiz</span>
-                        Trocar clínica
+                        Trocar empresa
                     </a>
                     @endif
                     @can('manage-clinic')
@@ -352,12 +352,17 @@
 
         {{-- Conteúdo --}}
         <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-            @if(session('success'))
-                <x-ui.alert type="success" class="mb-5">{{ session('success') }}</x-ui.alert>
-            @endif
-            @if(session('error'))
-                <x-ui.alert type="error" class="mb-5">{{ session('error') }}</x-ui.alert>
-            @endif
+            @unless(request()->routeIs('clinica.configuracoes.edit'))
+                @if(session('success'))
+                    <x-ui.alert type="success" class="mb-5">{{ session('success') }}</x-ui.alert>
+                @endif
+                @if(session('error'))
+                    <x-ui.alert type="error" class="mb-5">{{ session('error') }}</x-ui.alert>
+                @endif
+                @if(session('billing_warning'))
+                    <x-ui.alert type="warning" class="mb-5">{{ session('billing_warning') }}</x-ui.alert>
+                @endif
+            @endunless
 
             @yield('content')
         </main>

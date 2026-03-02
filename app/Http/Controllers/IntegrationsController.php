@@ -49,7 +49,7 @@ class IntegrationsController extends Controller
         $this->authorize('manage-clinic');
         $clinicId = session('current_clinic_id');
         if (! $clinicId) {
-            return redirect()->route('clinica.integracoes.index')->with('error', 'Selecione uma clínica.');
+            return redirect()->route('clinica.integracoes.index')->with('error', 'Selecione uma empresa.');
         }
 
         $validated = $request->validate([
@@ -78,7 +78,7 @@ class IntegrationsController extends Controller
         $this->authorize('manage-clinic');
         $clinicId = session('current_clinic_id');
         if (! $clinicId) {
-            return redirect()->route('clinica.integracoes.index')->with('error', 'Selecione uma clínica.');
+            return redirect()->route('clinica.integracoes.index')->with('error', 'Selecione uma empresa.');
         }
 
         $validated = $request->validate([

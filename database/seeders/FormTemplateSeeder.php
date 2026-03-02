@@ -12,8 +12,6 @@ class FormTemplateSeeder extends Seeder
 {
     public function run(): void
     {
-        $templates = FormTemplateDefinitions::all();
-
         $clinics = Clinic::all();
         if ($clinics->isEmpty()) {
             return;
@@ -29,29 +27,39 @@ class FormTemplateSeeder extends Seeder
             }
 
             $owner = User::withoutGlobalScopes()->where('clinic_id', $clinic->id)->first();
+            self::seedTemplatesForClinic($clinic, $owner);
+        }
+    }
 
-            foreach ($templates as $t) {
-                $fields = $t['fields'];
-                $category = $t['category'];
-                unset($t['fields'], $t['category']);
+    /**
+     * Cria os templates padrão (FormTemplateDefinitions) para uma clínica.
+     * Usado no cadastro de novo tenant e pelo run() do seeder.
+     */
+    public static function seedTemplatesForClinic(Clinic $clinic, ?User $owner = null): void
+    {
+        $templates = FormTemplateDefinitions::all();
 
-                $template = FormTemplate::withoutGlobalScopes()->create([
-                    'clinic_id' => $clinic->id,
-                    'name' => $t['name'],
-                    'description' => $t['description'],
-                    'category' => $category,
-                    'is_active' => true,
-                    'public_enabled' => false,
-                    'created_by' => $owner?->id,
-                ]);
+        foreach ($templates as $t) {
+            $fields = $t['fields'];
+            $category = $t['category'];
+            unset($t['fields'], $t['category']);
 
-                foreach ($fields as $f) {
-                    $opts = $f['options'] ?? null;
-                    unset($f['options']);
-                    $f['template_id'] = $template->id;
-                    $f['options_json'] = $opts ? ['options' => $opts] : null;
-                    FormField::create($f);
-                }
+            $template = FormTemplate::withoutGlobalScopes()->create([
+                'clinic_id' => $clinic->id,
+                'name' => $t['name'],
+                'description' => $t['description'],
+                'category' => $category,
+                'is_active' => true,
+                'public_enabled' => false,
+                'created_by' => $owner?->id,
+            ]);
+
+            foreach ($fields as $f) {
+                $opts = $f['options'] ?? null;
+                unset($f['options']);
+                $f['template_id'] = $template->id;
+                $f['options_json'] = $opts ? ['options' => $opts] : null;
+                FormField::create($f);
             }
         }
     }

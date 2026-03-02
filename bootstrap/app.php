@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [\App\Http\Middleware\SetClinic::class]);
+        $middleware->web(append: [
+            \App\Http\Middleware\SetClinic::class,
+            \App\Http\Middleware\EnsureClinicBillingIsActive::class,
+        ]);
         $middleware->api(append: [\App\Http\Middleware\SetClinicForApi::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

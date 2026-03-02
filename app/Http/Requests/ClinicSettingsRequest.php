@@ -52,6 +52,13 @@ class ClinicSettingsRequest extends FormRequest
             'cover_image'        => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:3072'],
             'theme'              => ['nullable', 'string', Rule::in($validThemes)],
             'dark_mode'          => ['nullable', 'boolean'],
+            'billing_name'       => ['nullable', 'string', 'max:255'],
+            'billing_email'      => ['nullable', 'email', 'max:255'],
+            'billing_document'   => ['nullable', 'string', 'max:25', 'regex:/^[\d\.\-\/\s]+$/'],
+            'whatsapp_notifications_enabled' => ['nullable', 'boolean'],
+            'whatsapp_notify_cobranca'       => ['nullable', 'boolean'],
+            'whatsapp_notify_faturas_boleto' => ['nullable', 'boolean'],
+            'whatsapp_notify_avisos'         => ['nullable', 'boolean'],
         ];
     }
 
@@ -64,6 +71,14 @@ class ClinicSettingsRequest extends FormRequest
             'logo'               => 'logo',
             'theme'              => 'tema',
             'dark_mode'          => 'modo escuro',
+            'billing_document'   => 'CPF/CNPJ',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'billing_document.regex' => 'O CPF/CNPJ deve conter apenas números e pontuação (pontos, traços, barra).',
         ];
     }
 }

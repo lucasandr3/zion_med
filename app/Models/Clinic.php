@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Clinic extends Model
 {
     protected $fillable = [
+        'tenant_id',
         'name',
         'slug',
         'logo_path',
@@ -24,11 +26,30 @@ class Clinic extends Model
         'business_hours',
         'theme',
         'dark_mode',
+        'asaas_customer_id',
+        'billing_email',
+        'billing_name',
+        'billing_document',
+        'plan_key',
+        'trial_ends_at',
+        'grace_ends_at',
+        'subscription_status',
+        'billing_status',
+        'whatsapp_notifications_enabled',
+        'whatsapp_notify_cobranca',
+        'whatsapp_notify_faturas_boleto',
+        'whatsapp_notify_avisos',
     ];
 
     protected $casts = [
         'dark_mode'      => 'boolean',
+        'whatsapp_notifications_enabled' => 'boolean',
+        'whatsapp_notify_cobranca' => 'boolean',
+        'whatsapp_notify_faturas_boleto' => 'boolean',
+        'whatsapp_notify_avisos' => 'boolean',
         'business_hours' => 'array',
+        'trial_ends_at'   => 'datetime',
+        'grace_ends_at'   => 'datetime',
     ];
 
     /**
@@ -125,6 +146,11 @@ class Clinic extends Model
         return array_map('trim', explode(',', $this->specialties));
     }
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
@@ -158,5 +184,33 @@ class Clinic extends Model
     public function webhooks(): HasMany
     {
         return $this->hasMany(ClinicWebhook::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function isOnTrial(): bool
+    {
+        return $this->subscription_status === 'trial' && $this->trial_ends_at && now()->lte($this->trial_ends_at);
+    }
+
+    public function isPastDueInGrace(): bool
+    {
+        if ($this->subscription_status !== 'past_due' || ! $this->grace_ends_at) {
+            return false;
+        }
+        return now()->lte($this->grace_ends_at);
+    }
+
+    public function isBillingBlocked(): bool
+    {
+        return $this->billing_status === 'blocked';
     }
 }

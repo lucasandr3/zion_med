@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Role;
 use App\Models\Clinic;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -11,6 +12,11 @@ class ClinicSeeder extends Seeder
 {
     public function run(): void
     {
+        $tenant = Tenant::firstOrCreate(
+            ['slug' => 'clinica-demo-zion'],
+            ['name' => 'Clínica Demo Zion'],
+        );
+
         $clinics = [
             [
                 'name' => 'Clínica Demo Zion - Matriz',
@@ -32,8 +38,18 @@ class ClinicSeeder extends Seeder
             ],
         ];
 
+        $trialDays = (int) config('asaas.trial_days', 14);
+
         foreach ($clinics as $index => $data) {
-            $clinic = Clinic::create($data);
+            $clinic = Clinic::create(array_merge($data, ['tenant_id' => $tenant->id]));
+
+            if ($index === 0) {
+                $clinic->update([
+                    'trial_ends_at' => now()->addDays($trialDays),
+                    'subscription_status' => 'trial',
+                    'billing_status' => 'ok',
+                ]);
+            }
 
             $emails = [
                 'admin@demo.zionmed.com',      // Matriz
