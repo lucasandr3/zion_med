@@ -55,6 +55,13 @@ RUN echo "memory_limit = 256M" > $PHP_INI_DIR/conf.d/memory.ini \
 # Usuário www
 RUN addgroup -g 1000 www && adduser -D -u 1000 -G www www
 
+# Diretórios de temp do Nginx graváveis pelo usuário www (evita 500 em POST)
+RUN mkdir -p /var/lib/nginx/tmp/client_body \
+             /var/lib/nginx/tmp/proxy \
+             /var/lib/nginx/tmp/fastcgi \
+             /var/lib/nginx/tmp/uwsgi \
+    && chown -R www:www /var/lib/nginx
+
 # Config Nginx + Supervisor + PHP-FPM pool
 COPY docker/nginx-production.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
