@@ -1,7 +1,7 @@
 # Dockerfile para Laravel em produção (Easypanel)
 FROM php:8.4-fpm-alpine
 
-# Instalar dependências do sistema + node/npm
+# Dependências do sistema
 RUN apk add --no-cache \
     nginx \
     supervisor \
@@ -29,16 +29,16 @@ RUN apk add --no-cache \
     opcache \
     && rm -rf /var/cache/apk/*
 
-# Instalar Redis (sem remover deps que você nem instalou aqui)
+# Redis
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps
 
-# Instalar Composer
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configurar PHP para produção
+# PHP produção
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # Configurações PHP customizadas
@@ -52,41 +52,50 @@ RUN echo "memory_limit = 256M" > $PHP_INI_DIR/conf.d/memory.ini \
     && echo "opcache.max_accelerated_files=10000" >> $PHP_INI_DIR/conf.d/opcache.ini \
     && echo "opcache.revalidate_freq=2" >> $PHP_INI_DIR/conf.d/opcache.ini
 
-# Configurar Nginx + Supervisor
-COPY docker/nginx-production.conf /etc/nginx/nginx.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Criar usuário www
+# Usuário www
 RUN addgroup -g 1000 www && adduser -D -u 1000 -G www www
 
-# Diretório de trabalho
+# Config Nginx + Supervisor + PHP-FPM pool
+COPY docker/nginx-production.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/php-fpm-www.conf /usr/local/etc/php-fpm.d/www.conf
+
+# Entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 WORKDIR /var/www/html
 
 # Copiar projeto
 COPY --chown=www:www . .
 
-# Garantir tmp e permissões (antes de rodar artisan)
+# TMP e permissões base
 RUN chmod 1777 /tmp \
     && mkdir -p /var/www/html/storage/tmp \
     && chown -R www:www /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Usar tmp interno do Laravel (mais estável em plataformas)
+# tmp interno do Laravel
 ENV TMPDIR=/var/www/html/storage/tmp
 
 # Instalar deps PHP
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Build do front (Vite/Mix)
+# Build do front
 RUN npm ci && npm run build && npm cache clean --force
 
-# Otimizações Laravel
-RUN php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+# chown final (IMPORTANTE depois de composer/npm)
+RUN chown -R www:www /var/www/html \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Logs
-RUN mkdir -p /var/log/supervisor /var/log/nginx
+RUN mkdir -p /var/log/supervisor /var/log/nginx \
+    && touch /var/log/nginx/error.log /var/log/nginx/access.log \
+    && chown -R www:www /var/log/nginx
 
 EXPOSE 80
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+    CMD curl -f http://127.0.0.1/ || exit 1
+
+CMD ["/entrypoint.sh"]

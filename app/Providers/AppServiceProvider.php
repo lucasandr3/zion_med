@@ -62,6 +62,10 @@ class AppServiceProvider extends ServiceProvider
             return $user !== null;
         });
 
+        Gate::define('viewLogViewer', function (?User $user) {
+            return $user !== null && $user->role === Role::SuperAdmin;
+        });
+
         /** Quem pode conceder "acessar todas as clínicas" a outro usuário (SuperAdmin ou Owner na mesma clínica). */
         Gate::define('grant-clinic-switch', function (User $user, ?User $target = null) {
             if ($user->role === Role::SuperAdmin) {
