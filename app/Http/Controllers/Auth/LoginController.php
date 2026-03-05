@@ -29,8 +29,14 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        // SuperAdmin sem clínica fixa: redireciona para escolher clínica
-        if (Auth::user()->canSwitchClinic() && session('current_clinic_id') === null && Auth::user()->clinic_id === null) {
+        $user = Auth::user();
+
+        if ($user->isPlatformAdmin()) {
+            return redirect()->intended(route('platform.dashboard'));
+        }
+
+        // Usuário de tenant com permissão de troca de clínica e sem clínica fixa: redireciona para escolher clínica
+        if ($user->canSwitchClinic() && session('current_clinic_id') === null && $user->clinic_id === null) {
             return redirect()->intended(route('clinica.escolher'));
         }
 

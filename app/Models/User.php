@@ -65,6 +65,21 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class);
     }
 
+    public function isPlatformAdmin(): bool
+    {
+        return $this->role === Role::PlatformAdmin;
+    }
+
+    public function isTenantUser(): bool
+    {
+        return in_array($this->role, [
+            Role::SuperAdmin,
+            Role::Owner,
+            Role::Manager,
+            Role::Staff,
+        ], true);
+    }
+
     public function isOwner(): bool
     {
         return $this->role === Role::Owner;

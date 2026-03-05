@@ -196,6 +196,12 @@
                         Trocar empresa
                     </a>
                     @endif
+                    @if(auth()->user()->isPlatformAdmin())
+                    <a href="{{ route('platform.dashboard') }}">
+                        <span class="material-symbols-outlined" style="font-size:16px">admin_panel_settings</span>
+                        Admin da plataforma
+                    </a>
+                    @endif
                     @can('manage-clinic')
                     <a href="{{ route('clinica.configuracoes.edit') }}">
                         <span class="material-symbols-outlined" style="font-size:16px">settings</span>

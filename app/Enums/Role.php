@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum Role: string
 {
+    case PlatformAdmin = 'platform_admin';
     case SuperAdmin = 'super_admin';
     case Owner = 'owner';
     case Manager = 'manager';
@@ -12,6 +13,7 @@ enum Role: string
     public function label(): string
     {
         return match ($this) {
+            self::PlatformAdmin => 'Admin da plataforma',
             self::SuperAdmin => 'Super administrador',
             self::Owner => 'Proprietário',
             self::Manager => 'Gerente',
@@ -19,10 +21,10 @@ enum Role: string
         };
     }
 
-    /** Pode acessar e trocar entre todas as clínicas (multi-tenant). */
+    /** Pode acessar e trocar entre empresas dentro do mesmo tenant. */
     public function canSwitchClinic(): bool
     {
-        return $this === self::SuperAdmin;
+        return in_array($this, [self::SuperAdmin, self::Owner], true);
     }
 
     public function canManageClinic(): bool

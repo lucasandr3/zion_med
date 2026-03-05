@@ -11,8 +11,7 @@ use Illuminate\View\View;
 class ChooseClinicController extends Controller
 {
     /**
-     * Exibe a tela para escolher a clínica (SuperAdmin ou primeiro acesso).
-     * SuperAdmin vê todas as clínicas; demais usuários com can_switch_clinic veem só clínicas do mesmo tenant.
+     * Exibe a tela para escolher a clínica (dentro do mesmo tenant).
      */
     public function show(Request $request): View
     {
@@ -77,19 +76,15 @@ class ChooseClinicController extends Controller
     }
 
     /**
-     * Clínicas que o usuário pode escolher: SuperAdmin vê todas; demais veem só as do mesmo tenant.
+     * Clínicas que o usuário pode escolher: sempre dentro do mesmo tenant.
      */
     private function clinicsAllowedForUser($user): \Illuminate\Database\Eloquent\Collection
     {
-        if ($user->role === Role::SuperAdmin) {
-            return Clinic::orderBy('name')->withCount('users')->get();
-        }
-
         $tenantId = $user->clinic?->tenant_id;
         if ($tenantId === null) {
             return $user->clinic_id
                 ? Clinic::where('id', $user->clinic_id)->withCount('users')->get()
-                : collect();
+                : Clinic::whereRaw('0 = 1')->withCount('users')->get();
         }
 
         return Clinic::where('tenant_id', $tenantId)->orderBy('name')->withCount('users')->get();

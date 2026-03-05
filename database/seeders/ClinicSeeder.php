@@ -67,14 +67,14 @@ class ClinicSeeder extends Seeder
             ]);
         }
 
-        // SuperAdmin: acessa todas as clínicas (clinic_id null), senha: senha123
+        // Usuário PlatformAdmin: dono da plataforma, não está vinculado a tenant/clinic.
         User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'super@demo.zionmed.com'],
+            ['email' => 'admin@zionmed.com'],
             [
                 'clinic_id' => null,
-                'name' => 'Super Admin',
+                'name' => 'Admin Plataforma',
                 'password' => bcrypt('senha123'),
-                'role' => Role::SuperAdmin,
+                'role' => Role::PlatformAdmin,
                 'active' => true,
             ]
         );

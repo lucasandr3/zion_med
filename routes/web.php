@@ -7,6 +7,9 @@ use App\Http\Controllers\ChooseClinicController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\IntegrationsController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
+use App\Http\Controllers\Platform\TenantController as PlatformTenantController;
+use App\Http\Controllers\Platform\BillingOverviewController;
 use App\Http\Controllers\FormSubmissionController;
 use App\Http\Controllers\FormTemplateController;
 use App\Http\Controllers\LinkBioController;
@@ -31,6 +34,18 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('auth');
 
+Route::middleware(['auth', 'platform'])
+    ->prefix('admin')
+    ->name('platform.')
+    ->group(function () {
+        Route::get('/', PlatformDashboardController::class)->name('dashboard');
+        Route::get('/tenants', [PlatformTenantController::class, 'index'])->name('tenants.index');
+        Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show'])->name('tenants.show');
+
+        Route::get('/assinaturas', [BillingOverviewController::class, 'subscriptions'])->name('subscriptions.index');
+        Route::get('/faturas', [BillingOverviewController::class, 'payments'])->name('payments.index');
+    });
+
 Route::get('/l/{slug}', [LinkBioController::class, 'public'])->name('link-bio.public');
 Route::get('/l/{slug}/out', [LinkBioController::class, 'out'])->name('link-bio.out');
 
@@ -42,7 +57,7 @@ Route::prefix('f')->name('formulario-publico.')->group(function () {
 
 Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])->name('webhooks.asaas');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::prefix('billing')->name('billing.')->group(function () {
