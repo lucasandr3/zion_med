@@ -120,7 +120,7 @@ class BillingController extends Controller
         }
 
         $subscription = Subscription::create([
-            'clinic_id' => $clinic->id,
+            'organization_id' => $clinic->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $request->input('plan_key'),
             'status' => 'active',
@@ -166,7 +166,7 @@ class BillingController extends Controller
             Payment::updateOrCreate(
                 ['asaas_payment_id' => $asaasPaymentId],
                 [
-                    'clinic_id' => $clinic->id,
+                    'organization_id' => $clinic->id,
                     'subscription_id' => $subscription->id,
                     'status' => $item['status'] ?? 'PENDING',
                     'due_date' => isset($item['dueDate']) ? $item['dueDate'] : null,

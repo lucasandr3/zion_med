@@ -162,7 +162,7 @@ class AsaasService
                 Payment::updateOrCreate(
                     ['asaas_payment_id' => $asaasPaymentId],
                     [
-                        'clinic_id' => $clinic->id,
+                        'organization_id' => $clinic->id,
                         'subscription_id' => $subscription->id,
                         'status' => $status,
                         'due_date' => $item['dueDate'] ?? null,

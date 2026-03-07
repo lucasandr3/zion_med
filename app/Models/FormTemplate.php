@@ -15,15 +15,26 @@ class FormTemplate extends Model
     }
 
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'name',
         'description',
         'category',
         'is_active',
         'public_enabled',
         'public_token',
+        'public_token_expires_at',
         'created_by',
     ];
+
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
+    }
 
     public static function categoryLabels(): array
     {
@@ -52,12 +63,19 @@ class FormTemplate extends Model
         return [
             'is_active' => 'boolean',
             'public_enabled' => 'boolean',
+            'public_token_expires_at' => 'datetime',
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function creator(): BelongsTo

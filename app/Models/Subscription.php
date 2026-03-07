@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Subscription extends Model
 {
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'asaas_subscription_id',
         'plan_key',
         'status',
@@ -22,9 +22,15 @@ class Subscription extends Model
         'next_due_date'      => 'date',
     ];
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). Alias para compatibilidade (Clinic = Organization). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Clinic::class, 'organization_id');
     }
 
     public function payments(): HasMany

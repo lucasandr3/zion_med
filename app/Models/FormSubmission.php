@@ -16,7 +16,7 @@ class FormSubmission extends Model
     }
 
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'template_id',
         'status',
         'submitted_by_user_id',
@@ -29,6 +29,16 @@ class FormSubmission extends Model
         'protocol_number',
     ];
 
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
+    }
+
     protected function casts(): array
     {
         return [
@@ -38,9 +48,15 @@ class FormSubmission extends Model
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function template(): BelongsTo

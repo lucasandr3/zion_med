@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Clinic;
+use App\Models\Organization;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,6 +12,7 @@ class EnsureClinicBillingIsActive
     private const ALLOWED_PREFIXES = [
         'billing',
         'logout',
+        'webhooks',
         'webhooks/asaas',
         'f/',
     ];
@@ -26,16 +27,16 @@ class EnsureClinicBillingIsActive
             return $next($request);
         }
 
-        $clinic = $this->currentClinic($request);
-        if (! $clinic) {
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
             return $next($request);
         }
 
-        $this->syncExpiredTrial($clinic);
+        $this->syncExpiredTrial($organization);
 
-        if ($this->canAccess($clinic, $request)) {
-            if ($clinic->subscription_status === 'past_due' && $clinic->grace_ends_at && now()->lte($clinic->grace_ends_at)) {
-                $request->session()->flash('billing_warning', 'Pagamento pendente. Regularize até ' . $clinic->grace_ends_at->format('d/m/Y') . ' para evitar a suspensão do acesso.');
+        if ($this->canAccess($organization, $request)) {
+            if ($organization->subscription_status === 'past_due' && $organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
+                $request->session()->flash('billing_warning', 'Pagamento pendente. Regularize até ' . $organization->grace_ends_at->format('d/m/Y') . ' para evitar a suspensão do acesso.');
             }
             return $next($request);
         }
@@ -71,43 +72,43 @@ class EnsureClinicBillingIsActive
         return false;
     }
 
-    private function currentClinic(Request $request): ?Clinic
+    private function currentOrganization(Request $request): ?Organization
     {
-        $clinicId = session('current_clinic_id') ?? $request->user()->clinic_id;
-        if (! $clinicId) {
+        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        if (! $orgId) {
             return null;
         }
-        return Clinic::find($clinicId);
+        return Organization::find($orgId);
     }
 
-    private function syncExpiredTrial(Clinic $clinic): void
+    private function syncExpiredTrial(Organization $organization): void
     {
-        if ($clinic->subscription_status !== 'trial' || ! $clinic->trial_ends_at || now()->lte($clinic->trial_ends_at)) {
+        if ($organization->subscription_status !== 'trial' || ! $organization->trial_ends_at || now()->lte($organization->trial_ends_at)) {
             return;
         }
-        $hasActiveSubscription = $clinic->subscriptions()->where('status', 'active')->exists();
+        $hasActiveSubscription = $organization->subscriptions()->where('status', 'active')->exists();
         if (! $hasActiveSubscription) {
-            $clinic->update([
+            $organization->update([
                 'subscription_status' => 'inactive',
                 'billing_status'     => 'blocked',
             ]);
         }
     }
 
-    private function canAccess(Clinic $clinic, Request $request): bool
+    private function canAccess(Organization $organization, Request $request): bool
     {
-        if ($clinic->subscription_status === 'active') {
+        if ($organization->subscription_status === 'active') {
             return true;
         }
-        if ($clinic->subscription_status === 'trial' && $clinic->trial_ends_at && now()->lte($clinic->trial_ends_at)) {
+        if ($organization->subscription_status === 'trial' && $organization->trial_ends_at && now()->lte($organization->trial_ends_at)) {
             return true;
         }
-        if ($clinic->subscription_status === 'past_due') {
-            if ($clinic->grace_ends_at && now()->lte($clinic->grace_ends_at)) {
+        if ($organization->subscription_status === 'past_due') {
+            if ($organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
                 return true;
             }
-            if ($clinic->grace_ends_at && now()->gt($clinic->grace_ends_at)) {
-                $clinic->update(['billing_status' => 'blocked']);
+            if ($organization->grace_ends_at && now()->gt($organization->grace_ends_at)) {
+                $organization->update(['billing_status' => 'blocked']);
             }
         }
         return false;

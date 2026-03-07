@@ -21,18 +21,19 @@ class IntegrationsController extends Controller
         }
 
         $tokens = $request->user()->tokens()->where('name', 'like', 'clinic:' . $clinicId . '-%')->get();
-        $webhooks = ClinicWebhook::where('clinic_id', $clinicId)->orderBy('created_at', 'desc')->get();
-        $deliveries = WebhookDelivery::whereHas('clinicWebhook', fn ($q) => $q->where('clinic_id', $clinicId))
+        $webhooks = ClinicWebhook::where('organization_id', $clinicId)->orderBy('created_at', 'desc')->get();
+        $deliveries = WebhookDelivery::whereHas('clinicWebhook', fn ($q) => $q->where('organization_id', $clinicId))
             ->with('clinicWebhook')
             ->latest()
             ->limit(50)
             ->get();
 
-        $availableEvents = ['protocol.submitted', 'protocol.approved', 'protocol.rejected'];
+        $availableEvents = ['submission.created', 'submission.signed', 'submission.approved', 'submission.rejected'];
         $eventLabels = [
-            'protocol.submitted' => 'Protocolo enviado',
-            'protocol.approved' => 'Protocolo aprovado',
-            'protocol.rejected' => 'Protocolo reprovado',
+            'submission.created' => 'Submissão criada',
+            'submission.signed' => 'Submissão assinada',
+            'submission.approved' => 'Submissão aprovada',
+            'submission.rejected' => 'Submissão reprovada',
         ];
 
         return view('clinica.integracoes', [
@@ -84,13 +85,13 @@ class IntegrationsController extends Controller
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:2048'],
             'events' => ['required', 'array'],
-            'events.*' => [Rule::in(['protocol.submitted', 'protocol.approved', 'protocol.rejected'])],
+            'events.*' => [Rule::in(['submission.created', 'submission.signed', 'submission.approved', 'submission.rejected'])],
             'secret' => ['nullable', 'string', 'max:64'],
             'description' => ['nullable', 'string', 'max:255'],
         ]);
 
         ClinicWebhook::create([
-            'clinic_id' => $clinicId,
+            'organization_id' => $clinicId,
             'url' => $validated['url'],
             'events' => $validated['events'],
             'secret' => $validated['secret'] ?: null,
@@ -111,7 +112,7 @@ class IntegrationsController extends Controller
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:2048'],
             'events' => ['required', 'array'],
-            'events.*' => [Rule::in(['protocol.submitted', 'protocol.approved', 'protocol.rejected'])],
+            'events.*' => [Rule::in(['submission.created', 'submission.signed', 'submission.approved', 'submission.rejected'])],
             'secret' => ['nullable', 'string', 'max:64'],
             'description' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],

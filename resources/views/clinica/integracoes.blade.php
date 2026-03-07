@@ -227,8 +227,8 @@
                 <span class="section-title">Webhooks</span>
             </div>
             <div class="section-body">
-                <p style="margin-bottom:8px">Receba notificações em tempo real (POST na URL informada) quando um protocolo for enviado, aprovado ou reprovado.</p>
-                <p class="hint" style="margin-bottom:16px">Use o header <code>X-Webhook-Signature</code> (HMAC SHA-256) para validar.</p>
+                <p style="margin-bottom:8px">Receba notificações em tempo real (POST na URL informada) quando uma submissão for criada, assinada, aprovada ou reprovada.</p>
+                <p class="hint" style="margin-bottom:16px">Cada requisição inclui o header <code>X-Webhook-Signature</code> com assinatura HMAC SHA-256 do corpo (formato: <code>sha256=&lt;hash&gt;</code>). Use o secret configurado para validar a autenticidade no seu servidor.</p>
                 <form action="{{ route('clinica.integracoes.webhooks.store') }}" method="POST" style="display:flex;flex-direction:column;gap:1rem;max-width:560px;margin-bottom:1.5rem">
                     @csrf
                     <div class="field" style="margin-bottom:0">

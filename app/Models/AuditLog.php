@@ -10,13 +10,23 @@ class AuditLog extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'user_id',
         'action',
         'entity_type',
         'entity_id',
         'meta_json',
     ];
+
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
+    }
 
     protected function casts(): array
     {
@@ -25,9 +35,15 @@ class AuditLog extends Model
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function user(): BelongsTo

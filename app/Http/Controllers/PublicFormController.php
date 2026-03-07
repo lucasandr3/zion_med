@@ -20,6 +20,10 @@ class PublicFormController extends Controller
             ->where('public_token', $token)
             ->where('public_enabled', true)
             ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('public_token_expires_at')
+                    ->orWhere('public_token_expires_at', '>', now());
+            })
             ->with(['fields', 'clinic'])
             ->firstOrFail();
 
@@ -40,6 +44,10 @@ class PublicFormController extends Controller
             ->where('public_token', $token)
             ->where('public_enabled', true)
             ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('public_token_expires_at')
+                    ->orWhere('public_token_expires_at', '>', now());
+            })
             ->with('fields')
             ->firstOrFail();
 
@@ -74,7 +82,7 @@ class PublicFormController extends Controller
             $signatures = $signatures ? ['signature' => $signatures] : [];
         }
 
-        $submission = $this->submissionService->createFromPublicForm($template, $data, $files, $signatures);
+        $submission = $this->submissionService->createFromPublicForm($template, $data, $files, $signatures, $request);
 
         return redirect()->route('formulario-publico.sucesso', ['protocolo' => $submission->protocol_number])
             ->with('protocol_number', $submission->protocol_number)

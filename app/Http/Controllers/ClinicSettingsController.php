@@ -6,7 +6,7 @@ use App\Http\Requests\ClinicSettingsRequest;
 use App\Models\Clinic;
 use App\Models\Tenant;
 use App\Services\AsaasService;
-use App\Services\AuditService;
+use App\Events\AuditEvent;
 use App\Services\ThemeService;
 use Database\Seeders\FormTemplateSeeder;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +18,6 @@ use Illuminate\View\View;
 class ClinicSettingsController extends Controller
 {
     public function __construct(
-        private AuditService $auditService,
         private ThemeService $themeService,
         private AsaasService $asaasService,
     ) {}
@@ -114,7 +113,7 @@ class ClinicSettingsController extends Controller
         $data['whatsapp_notify_avisos'] = $request->boolean('whatsapp_notify_avisos');
 
         $clinic->update($data);
-        $this->auditService->log('clinic.updated', Clinic::class, $clinic->id);
+        \Illuminate\Support\Facades\Event::dispatch(new AuditEvent('clinic.updated', Clinic::class, $clinic->id, null, $clinic->id, $request->user()?->id));
 
         return redirect()->route('clinica.configuracoes.edit')
             ->with('success', 'Configurações salvas com sucesso.');
@@ -172,7 +171,7 @@ class ClinicSettingsController extends Controller
         $owner = $request->user();
         FormTemplateSeeder::seedTemplatesForClinic($newClinic, $owner);
 
-        $this->auditService->log('clinic.created', Clinic::class, $newClinic->id);
+        \Illuminate\Support\Facades\Event::dispatch(new AuditEvent('clinic.created', Clinic::class, $newClinic->id, null, $newClinic->id, $owner->id));
 
         // Não alterar a clínica atual: o usuário continua na empresa em que estava.
         // Para usar a nova empresa, ele deve clicar em "Trocar empresa" no menu.

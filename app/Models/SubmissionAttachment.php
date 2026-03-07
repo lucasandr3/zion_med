@@ -24,6 +24,14 @@ class SubmissionAttachment extends Model
 
     public function getUrlAttribute(): string
     {
+        // Preferir R2; se não configurado, cair para o disco público local.
+        if (Storage::disk('r2_attachments')->exists($this->file_path)) {
+            return Storage::disk('r2_attachments')->temporaryUrl(
+                $this->file_path,
+                now()->addMinutes(15)
+            );
+        }
+
         return Storage::disk('public')->url($this->file_path);
     }
 }

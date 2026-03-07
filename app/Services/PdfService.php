@@ -10,8 +10,8 @@ class PdfService
 {
     public function streamSubmissionPdf(FormSubmission $submission): \Illuminate\Http\Response
     {
-        $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'clinic']);
-        $clinic = $submission->clinic;
+        $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'organization']);
+        $clinic = $submission->organization ?? $submission->clinic;
         $logoPath = null;
         if ($clinic->logo_path && Storage::disk('public')->exists($clinic->logo_path)) {
             $logoPath = Storage::disk('public')->path($clinic->logo_path);
@@ -34,8 +34,8 @@ class PdfService
     /** Retorna o conteúdo binário do PDF para inclusão em ZIP. */
     public function getSubmissionPdfContent(FormSubmission $submission): string
     {
-        $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'clinic']);
-        $clinic = $submission->clinic;
+        $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'organization']);
+        $clinic = $submission->organization ?? $submission->clinic;
         $logoPath = null;
         if ($clinic->logo_path && Storage::disk('public')->exists($clinic->logo_path)) {
             $logoPath = Storage::disk('public')->path($clinic->logo_path);

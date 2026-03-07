@@ -21,13 +21,13 @@ class ClinicScopingTest extends TestCase
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
 
         $clinic1 = Clinic::first();
-        $user1 = User::withoutGlobalScopes()->where('clinic_id', $clinic1->id)->first();
-        $template1 = FormTemplate::withoutGlobalScopes()->where('clinic_id', $clinic1->id)->first();
+        $user1 = User::withoutGlobalScopes()->where('organization_id', $clinic1->id)->first();
+        $template1 = FormTemplate::withoutGlobalScopes()->where('organization_id', $clinic1->id)->first();
 
         $tenant2 = Tenant::create(['name' => 'Outra Clínica', 'slug' => 'outra-clinica']);
         $clinic2 = Clinic::create(['tenant_id' => $tenant2->id, 'name' => 'Outra Clínica', 'slug' => 'outra-clinica', 'notification_email' => null]);
         $user2 = User::withoutGlobalScopes()->create([
-            'clinic_id' => $clinic2->id,
+            'organization_id' => $clinic2->id,
             'name' => 'User 2',
             'email' => 'user2@outra.com',
             'password' => bcrypt('senha'),
@@ -35,20 +35,20 @@ class ClinicScopingTest extends TestCase
             'active' => true,
         ]);
         $template2 = FormTemplate::withoutGlobalScopes()->create([
-            'clinic_id' => $clinic2->id,
+            'organization_id' => $clinic2->id,
             'name' => 'Template 2',
             'is_active' => true,
             'public_enabled' => false,
         ]);
 
         FormSubmission::withoutGlobalScopes()->create([
-            'clinic_id' => $clinic1->id,
+            'organization_id' => $clinic1->id,
             'template_id' => $template1->id,
             'status' => 'pending',
             'protocol_number' => 'ZM-AAA-001',
         ]);
         FormSubmission::withoutGlobalScopes()->create([
-            'clinic_id' => $clinic2->id,
+            'organization_id' => $clinic2->id,
             'template_id' => $template2->id,
             'status' => 'pending',
             'protocol_number' => 'ZM-BBB-002',

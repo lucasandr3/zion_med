@@ -24,7 +24,7 @@ class UserUpdateRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users')->where('clinic_id', $clinicId)->ignore($user->id),
+                Rule::unique('users')->where('organization_id', $clinicId)->ignore($user->id),
             ],
             'role' => ['required', 'string', 'in:owner,manager,staff'],
             'active' => ['boolean'],

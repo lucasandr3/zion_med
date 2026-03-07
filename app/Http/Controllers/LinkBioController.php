@@ -31,7 +31,7 @@ class LinkBioController extends Controller
         $publicUrl = route('link-bio.public', $clinic->slug);
 
         $formLinksPublic = FormTemplate::withoutGlobalScopes()
-            ->where('clinic_id', $clinic->id)
+            ->where('organization_id', $clinic->id)
             ->where('public_enabled', true)
             ->where('is_active', true)
             ->whereNotNull('public_token')
@@ -40,11 +40,11 @@ class LinkBioController extends Controller
 
         $today = Carbon::today()->toDateString();
 
-        $visitasHoje = (int) LinkBioPageView::where('clinic_id', $clinic->id)
+        $visitasHoje = (int) LinkBioPageView::where('organization_id', $clinic->id)
             ->where('date', $today)
             ->value('views');
 
-        $totalViews = (int) LinkBioPageView::where('clinic_id', $clinic->id)->sum('views');
+        $totalViews = (int) LinkBioPageView::where('organization_id', $clinic->id)->sum('views');
 
         $linkIds = $bioLinks->pluck('id')->toArray();
         $totalClicks = empty($linkIds)
@@ -58,7 +58,7 @@ class LinkBioController extends Controller
 
         $taxaClique = $totalViews > 0 ? round($totalClicks / $totalViews * 100, 1) : 0;
 
-        $formTemplatesAll = FormTemplate::withoutGlobalScopes()->where('clinic_id', $clinic->id)->get();
+        $formTemplatesAll = FormTemplate::withoutGlobalScopes()->where('organization_id', $clinic->id)->get();
         $formulariosTotal = $formTemplatesAll->count();
         $formulariosAtivos = $formLinksPublic->count();
         $formulariosDraft = $formulariosTotal - $formulariosAtivos;
@@ -90,14 +90,14 @@ class LinkBioController extends Controller
 
         $viewsPerDay = [];
         foreach (array_keys($clicksPerDay) as $date) {
-            $viewsPerDay[$date] = (int) LinkBioPageView::where('clinic_id', $clinic->id)
+            $viewsPerDay[$date] = (int) LinkBioPageView::where('organization_id', $clinic->id)
                 ->where('date', $date)
                 ->value('views');
         }
 
         $peakDayLabel = null;
         if ($totalViews > 0) {
-            $dayWithMostViews = LinkBioPageView::where('clinic_id', $clinic->id)
+            $dayWithMostViews = LinkBioPageView::where('organization_id', $clinic->id)
                 ->orderByDesc('views')
                 ->first();
             if ($dayWithMostViews) {
@@ -199,7 +199,7 @@ class LinkBioController extends Controller
         $clinicId = session('current_clinic_id');
 
         foreach ($ids as $order => $id) {
-            ClinicLink::where('id', $id)->where('clinic_id', $clinicId)->update(['sort_order' => $order]);
+            ClinicLink::where('id', $id)->where('organization_id', $clinicId)->update(['sort_order' => $order]);
         }
 
         return response()->json(['ok' => true]);
@@ -214,7 +214,7 @@ class LinkBioController extends Controller
         $bioLinks = $clinic->bioLinks()->get();
 
         $formLinks = FormTemplate::withoutGlobalScopes()
-            ->where('clinic_id', $clinic->id)
+            ->where('organization_id', $clinic->id)
             ->where('public_enabled', true)
             ->where('is_active', true)
             ->whereNotNull('public_token')
@@ -235,7 +235,7 @@ class LinkBioController extends Controller
     {
         $clinic = Clinic::where('slug', $slug)->firstOrFail();
         $linkId = $request->integer('link');
-        $link   = ClinicLink::where('id', $linkId)->where('clinic_id', $clinic->id)->firstOrFail();
+        $link   = ClinicLink::where('id', $linkId)->where('organization_id', $clinic->id)->firstOrFail();
 
         LinkBioLinkClick::incrementForLink($link->id);
 

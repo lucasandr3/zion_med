@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Enums\Role;
 use App\Http\Requests\UserStoreRequest;
 use App\Http\Requests\UserUpdateRequest;
+use App\Events\AuditEvent;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -16,7 +18,7 @@ class UserController extends Controller
     {
         $this->authorize('manage-users');
         $users = User::withoutGlobalScopes()
-            ->where('clinic_id', session('current_clinic_id'))
+            ->where('organization_id', session('current_clinic_id'))
             ->orderBy('name')
             ->get();
         return view('usuarios.index', ['users' => $users]);
@@ -38,7 +40,8 @@ class UserController extends Controller
         $data['can_switch_clinic'] = $request->user()->can('grant-clinic-switch')
             ? $request->boolean('can_switch_clinic')
             : false;
-        User::create($data);
+        $user = User::create($data);
+        Event::dispatch(new AuditEvent('user.created', User::class, $user->id, null, $user->clinic_id, $request->user()->id));
         return redirect()->route('usuarios.index')->with('success', 'Usuário criado.');
     }
 
@@ -75,6 +78,7 @@ class UserController extends Controller
             return redirect()->route('usuarios.index')->with('error', 'Não é possível desativar a si mesmo.');
         }
         $usuario->update(['active' => false]);
+        Event::dispatch(new AuditEvent('user.deactivated', User::class, $usuario->id, null, $usuario->clinic_id, $request->user()->id));
         return redirect()->route('usuarios.index')->with('success', 'Usuário desativado.');
     }
 }

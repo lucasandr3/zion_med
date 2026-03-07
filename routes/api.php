@@ -12,6 +12,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::get('/protocols/{protocol}', [ProtocolController::class, 'show'])->name('api.v1.protocols.show')
         ->scopeBindings();
     Route::get('/templates', [TemplateController::class, 'index'])->name('api.v1.templates.index');
+    Route::post('/templates', [TemplateController::class, 'store'])->name('api.v1.templates.store');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show')
         ->scopeBindings();
 });

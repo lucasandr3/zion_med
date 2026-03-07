@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\SubmissionStatus;
+use App\Events\AuditEvent;
 use App\Models\Clinic;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
@@ -11,12 +12,14 @@ use App\Models\SubmissionEvent;
 use App\Models\SubmissionSignature;
 use App\Models\SubmissionValue;
 use App\Models\User;
+use Illuminate\Http\Request;
 use App\Notifications\NovoComentario;
 use App\Notifications\NovoProtocoloRecebido;
 use App\Notifications\ProtocoloAprovado;
 use App\Notifications\ProtocoloReprovado;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -25,29 +28,33 @@ use Illuminate\Validation\ValidationException;
 class SubmissionService
 {
     public function __construct(
-        protected AuditService $auditService,
-        protected WebhookService $webhookService
+        protected WebhookService $webhookService,
+        protected ProtocolGeneratorService $protocolGenerator
     ) {}
 
     /**
      * @param  array<string, string>  $signatures  field_key => base64 image
      */
-    public function createFromPublicForm(FormTemplate $template, array $data, array $files = [], array $signatures = []): FormSubmission
+    public function createFromPublicForm(FormTemplate $template, array $data, array $files = [], array $signatures = [], ?Request $request = null): FormSubmission
     {
         if (! $template->public_enabled || ! $template->public_token) {
             throw ValidationException::withMessages(['formulário' => ['Formulário não disponível para preenchimento público.']]);
         }
 
-        $submission = DB::transaction(function () use ($template, $data, $files, $signatures) {
+        $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request) {
+            $orgId = $template->organization_id ?? $template->clinic_id;
+
             $submission = FormSubmission::withoutGlobalScopes()->create([
-                'clinic_id' => $template->clinic_id,
+                'organization_id' => $orgId,
                 'template_id' => $template->id,
                 'status' => SubmissionStatus::Pending,
                 'submitter_name' => $data['_submitter_name'] ?? null,
                 'submitter_email' => $data['_submitter_email'] ?? null,
                 'submitted_at' => now(),
             ]);
-            $submission->update(['protocol_number' => 'ZM-' . $submission->id . '-' . now()->format('YmdHis')]);
+            $submission->update([
+                'protocol_number' => $this->protocolGenerator->generate($template->organization_id ?? $template->clinic_id),
+            ]);
 
             foreach ($template->fields as $field) {
                 $key = $field->name_key;
@@ -76,7 +83,10 @@ class SubmissionService
 
             foreach ($files as $fieldKey => $file) {
                 if ($file instanceof UploadedFile) {
-                    $path = $file->store('submissions/' . $submission->id, 'public');
+                    $path = $file->store(
+                        'organizations/' . $orgId . '/submissions/' . $submission->id,
+                        'r2_attachments'
+                    );
                     SubmissionAttachment::create([
                         'submission_id' => $submission->id,
                         'file_path' => $path,
@@ -92,18 +102,31 @@ class SubmissionService
                 if (! is_string($signatureBase64) || $signatureBase64 === '') {
                     continue;
                 }
-                $imagePath = $this->storeSignatureImage($submission->id, $signatureBase64);
+                $imagePath = $this->storeSignatureImage($orgId, $submission->id, $signatureBase64);
+                $signedAt = now();
+                $signedName = $data['_submitter_name'] ?? null;
+                $evidencePayload = implode('|', [
+                    (string) $submission->id,
+                    $fieldKey,
+                    $signedAt->toIso8601String(),
+                    (string) $signedName,
+                ]);
                 SubmissionSignature::create([
                     'submission_id' => $submission->id,
                     'image_path' => $imagePath,
                     'field_key' => $fieldKey,
+                    'signed_name' => $signedName,
+                    'signed_ip' => $request?->ip(),
+                    'signed_user_agent' => $request ? Str::limit($request->userAgent(), 512) : null,
+                    'signed_hash' => hash('sha256', $evidencePayload),
+                    'signed_at' => $signedAt,
                 ]);
             }
 
-            $this->auditService->log('submission.created', FormSubmission::class, $submission->id, [
+            Event::dispatch(new AuditEvent('submission.created', FormSubmission::class, $submission->id, [
                 'protocol' => $submission->protocol_number,
                 'template_id' => $template->id,
-            ], $template->clinic_id, null);
+            ], $template->organization_id ?? $template->clinic_id, null));
 
             SubmissionEvent::create([
                 'form_submission_id' => $submission->id,
@@ -121,28 +144,32 @@ class SubmissionService
         $submission->load('template');
         $this->notifyClinicUsersNewSubmission($submission);
 
-        $this->webhookService->dispatch($submission->clinic_id, 'protocol.submitted', $this->webhookPayload($submission));
+        $orgId = $submission->organization_id ?? $submission->clinic_id;
+        $this->webhookService->dispatch($orgId, 'submission.created', $this->webhookPayload($submission));
+        if ($submission->signatures()->exists()) {
+            $this->webhookService->dispatch($orgId, 'submission.signed', $this->webhookPayload($submission));
+        }
 
         return $submission;
     }
 
-    protected function storeSignatureImage(int $submissionId, string $base64): string
+    protected function storeSignatureImage(int $organizationId, int $submissionId, string $base64): string
     {
         $data = preg_replace('#^data:image/\w+;base64,#i', '', $base64);
         $decoded = base64_decode($data, true);
         if ($decoded === false) {
             throw ValidationException::withMessages(['signature' => ['Assinatura inválida.']]);
         }
-        $dir = 'signatures/' . $submissionId;
+        $dir = 'organizations/' . $organizationId . '/signatures/' . $submissionId;
         $filename = Str::random(10) . '.png';
         $path = $dir . '/' . $filename;
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $decoded);
+        \Illuminate\Support\Facades\Storage::disk('r2_submissions')->put($path, $decoded);
         return $path;
     }
 
     protected function sendNotificationEmail(FormSubmission $submission): void
     {
-        $clinic = $submission->clinic;
+        $clinic = $submission->organization ?? $submission->clinic;
         $email = $clinic->notification_email;
         if (! $email) {
             return;
@@ -174,18 +201,18 @@ class SubmissionService
             'user_id' => $userId,
             'body' => $comment,
         ]);
-        $this->auditService->log('submission.reviewed', FormSubmission::class, $submission->id, [
+        Event::dispatch(new AuditEvent('submission.reviewed', FormSubmission::class, $submission->id, [
             'status' => $status,
             'comment' => $comment,
-        ]);
+        ], $submission->organization_id ?? $submission->clinic_id, $userId));
 
-        $event = $status === 'approved' ? 'protocol.approved' : 'protocol.rejected';
-        $this->webhookService->dispatch($submission->clinic_id, $event, $this->webhookPayload($submission));
+        $event = $status === 'approved' ? 'submission.approved' : 'submission.rejected';
+        $this->webhookService->dispatch($submission->organization_id ?? $submission->clinic_id, $event, $this->webhookPayload($submission));
 
         $reviewer = User::find($userId);
         if ($reviewer) {
             $submission->load(['template']);
-            $recipients = $this->getClinicUsers($submission->clinic_id)
+            $recipients = $this->getClinicUsers($submission->organization_id ?? $submission->clinic_id)
                 ->reject(fn ($u) => $u->id === $userId);
 
             if ($status === 'approved') {
@@ -209,7 +236,8 @@ class SubmissionService
             'submitter_email' => $submission->submitter_email,
             'submitted_at' => $submission->submitted_at?->toIso8601String(),
             'approved_at' => $submission->approved_at?->toIso8601String(),
-            'clinic_id' => $submission->clinic_id,
+            'organization_id' => $submission->organization_id ?? $submission->clinic_id,
+            'clinic_id' => $submission->organization_id ?? $submission->clinic_id,
             'timestamp' => now()->toIso8601String(),
         ];
     }
@@ -222,12 +250,12 @@ class SubmissionService
             'user_id' => $userId,
             'body' => $body,
         ]);
-        $this->auditService->log('submission.comment', FormSubmission::class, $submission->id, ['event_id' => $event->id], $submission->clinic_id, $userId);
+        Event::dispatch(new AuditEvent('submission.comment', FormSubmission::class, $submission->id, ['event_id' => $event->id], $submission->clinic_id, $userId));
 
         $commenter = User::find($userId);
         if ($commenter) {
             $submission->load(['template']);
-            $recipients = $this->getClinicUsers($submission->clinic_id)
+            $recipients = $this->getClinicUsers($submission->organization_id ?? $submission->clinic_id)
                 ->reject(fn ($u) => $u->id === $userId);
 
             Notification::send($recipients, new NovoComentario($submission, $commenter, $body));
@@ -239,7 +267,7 @@ class SubmissionService
     /** Notifica todos os usuários da clínica sobre novo protocolo (chamado após commit). */
     protected function notifyClinicUsersNewSubmission(FormSubmission $submission): void
     {
-        $recipients = $this->getClinicUsers($submission->clinic_id);
+        $recipients = $this->getClinicUsers($submission->organization_id ?? $submission->clinic_id);
         if ($recipients->isEmpty()) {
             return;
         }
@@ -251,11 +279,12 @@ class SubmissionService
     }
 
     /** Todos os usuários ativos da clínica (recebem todas as notificações). Inclui SuperAdmins. */
-    protected function getClinicUsers(int $clinicId): \Illuminate\Support\Collection
+    protected function getClinicUsers(int $organizationId): \Illuminate\Support\Collection
     {
-        return User::where('active', true)
-            ->where(function ($q) use ($clinicId) {
-                $q->where('clinic_id', $clinicId)
+        return User::withoutGlobalScopes()
+            ->where('active', true)
+            ->where(function ($q) use ($organizationId) {
+                $q->where('organization_id', $organizationId)
                     ->orWhereIn('role', ['super_admin']);
             })
             ->get();
