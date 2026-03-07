@@ -10,7 +10,7 @@ class LinkBioPageView extends Model
     protected $table = 'link_bio_page_views';
 
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'date',
         'views',
     ];
@@ -20,19 +20,25 @@ class LinkBioPageView extends Model
         'views' => 'integer',
     ];
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Clinic::class, 'organization_id');
     }
 
     /**
-     * Incrementa o contador de views para a clínica na data dada (hoje por padrão).
+     * Incrementa o contador de views para a organização na data dada (hoje por padrão).
      */
     public static function incrementForClinic(int $clinicId, ?string $date = null): void
     {
         $date = $date ?? now()->toDateString();
         $row  = static::query()->firstOrCreate(
-            ['clinic_id' => $clinicId, 'date' => $date],
+            ['organization_id' => $clinicId, 'date' => $date],
             ['views' => 0]
         );
         $row->increment('views');

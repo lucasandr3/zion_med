@@ -401,10 +401,22 @@
         }
     </style>
 </head>
-<body class="{{ $themeBodyClasses ?? 'theme-zion-blue' }}">
+<body class="theme-zion-blue">
 
-    {{-- Anti-FOUC --}}
-    <script>(function(){try{if(localStorage.getItem('zionmed_dark_mode')==='1')document.body.classList.add('dark');}catch(e){}}());</script>
+    {{-- Anti-FOUC: aplicar tema e modo escuro salvos (mesma preferência da aplicação) --}}
+    <script>
+    (function(){
+        try{
+            var validThemes = ['zion-blue','ocean-blue','indigo-night','emerald-fresh','rose-elegant','amber-warm','violet-dream','teal-ocean','slate-pro','cyan-tech','fuchsia-bold'];
+            var saved = localStorage.getItem('zionmed_theme');
+            if (saved && validThemes.indexOf(saved) !== -1) {
+                document.body.classList.remove('theme-zion-blue');
+                document.body.classList.add('theme-' + saved);
+            }
+            if (localStorage.getItem('zionmed_dark_mode') === '1') document.body.classList.add('dark');
+        }catch(e){}
+    })();
+    </script>
 
     {{-- Toggle dark mode --}}
     <button type="button" id="login-dark-btn" data-tooltip="Alternar modo escuro" aria-label="Alternar modo escuro">

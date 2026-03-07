@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClinicLink extends Model
 {
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'label',
         'url',
         'icon',
@@ -36,9 +36,25 @@ class ClinicLink extends Model
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Clinic::class, 'organization_id');
+    }
+
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
     }
 
     public function linkClicks(): HasMany

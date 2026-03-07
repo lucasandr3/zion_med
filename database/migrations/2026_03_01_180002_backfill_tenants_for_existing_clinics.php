@@ -1,29 +1,39 @@
 <?php
 
-use App\Models\Clinic;
 use App\Models\Tenant;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        $clinics = Clinic::whereNull('tenant_id')->get();
+        // Usa diretamente a tabela física "clinics" para evitar depender do modelo Clinic,
+        // que hoje é um alias para Organization (tabela "organizations").
+        $clinics = DB::table('clinics')
+            ->whereNull('tenant_id')
+            ->get();
 
         foreach ($clinics as $clinic) {
             $slug = $this->uniqueTenantSlug(Str::slug($clinic->name));
+
             $tenant = Tenant::create([
                 'name' => $clinic->name,
                 'slug' => $slug,
             ]);
-            $clinic->update(['tenant_id' => $tenant->id]);
+
+            DB::table('clinics')
+                ->where('id', $clinic->id)
+                ->update(['tenant_id' => $tenant->id]);
         }
     }
 
     public function down(): void
     {
-        Clinic::whereNotNull('tenant_id')->update(['tenant_id' => null]);
+        DB::table('clinics')
+            ->whereNotNull('tenant_id')
+            ->update(['tenant_id' => null]);
     }
 
     private function uniqueTenantSlug(string $base): string

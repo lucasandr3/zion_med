@@ -63,9 +63,16 @@
             <strong>Assinatura(s)</strong>
             <p class="signature-notice" style="font-size:9px;color:#64748b;margin:4px 0 8px 0;">A assinatura digital tem validade jurídica nos termos da legislação vigente.</p>
             @foreach($submission->signatures as $sig)
-                <div style="margin-top:8px">
+                <div style="margin-top:12px;padding:8px 0;border-bottom:1px solid #e2e8f0">
                     @if($sig->image_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($sig->image_path))
-                        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->path($sig->image_path) }}" alt="Assinatura">
+                        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->path($sig->image_path) }}" alt="Assinatura" style="max-width:280px;max-height:80px">
+                    @endif
+                    <p style="font-size:9px;color:#475569;margin:6px 0 2px 0">
+                        @if($sig->signed_name) <strong>Nome:</strong> {{ $sig->signed_name }} @endif
+                        @if($sig->signed_at) &nbsp;|&nbsp; <strong>Data/Hora:</strong> {{ $sig->signed_at->format('d/m/Y H:i:s') }} @endif
+                    </p>
+                    @if($sig->signed_hash)
+                        <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (evidência): {{ $sig->signed_hash }}</p>
                     @endif
                 </div>
             @endforeach

@@ -58,7 +58,7 @@ class ClinicSeeder extends Seeder
             ];
 
             User::create([
-                'clinic_id' => $clinic->id,
+                'organization_id' => $clinic->id,
                 'name' => 'Admin Demo',
                 'email' => $emails[$index],
                 'password' => bcrypt('senha123'),
@@ -71,7 +71,7 @@ class ClinicSeeder extends Seeder
         User::withoutGlobalScopes()->firstOrCreate(
             ['email' => 'admin@zionmed.com'],
             [
-                'clinic_id' => null,
+                'organization_id' => null,
                 'name' => 'Admin Plataforma',
                 'password' => bcrypt('senha123'),
                 'role' => Role::PlatformAdmin,

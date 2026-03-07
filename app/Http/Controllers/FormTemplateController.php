@@ -6,8 +6,9 @@ use App\Http\Requests\FormFieldRequest;
 use App\Http\Requests\FormTemplateRequest;
 use App\Models\FormField;
 use App\Models\FormTemplate;
-use App\Services\AuditService;
+use App\Events\AuditEvent;
 use App\Services\PublicLinkService;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,16 +17,22 @@ use Illuminate\View\View;
 class FormTemplateController extends Controller
 {
     public function __construct(
-        private AuditService $auditService,
         private PublicLinkService $publicLinkService
     ) {}
 
     public function index(): View
     {
         $this->authorize('manage-templates');
-        $templates = FormTemplate::orderByRaw('COALESCE(category, \'\')')
-            ->orderBy('name')
-            ->get();
+        $orgId = session('current_clinic_id');
+        $templates = \Illuminate\Support\Facades\Cache::remember(
+            'org:' . $orgId . ':templates:index',
+            now()->addMinutes(5),
+            function () {
+                return FormTemplate::orderByRaw('COALESCE(category, \'\')')
+                    ->orderBy('name')
+                    ->get();
+            }
+        );
         $templatesByCategory = $templates->groupBy(fn (FormTemplate $t) => $t->category ?? 'personalizado');
         $categoryLabels = array_merge(['personalizado' => 'Personalizado'], FormTemplate::categoryLabels());
         return view('templates.index', [
@@ -75,9 +82,9 @@ class FormTemplateController extends Controller
         $this->authorize('manage-templates');
         $this->authorize('update-template', $template);
 
-        $clinicId = $request->user()->clinic_id ?? session('current_clinic_id');
+        $clinicId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
         $newTemplate = FormTemplate::create([
-            'clinic_id' => $clinicId,
+            'organization_id' => $clinicId,
             'name' => $template->name,
             'description' => $template->description,
             'category' => null,
@@ -98,7 +105,7 @@ class FormTemplateController extends Controller
             ]);
         }
 
-        $this->auditService->log('template.created', FormTemplate::class, $newTemplate->id);
+        Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $newTemplate->id, null, $newTemplate->organization_id ?? $newTemplate->clinic_id, $request->user()->id));
         return redirect()->route('templates.campos.index', $newTemplate)
             ->with('success', 'Template criado a partir do modelo. Você pode editá-lo livremente.');
     }
@@ -106,10 +113,10 @@ class FormTemplateController extends Controller
     public function store(FormTemplateRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $data['clinic_id'] = $request->user()->clinic_id ?? session('current_clinic_id');
+        $data['organization_id'] = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
         $data['created_by'] = $request->user()->id;
         $template = FormTemplate::create($data);
-        $this->auditService->log('template.created', FormTemplate::class, $template->id);
+        Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $template->id, null, $template->organization_id ?? $template->clinic_id, $request->user()->id));
         return redirect()->route('templates.campos.index', $template)->with('success', 'Template criado.');
     }
 
@@ -123,15 +130,17 @@ class FormTemplateController extends Controller
     {
         $this->authorize('update-template', $template);
         $template->update($request->validated());
-        $this->auditService->log('template.updated', FormTemplate::class, $template->id);
+        Event::dispatch(new AuditEvent('template.updated', FormTemplate::class, $template->id, null, $template->organization_id ?? $template->clinic_id, $request->user()->id));
         return redirect()->route('templates.index')->with('success', 'Template atualizado.');
     }
 
     public function destroy(FormTemplate $template): RedirectResponse
     {
         $this->authorize('update-template', $template);
+        $templateId = $template->id;
+        $clinicId = $template->organization_id ?? $template->clinic_id;
         $template->delete();
-        $this->auditService->log('template.deleted', FormTemplate::class, $template->id);
+        Event::dispatch(new AuditEvent('template.deleted', FormTemplate::class, $templateId, null, $clinicId, request()->user()?->id));
         return redirect()->route('templates.index')->with('success', 'Template removido.');
     }
 

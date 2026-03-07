@@ -15,11 +15,11 @@ class AuditService
         ?int $clinicId = null,
         ?int $userId = null
     ): AuditLog {
-        $clinicId = $clinicId ?? Auth::user()?->clinic_id ?? session('current_clinic_id');
+        $organizationId = $clinicId ?? Auth::user()?->organization_id ?? Auth::user()?->clinic_id ?? session('current_clinic_id');
         $userId = $userId ?? Auth::id();
 
         return AuditLog::create([
-            'clinic_id' => $clinicId,
+            'organization_id' => $organizationId,
             'user_id' => $userId,
             'action' => $action,
             'entity_type' => $entityType,

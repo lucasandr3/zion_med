@@ -12,7 +12,19 @@ class SubmissionSignature extends Model
         'submission_id',
         'image_path',
         'field_key',
+        'signed_name',
+        'signed_ip',
+        'signed_user_agent',
+        'signed_hash',
+        'signed_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'signed_at' => 'datetime',
+        ];
+    }
 
     public function submission(): BelongsTo
     {
@@ -21,6 +33,13 @@ class SubmissionSignature extends Model
 
     public function getUrlAttribute(): string
     {
+        if (Storage::disk('r2_submissions')->exists($this->image_path)) {
+            return Storage::disk('r2_submissions')->temporaryUrl(
+                $this->image_path,
+                now()->addMinutes(15)
+            );
+        }
+
         return Storage::disk('public')->url($this->image_path);
     }
 }

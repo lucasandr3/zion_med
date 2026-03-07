@@ -80,7 +80,7 @@ class ComeceController extends Controller
         ]);
 
         $user = User::create([
-            'clinic_id' => $clinic->id,
+            'organization_id' => $clinic->id,
             'name' => $validated['company_name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
@@ -105,7 +105,7 @@ class ComeceController extends Controller
                     $asaasId = $payload['id'] ?? null;
                     if ($asaasId) {
                         Subscription::create([
-                            'clinic_id' => $clinic->id,
+                            'organization_id' => $clinic->id,
                             'asaas_subscription_id' => $asaasId,
                             'plan_key' => $validated['plan_key'],
                             'status' => 'active',

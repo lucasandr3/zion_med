@@ -15,7 +15,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'name',
         'email',
         'password',
@@ -23,6 +23,16 @@ class User extends Authenticatable
         'active',
         'can_switch_clinic',
     ];
+
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
+    }
 
     protected $hidden = [
         'password',
@@ -40,9 +50,15 @@ class User extends Authenticatable
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function createdFormTemplates(): HasMany

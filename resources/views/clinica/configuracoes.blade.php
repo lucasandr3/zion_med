@@ -452,6 +452,7 @@
     width: 180px; height: 180px;
     background: rgba(255,255,255,0.06);
     border-radius: 50%;
+    pointer-events: none;
 }
 #panel-assinatura .plan-card::after {
     content: '';
@@ -460,8 +461,10 @@
     width: 200px; height: 200px;
     background: rgba(255,255,255,0.04);
     border-radius: 50%;
+    pointer-events: none;
 }
 #panel-assinatura .plan-info { position: relative; z-index: 1; }
+#panel-assinatura .plan-card form { position: relative; z-index: 1; }
 #panel-assinatura .plan-label {
     font-size: 11px;
     font-weight: 600;

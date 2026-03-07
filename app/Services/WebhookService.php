@@ -10,11 +10,11 @@ use Illuminate\Support\Str;
 class WebhookService
 {
     /**
-     * Dispara um evento para todos os webhooks da clínica que escutam esse evento.
+     * Dispara um evento para todos os webhooks da organização que escutam esse evento.
      */
-    public function dispatch(int $clinicId, string $event, array $payload): void
+    public function dispatch(int $organizationId, string $event, array $payload): void
     {
-        $webhooks = ClinicWebhook::where('clinic_id', $clinicId)
+        $webhooks = ClinicWebhook::where('organization_id', $organizationId)
             ->where('is_active', true)
             ->get();
 

@@ -19,14 +19,14 @@ class FormTemplateSeeder extends Seeder
 
         foreach ($clinics as $clinic) {
             $alreadyHasTemplates = FormTemplate::withoutGlobalScopes()
-                ->where('clinic_id', $clinic->id)
+                ->where('organization_id', $clinic->id)
                 ->whereNotNull('category')
                 ->exists();
             if ($alreadyHasTemplates) {
                 continue;
             }
 
-            $owner = User::withoutGlobalScopes()->where('clinic_id', $clinic->id)->first();
+            $owner = User::withoutGlobalScopes()->where('organization_id', $clinic->id)->first();
             self::seedTemplatesForClinic($clinic, $owner);
         }
     }
@@ -45,7 +45,7 @@ class FormTemplateSeeder extends Seeder
             unset($t['fields'], $t['category']);
 
             $template = FormTemplate::withoutGlobalScopes()->create([
-                'clinic_id' => $clinic->id,
+                'organization_id' => $clinic->id,
                 'name' => $t['name'],
                 'description' => $t['description'],
                 'category' => $category,

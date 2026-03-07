@@ -65,7 +65,7 @@ class FormSubmissionController extends Controller
     public function show(FormSubmission $submissao)
     {
         $this->authorize('view-submission', $submissao);
-        $submissao->load(['template.fields', 'values', 'attachments', 'signatures', 'clinic', 'approvedByUser', 'events.user']);
+        $submissao->load(['template.fields', 'values', 'attachments', 'signatures', 'organization', 'approvedByUser', 'events.user']);
         return view('protocolos.show', ['protocolo' => $submissao]);
     }
 
@@ -151,7 +151,7 @@ class FormSubmissionController extends Controller
     public function exportarPdfLote(Request $request): Response|StreamedResponse|\Illuminate\Http\RedirectResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $this->authorize('view-submissions');
-        $query = FormSubmission::with(['template.fields', 'values', 'attachments', 'signatures', 'clinic'])
+        $query = FormSubmission::with(['template.fields', 'values', 'attachments', 'signatures', 'organization'])
             ->latest();
 
         if ($request->filled('template_id')) {

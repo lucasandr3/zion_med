@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClinicWebhook extends Model
 {
     protected $fillable = [
-        'clinic_id',
+        'organization_id',
         'url',
         'secret',
         'events',
@@ -22,9 +22,25 @@ class ClinicWebhook extends Model
         'is_active' => 'boolean',
     ];
 
+    public function getClinicIdAttribute(): ?int
+    {
+        return $this->attributes['organization_id'] ?? null;
+    }
+
+    public function setClinicIdAttribute($value): void
+    {
+        $this->attributes['organization_id'] = $value;
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        return $this->organization();
     }
 
     public function deliveries(): HasMany

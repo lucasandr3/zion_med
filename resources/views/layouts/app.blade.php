@@ -37,12 +37,14 @@
 <body class="{{ $themeBodyClasses ?? 'theme-ocean-blue' }} min-h-screen"
       style="background-color:var(--c-bg);color:var(--c-text)">
 
-    {{-- Anti-FOUC --}}
+    {{-- Anti-FOUC + persistir tema atual para uso na página de login --}}
     <script>
     (function(){
         try{
             if(localStorage.getItem('zionmed_dark_mode')==='1')  document.body.classList.add('dark');
             if(localStorage.getItem('zionmed_sidebar_collapsed')==='1') document.body.classList.add('sidebar-collapsed');
+            var m = document.body.className.match(/theme-([a-z-]+)/);
+            if (m) localStorage.setItem('zionmed_theme', m[1]);
         }catch(e){}
     })();
     </script>
@@ -636,6 +638,7 @@
                 fd.append('theme_only', '1');
                 fd.append('theme', theme);
                 fetch(route, { method:'POST', body:fd }).catch(function(){});
+                try { localStorage.setItem('zionmed_theme', theme); } catch (e) {}
             });
         });
 

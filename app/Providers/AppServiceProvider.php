@@ -14,6 +14,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
@@ -29,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         App::setLocale('pt_BR');
+
+        Event::listen(\App\Events\AuditEvent::class, \App\Listeners\LogAuditListener::class);
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());

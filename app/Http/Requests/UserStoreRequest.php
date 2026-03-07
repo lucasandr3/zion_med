@@ -23,7 +23,7 @@ class UserStoreRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users')->where('clinic_id', $clinicId),
+                Rule::unique('users')->where('organization_id', $clinicId),
             ],
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'role' => ['required', 'string', 'in:owner,manager,staff'],

@@ -57,7 +57,7 @@ class AsaasWebhookController extends Controller
             $subscriptionId = $paymentData['subscription'] ?? null;
             $sub = $subscriptionId ? Subscription::where('asaas_subscription_id', $subscriptionId)->first() : null;
             $payment = Payment::create([
-                'clinic_id' => $clinic->id,
+                'organization_id' => $clinic->id,
                 'subscription_id' => $sub?->id,
                 'asaas_payment_id' => $asaasPaymentId,
                 'status' => $paymentData['status'] ?? 'PENDING',
