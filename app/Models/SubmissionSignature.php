@@ -33,8 +33,8 @@ class SubmissionSignature extends Model
 
     public function getUrlAttribute(): string
     {
-        if (Storage::disk('r2_submissions')->exists($this->image_path)) {
-            return Storage::disk('r2_submissions')->temporaryUrl(
+        if (Storage::disk('minio_submissions')->exists($this->image_path)) {
+            return Storage::disk('minio_submissions')->temporaryUrl(
                 $this->image_path,
                 now()->addMinutes(15)
             );

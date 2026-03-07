@@ -15,10 +15,10 @@
   <meta property="og:description" content="{{ $clinic->meta_description ?? $clinic->short_description ?? 'Acesse nossos links e formulários' }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ url()->current() }}">
-  @if($clinic->cover_image_path)
-    <meta property="og:image" content="{{ asset('storage/' . $clinic->cover_image_path) }}">
-  @elseif($clinic->logo_path)
-    <meta property="og:image" content="{{ asset('storage/' . $clinic->logo_path) }}">
+  @if($clinic->cover_image_url)
+    <meta property="og:image" content="{{ $clinic->cover_image_url }}">
+  @elseif($clinic->logo_url)
+    <meta property="og:image" content="{{ $clinic->logo_url }}">
   @endif
 
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
@@ -228,8 +228,8 @@
       {{-- Header --}}
       <div class="f d1 flex flex-col items-center text-center gap-4">
         <div class="logo-wrap">
-          @if($clinic->logo_path)
-            <img src="{{ asset('storage/' . $clinic->logo_path) }}" alt="{{ $clinic->name }}" style="width:auto;height:auto;border:none;outline:none">
+          @if($clinic->logo_url)
+            <img src="{{ $clinic->logo_url }}" alt="{{ $clinic->name }}" style="width:auto;height:auto;border:none;outline:none">
           @else
             <span class="text-2xl font-medium text-[#f7f5f2]" style="font-family:'Cormorant Garamond',serif">{{ mb_strtoupper(mb_substr($clinic->name, 0, 1)) }}</span>
           @endif

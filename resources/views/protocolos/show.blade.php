@@ -230,7 +230,7 @@
         </div>
         <div class="flex flex-wrap gap-4">
             @foreach($protocolo->signatures as $sig)
-                <img src="{{ asset('storage/'.$sig->image_path) }}" alt="Assinatura"
+                <img src="{{ $sig->url }}" alt="Assinatura"
                      class="max-w-xs border border-border-soft rounded-lg bg-white p-2">
             @endforeach
         </div>
@@ -246,7 +246,7 @@
         </div>
         <div class="space-y-2">
             @foreach($protocolo->attachments as $att)
-                <a href="{{ asset('storage/'.$att->file_path) }}" target="_blank"
+                <a href="{{ $att->url }}" target="_blank"
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-border-soft hover:bg-content/[0.02] transition-colors group">
                     <span class="material-symbols-outlined text-muted group-hover:text-primary transition-colors" style="font-size:20px">description</span>
                     <div>

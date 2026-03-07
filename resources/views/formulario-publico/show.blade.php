@@ -107,8 +107,8 @@
                 @if($template->clinic)
                 <div class="flex items-center gap-3 mb-6 pb-4 bio-border" style="border-bottom-width:1px">
                     <div class="logo-wrap shrink-0">
-                        @if($template->clinic->logo_path)
-                            <img src="{{ asset('storage/'.$template->clinic->logo_path) }}" alt="{{ $template->clinic->name }}">
+                        @if($template->clinic->logo_url)
+                            <img src="{{ $template->clinic->logo_url }}" alt="{{ $template->clinic->name }}">
                         @else
                             <img src="{{ asset('assets/images/logo/zionmed_logo.png') }}" alt="Zion Med">
                         @endif
@@ -202,7 +202,8 @@
                             </label>
 
                         @elseif($field->type === 'file')
-                            <input type="file" name="{{ $field->name_key }}" id="field_{{ $field->id }}" accept=".pdf,.jpg,.jpeg,.png,.gif" class="form-input">
+                            <input type="file" name="{{ $field->name_key }}" id="field_{{ $field->id }}" accept=".pdf,.jpg,.jpeg,.png,.gif" class="form-input" data-show-details="true">
+                            <div class="file-selected-details mt-2 text-sm rounded-lg border p-3 hidden border bio-border bio-bg-soft" id="file-details-field_{{ $field->id }}" data-for="field_{{ $field->id }}" aria-live="polite"></div>
                             <p class="text-xs bio-muted mt-1 flex items-center gap-1">
                                 <span class="material-symbols-outlined" style="font-size:14px">info</span>
                                 PDF ou imagem, até 5 MB
@@ -359,6 +360,38 @@
             var inp = document.getElementById('input_signature_' + nameKey);
             if (inp) inp.value = data;
         }
+
+        // Detalhes do arquivo selecionado (qualquer campo type=file)
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        document.querySelectorAll('.file-selected-details[data-for]').forEach(function(detailsEl) {
+            var inputId = detailsEl.getAttribute('data-for');
+            var input = document.getElementById(inputId);
+            if (!input || input.type !== 'file') return;
+            input.addEventListener('change', function() {
+                var file = this.files && this.files[0];
+                if (!file) {
+                    detailsEl.classList.add('hidden');
+                    detailsEl.innerHTML = '';
+                    return;
+                }
+                var isImage = file.type.indexOf('image/') === 0;
+                var html = '<div class="flex items-center gap-3 flex-wrap">';
+                if (isImage) {
+                    var url = URL.createObjectURL(file);
+                    html += '<img src="' + url + '" alt="" class="max-h-14 rounded border bio-border object-contain" aria-hidden="true">';
+                }
+                html += '<div><span class="font-medium bio-text">' + (file.name || 'Arquivo') + '</span>';
+                html += '<p class="text-xs bio-muted mt-0.5">' + formatFileSize(file.size) + ' • ' + (file.type || '') + '</p></div></div>';
+                detailsEl.innerHTML = html;
+                detailsEl.classList.remove('hidden');
+            });
+        });
     })();
     </script>
 </body>

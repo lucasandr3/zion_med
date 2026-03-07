@@ -70,8 +70,8 @@
         @if(!empty($currentClinic))
         <div class="sidebar-clinic px-2 py-2 shrink-0" style="border-bottom:1px solid var(--c-border)">
             <div class="flex items-center gap-2.5 min-w-0">
-                @if($currentClinic->logo_path)
-                    <img src="{{ asset('storage/'.$currentClinic->logo_path) }}" alt="" class="w-9 h-9 rounded-lg object-contain shrink-0 border flex-shrink-0" style="border-color:var(--c-border);background:var(--c-surface);padding:2px">
+                @if($currentClinic->logo_url)
+                    <img src="{{ $currentClinic->logo_url }}" alt="" class="w-9 h-9 rounded-lg object-contain shrink-0 border flex-shrink-0" style="border-color:var(--c-border);background:var(--c-surface);padding:2px">
                 @else
                     <div class="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-sm font-bold flex-shrink-0" style="background:var(--c-soft);color:var(--c-primary)">
                         {{ mb_strtoupper(mb_substr($currentClinic->name, 0, 1)) }}
@@ -731,6 +731,53 @@
                 closeUserDrop();
         });
 
+    })();
+    </script>
+
+    {{-- Feedback de arquivo selecionado: em qualquer página com input[type=file] e um elemento .file-selected-details[data-for="id-do-input"] --}}
+    <script>
+    (function() {
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        function initFileDetailsFeedback() {
+            document.querySelectorAll('.file-selected-details[data-for]').forEach(function(detailsEl) {
+                if (detailsEl.dataset.initialized === '1' || detailsEl.dataset.fileFeedback === 'self') return;
+                var inputId = detailsEl.getAttribute('data-for');
+                var input = document.getElementById(inputId);
+                if (!input || input.type !== 'file') return;
+                detailsEl.dataset.initialized = '1';
+                input.addEventListener('change', function() {
+                    var file = this.files && this.files[0];
+                    if (!file) {
+                        detailsEl.classList.add('hidden');
+                        detailsEl.classList.remove('has-file');
+                        detailsEl.innerHTML = '';
+                        return;
+                    }
+                    var isImage = file.type.indexOf('image/') === 0;
+                    var html = '<div class="flex items-center gap-3 flex-wrap">';
+                    if (isImage) {
+                        var url = URL.createObjectURL(file);
+                        html += '<img src="' + url + '" alt="" class="max-h-14 max-w-14 rounded border object-contain" style="border-color:var(--c-border)" aria-hidden="true">';
+                    }
+                    html += '<div><span class="font-medium">' + (file.name || 'Arquivo') + '</span>';
+                    html += '<p class="text-xs mt-0.5" style="color:var(--c-muted)">' + formatFileSize(file.size) + ' • ' + (file.type || '') + '</p></div></div>';
+                    detailsEl.innerHTML = html;
+                    detailsEl.classList.remove('hidden');
+                    detailsEl.classList.add('has-file');
+                });
+            });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initFileDetailsFeedback);
+        } else {
+            initFileDetailsFeedback();
+        }
     })();
     </script>
 

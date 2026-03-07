@@ -41,8 +41,9 @@ touch database/database.sqlite
 # Migrations e seed (clínica demo + 3 templates)
 php artisan migrate --seed
 
-# Storage público (logos e anexos)
-php artisan storage:link
+# Storage: MinIO (produção) ou link público (dev)
+# Produção: configure MinIO (ex.: Easy Panel). No .env defina MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY e os buckets (MINIO_SUBMISSIONS_BUCKET, MINIO_ATTACHMENTS_BUCKET, MINIO_ASSETS_BUCKET, MINIO_INVOICES_BUCKET). Crie os buckets no Console MinIO.
+php artisan storage:link   # Apenas se usar disco local para logos (dev)
 
 # Frontend
 npm install
@@ -138,7 +139,7 @@ Rotas sempre permitidas (mesmo com bloqueio): `/billing`, `/billing/*`, `/logout
 
 ```bash
 php artisan migrate --seed   # Recriar DB e seed
-php artisan storage:link      # Link público para storage
+php artisan storage:link      # Link público (dev). Produção: use MinIO (veja .env.example MINIO_*).
 php artisan test              # Testes (mín. 6 feature)
 npm run dev                   # Vite em desenvolvimento
 ```

@@ -33,7 +33,14 @@ function initFlatpickr() {
 
   document.querySelectorAll('.flatpickr-time').forEach((el) => {
     if (el._flatpickr) return;
-    flatpickr(el, { ...defaultTimeOptions, ...(el.dataset.flatpickrOptions ? JSON.parse(el.dataset.flatpickrOptions) : {}) });
+    const initialVal = (el.value || '').trim();
+    const timeOptions = { ...defaultTimeOptions };
+    if (initialVal && /^\d{1,2}:\d{2}$/.test(initialVal)) {
+      const [h, m] = initialVal.split(':').map(Number);
+      timeOptions.defaultHour = h;
+      timeOptions.defaultMinute = m;
+    }
+    flatpickr(el, { ...timeOptions, ...(el.dataset.flatpickrOptions ? JSON.parse(el.dataset.flatpickrOptions) : {}) });
   });
 }
 

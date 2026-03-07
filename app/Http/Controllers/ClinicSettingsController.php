@@ -75,17 +75,25 @@ class ClinicSettingsController extends Controller
 
         if ($request->hasFile('logo')) {
             if ($clinic->logo_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->logo_path);
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($clinic->logo_path);
             }
-            $data['logo_path'] = $request->file('logo')->store('logos', 'public');
+            $data['logo_path'] = $request->file('logo')->store(
+                'organizations/' . $clinic->id . '/logos',
+                'minio_assets'
+            );
         }
         unset($data['logo']);
 
         if ($request->hasFile('cover_image')) {
             if ($clinic->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($clinic->cover_image_path);
             }
-            $data['cover_image_path'] = $request->file('cover_image')->store('covers', 'public');
+            $data['cover_image_path'] = $request->file('cover_image')->store(
+                'organizations/' . $clinic->id . '/covers',
+                'minio_assets'
+            );
         }
         unset($data['cover_image']);
 
@@ -95,7 +103,7 @@ class ClinicSettingsController extends Controller
                 $open  = trim($slot['open'] ?? '');
                 $close = trim($slot['close'] ?? '');
                 if ($open !== '' && $close !== '') {
-                    $cleaned[$d] = ['open' => $open, 'close' => $close];
+                    $cleaned[(string) $d] = ['open' => $open, 'close' => $close];
                 }
             }
             $data['business_hours'] = ! empty($cleaned) ? $cleaned : null;

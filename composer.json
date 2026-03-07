@@ -8,11 +8,12 @@
     "require": {
         "php": "^8.4",
         "barryvdh/laravel-dompdf": "^3.0",
-        "opcodesio/log-viewer": "^3.0",
         "dedoc/scramble": "^0.13.14",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.25",
+        "opcodesio/log-viewer": "^3.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

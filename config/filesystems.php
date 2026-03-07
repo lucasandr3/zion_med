@@ -47,38 +47,50 @@ return [
             'report' => false,
         ],
 
-        // Buckets S3-compatíveis (Cloudflare R2) para multi-tenant.
-        'r2_submissions' => [
+        // MinIO (S3-compatível, ex.: Easy Panel) — logos, capas, anexos, assinaturas, faturas.
+        'minio_submissions' => [
             'driver' => 's3',
-            'key' => env('R2_ACCESS_KEY_ID'),
-            'secret' => env('R2_SECRET_ACCESS_KEY'),
-            'region' => env('R2_REGION', 'auto'),
-            'bucket' => env('R2_SUBMISSIONS_BUCKET'),
-            'endpoint' => env('R2_ENDPOINT'),
+            'key' => env('MINIO_ACCESS_KEY'),
+            'secret' => env('MINIO_SECRET_KEY'),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_SUBMISSIONS_BUCKET'),
+            'endpoint' => env('MINIO_ENDPOINT'),
             'use_path_style_endpoint' => true,
             'throw' => false,
             'report' => false,
         ],
 
-        'r2_attachments' => [
+        'minio_attachments' => [
             'driver' => 's3',
-            'key' => env('R2_ACCESS_KEY_ID'),
-            'secret' => env('R2_SECRET_ACCESS_KEY'),
-            'region' => env('R2_REGION', 'auto'),
-            'bucket' => env('R2_ATTACHMENTS_BUCKET'),
-            'endpoint' => env('R2_ENDPOINT'),
+            'key' => env('MINIO_ACCESS_KEY'),
+            'secret' => env('MINIO_SECRET_KEY'),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_ATTACHMENTS_BUCKET'),
+            'endpoint' => env('MINIO_ENDPOINT'),
             'use_path_style_endpoint' => true,
             'throw' => false,
             'report' => false,
         ],
 
-        'r2_invoices' => [
+        'minio_assets' => [
             'driver' => 's3',
-            'key' => env('R2_ACCESS_KEY_ID'),
-            'secret' => env('R2_SECRET_ACCESS_KEY'),
-            'region' => env('R2_REGION', 'auto'),
-            'bucket' => env('R2_INVOICES_BUCKET'),
-            'endpoint' => env('R2_ENDPOINT'),
+            'key' => env('MINIO_ACCESS_KEY'),
+            'secret' => env('MINIO_SECRET_KEY'),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_ASSETS_BUCKET'),
+            'endpoint' => env('MINIO_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'minio_invoices' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY'),
+            'secret' => env('MINIO_SECRET_KEY'),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('MINIO_INVOICES_BUCKET'),
+            'endpoint' => env('MINIO_ENDPOINT'),
             'use_path_style_endpoint' => true,
             'throw' => false,
             'report' => false,

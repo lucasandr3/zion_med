@@ -80,8 +80,8 @@
                 @if($clinic)
                     <div class="flex items-center justify-center gap-2 mb-3">
                         <div class="logo-wrap shrink-0">
-                            @if($clinic->logo_path)
-                                <img src="{{ asset('storage/'.$clinic->logo_path) }}" alt="{{ $clinic->name }}">
+                            @if($clinic->logo_url)
+                                <img src="{{ $clinic->logo_url }}" alt="{{ $clinic->name }}">
                             @else
                                 <span class="text-xl font-medium text-[#f7f5f2]" style="font-family:'Cormorant Garamond',serif">{{ mb_strtoupper(mb_substr($clinic->name, 0, 1)) }}</span>
                             @endif

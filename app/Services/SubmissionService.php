@@ -85,7 +85,7 @@ class SubmissionService
                 if ($file instanceof UploadedFile) {
                     $path = $file->store(
                         'organizations/' . $orgId . '/submissions/' . $submission->id,
-                        'r2_attachments'
+                        'minio_attachments'
                     );
                     SubmissionAttachment::create([
                         'submission_id' => $submission->id,
@@ -163,7 +163,7 @@ class SubmissionService
         $dir = 'organizations/' . $organizationId . '/signatures/' . $submissionId;
         $filename = Str::random(10) . '.png';
         $path = $dir . '/' . $filename;
-        \Illuminate\Support\Facades\Storage::disk('r2_submissions')->put($path, $decoded);
+        \Illuminate\Support\Facades\Storage::disk('minio_submissions')->put($path, $decoded);
         return $path;
     }
 

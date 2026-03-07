@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\FormSubmission;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Storage;
 
 class PdfService
 {
@@ -12,17 +11,14 @@ class PdfService
     {
         $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'organization']);
         $clinic = $submission->organization ?? $submission->clinic;
-        $logoPath = null;
-        if ($clinic->logo_path && Storage::disk('public')->exists($clinic->logo_path)) {
-            $logoPath = Storage::disk('public')->path($clinic->logo_path);
-        }
+        $logoUrl = $clinic->logo_url;
         $valuesKeyed = $submission->getValuesKeyed();
         $fields = $submission->template->fields;
 
         $pdf = Pdf::loadView('pdf.submission', [
             'submission' => $submission,
             'clinic' => $clinic,
-            'logoPath' => $logoPath,
+            'logoUrl' => $logoUrl,
             'valuesKeyed' => $valuesKeyed,
             'fields' => $fields,
         ])->setPaper('a4');
@@ -36,17 +32,14 @@ class PdfService
     {
         $submission->load(['template.fields', 'values', 'attachments', 'signatures', 'organization']);
         $clinic = $submission->organization ?? $submission->clinic;
-        $logoPath = null;
-        if ($clinic->logo_path && Storage::disk('public')->exists($clinic->logo_path)) {
-            $logoPath = Storage::disk('public')->path($clinic->logo_path);
-        }
+        $logoUrl = $clinic->logo_url;
         $valuesKeyed = $submission->getValuesKeyed();
         $fields = $submission->template->fields;
 
         $pdf = Pdf::loadView('pdf.submission', [
             'submission' => $submission,
             'clinic' => $clinic,
-            'logoPath' => $logoPath,
+            'logoUrl' => $logoUrl,
             'valuesKeyed' => $valuesKeyed,
             'fields' => $fields,
         ])->setPaper('a4');

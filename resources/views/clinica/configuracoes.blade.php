@@ -212,6 +212,22 @@
 .clinica-config .upload-zone .upload-label { font-size: 13px; font-weight: 500; color: var(--c-text); }
 .clinica-config .upload-zone .upload-hint { font-size: 11px; color: var(--c-muted); }
 
+.clinica-config .file-selected-details {
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: var(--c-soft);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--c-text);
+    display: none;
+}
+.clinica-config .file-selected-details.has-file { display: block; }
+.clinica-config .file-selected-details .file-detail-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.clinica-config .file-selected-details .file-detail-name { font-weight: 600; word-break: break-all; }
+.clinica-config .file-selected-details .file-detail-meta { color: var(--c-muted); font-size: 11px; margin-top: 4px; }
+.clinica-config .file-selected-details .file-detail-preview { margin-top: 8px; max-height: 64px; max-width: 64px; border-radius: 6px; object-fit: contain; border: 1px solid var(--c-border); }
+
 .clinica-config .theme-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -743,7 +759,7 @@
                         </div>
                         <div class="field">
                             <label>Telefone / WhatsApp</label>
-                            <input type="text" name="phone" value="{{ old('phone', $clinic->phone) }}" class="form-input" placeholder="(11) 99999-9999">
+                            <input type="text" name="phone" id="config-phone" value="{{ old('phone', $clinic->phone) }}" class="form-input" placeholder="(11) 99999-9999" maxlength="16" autocomplete="tel">
                             @error('phone')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
                         </div>
                     </div>
@@ -786,7 +802,7 @@
                     </div>
                     <div class="field">
                         <label>CPF ou CNPJ <span class="req">*</span> <span class="opt">para assinatura</span></label>
-                        <input type="text" name="billing_document" value="{{ old('billing_document', $clinic->billing_document) }}" class="form-input" placeholder="000.000.000-00 ou 00.000.000/0001-00" maxlength="18">
+                        <input type="text" name="billing_document" id="config-billing-document" value="{{ old('billing_document', $clinic->billing_document) }}" class="form-input" placeholder="000.000.000-00 ou 00.000.000/0001-00" maxlength="18">
                         <div class="hint">Obrigatório para gerar boletos. Apenas números ou com pontuação.</div>
                         @error('billing_document')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
                     </div>
@@ -846,15 +862,18 @@
                     <div class="schedule-grid" id="scheduleGrid">
                         @php
                             $days = ['1'=>'Segunda','2'=>'Terça','3'=>'Quarta','4'=>'Quinta','5'=>'Sexta','6'=>'Sábado','7'=>'Domingo'];
-                            $bh = old('business_hours', $clinic->business_hours) ?? [];
+                            $bhRaw = old('business_hours', $clinic->business_hours) ?? [];
+                            $bh = is_array($bhRaw) ? $bhRaw : [];
+                            // Garantir chaves string (JSON pode devolver inteiros)
+                            $bh = array_combine(array_map('strval', array_keys($bh)), array_values($bh));
                         @endphp
                         @foreach($days as $d => $label)
                             @php
                                 $slot = is_array($bh[$d] ?? null) ? $bh[$d] : [];
-                                $open = $slot['open'] ?? '';
-                                $close = $slot['close'] ?? '';
+                                $open = isset($slot['open']) ? (string) $slot['open'] : '';
+                                $close = isset($slot['close']) ? (string) $slot['close'] : '';
                                 $active = $open !== '' || $close !== '';
-                                if (!$active) { $open = '08:00'; $close = '18:00'; }
+                                // Dias inativos: value vazio para não enviar horário no submit (evita Domingo “aparecer setado” ao editar outra coisa)
                             @endphp
                             <div class="schedule-row {{ $active ? 'active' : '' }}" data-day="{{ $d }}">
                                 <span class="day-label">{{ $label }}</span>
@@ -865,10 +884,10 @@
                                 </label>
                                 <div class="time-inputs" style="{{ $active ? '' : 'display:none' }}">
                                     <span class="time-sep" style="font-size:10px;color:var(--c-muted)">Abre</span>
-                                    <input class="form-input flatpickr-time time-input" type="text" name="business_hours[{{ $d }}][open]" value="{{ $open }}" placeholder="08:00" data-day="{{ $d }}" autocomplete="off" style="padding: 16px 8px;">
+                                    <input class="form-input flatpickr-time time-input" type="text" name="business_hours[{{ $d }}][open]" value="{{ $active ? $open : '' }}" data-initial-time="{{ $active ? $open : '' }}" placeholder="08:00" data-day="{{ $d }}" autocomplete="off" style="padding: 16px 8px;">
                                     <span class="time-sep">→</span>
                                     <span class="time-sep" style="font-size:10px;color:var(--c-muted)">Fecha</span>
-                                    <input class="form-input flatpickr-time time-input" type="text" name="business_hours[{{ $d }}][close]" value="{{ $close }}" placeholder="18:00" data-day="{{ $d }}" autocomplete="off" style="padding: 16px 8px;">
+                                    <input class="form-input flatpickr-time time-input" type="text" name="business_hours[{{ $d }}][close]" value="{{ $active ? $close : '' }}" data-initial-time="{{ $active ? $close : '' }}" placeholder="18:00" data-day="{{ $d }}" autocomplete="off" style="padding: 16px 8px;">
                                 </div>
                                 <span class="closed-tag" style="{{ $active ? 'display:none' : '' }}">Fechado</span>
                             </div>
@@ -890,9 +909,9 @@
                     <span class="section-title">Logo da empresa</span>
                 </div>
                 <div class="section-body">
-                    @if($clinic->logo_path)
+                    @if($clinic->logo_url)
                         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                            <img src="{{ asset('storage/'.$clinic->logo_path) }}" alt="Logo" style="height:40px;border-radius:8px;border:1px solid var(--c-border);object-fit:contain;padding:4px;background:var(--c-soft)">
+                            <img src="{{ $clinic->logo_url }}" alt="Logo" style="height:40px;border-radius:8px;border:1px solid var(--c-border);object-fit:contain;padding:4px;background:var(--c-soft)">
                             <span style="font-size:12px;color:var(--c-muted)">Logo atual</span>
                         </div>
                     @endif
@@ -901,6 +920,7 @@
                         <div class="upload-label">Arraste sua logo aqui ou <span style="color:var(--c-primary)">clique para escolher</span></div>
                         <div class="upload-hint">PNG, JPG ou SVG • Recomendado: 512×512px • Máx 2MB</div>
                     </div>
+                    <div class="file-selected-details" id="logo-file-details" data-for="logo-input" data-file-feedback="self" aria-live="polite"></div>
                     <input type="file" name="logo" id="logo-input" accept="image/*" class="sr-only" aria-hidden="true">
                     @error('logo')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
                 </div>
@@ -947,16 +967,17 @@
                     </div>
                     <div class="field">
                         <label>Imagem de capa</label>
-                        @if($clinic->cover_image_path)
+                        @if($clinic->cover_image_url)
                             <div style="margin-bottom:8px">
-                                <img src="{{ asset('storage/'.$clinic->cover_image_path) }}" alt="Capa" style="max-height:120px;border-radius:8px;border:1px solid var(--c-border);object-fit:cover">
+                                <img src="{{ $clinic->cover_image_url }}" alt="Capa" style="max-height:120px;border-radius:8px;border:1px solid var(--c-border);object-fit:cover">
                             </div>
                         @endif
-                        <div class="upload-zone" onclick="document.getElementById('cover-input').click()">
+                        <div class="upload-zone" id="cover-upload-zone" onclick="document.getElementById('cover-input').click()">
                             <span class="material-symbols-outlined">upload_file</span>
                             <div class="upload-label">Arraste a capa ou <span style="color:var(--c-primary)">clique para escolher</span></div>
                             <div class="upload-hint">Banner do topo do Link Bio • Recomendado: 1200×400px</div>
                         </div>
+                        <div class="file-selected-details" id="cover-file-details" data-for="cover-input" data-file-feedback="self" aria-live="polite"></div>
                         <input type="file" name="cover_image" id="cover-input" accept="image/*" class="sr-only" aria-hidden="true">
                         @error('cover_image')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
                     </div>
@@ -1260,6 +1281,46 @@
     var form = document.getElementById('clinica-config-form');
     if (!wrapper || !form) return;
 
+    // Máscara Telefone/WhatsApp: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+    var phoneEl = document.getElementById('config-phone');
+    if (phoneEl) {
+        function maskPhone() {
+            var v = this.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.slice(0, 11);
+            if (v.length <= 2) {
+                this.value = v ? '(' + v : '';
+                return;
+            }
+            if (v.length <= 7) {
+                this.value = '(' + v.slice(0, 2) + ') ' + v.slice(2);
+                return;
+            }
+            this.value = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
+        }
+        phoneEl.addEventListener('input', maskPhone);
+        if (phoneEl.value) maskPhone.call(phoneEl);
+    }
+
+    // Máscara CPF/CNPJ
+    var docEl = document.getElementById('config-billing-document');
+    if (docEl) {
+        function maskCpfCnpj() {
+            var v = this.value.replace(/\D/g, '');
+            if (v.length > 14) v = v.slice(0, 14);
+            if (v.length <= 11) {
+                this.value = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, function(_, a, b, c, d) {
+                    return (a ? a + (b ? '.' + b : '') : '') + (c ? '.' + c : '') + (d ? '-' + d : '');
+                });
+            } else {
+                this.value = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, function(_, a, b, c, d, e) {
+                    return (a ? a + (b ? '.' + b : '') : '') + (c ? '.' + c : '') + (d ? '/' + d : '') + (e ? '-' + e : '');
+                });
+            }
+        }
+        docEl.addEventListener('input', maskCpfCnpj);
+        if (docEl.value) maskCpfCnpj.call(docEl);
+    }
+
     var footerEl = document.getElementById('config-sticky-footer');
 
     function setTab(tabId) {
@@ -1324,6 +1385,32 @@
         });
     });
 
+    // Reaplicar horários do servidor nos inputs de tempo (cada dia mantém o que foi salvo; evita todos ficarem iguais após editar outra coisa)
+    function syncScheduleTimesFromServer() {
+        form.querySelectorAll('.schedule-row input.flatpickr-time').forEach(function(inp) {
+            var initial = inp.getAttribute('data-initial-time');
+            if (!initial || !/^\d{1,2}:\d{2}$/.test(initial)) return;
+            var parts = initial.split(':');
+            var h = parseInt(parts[0], 10);
+            var m = parseInt(parts[1], 10);
+            inp.value = initial;
+            if (inp._flatpickr) {
+                var d = new Date();
+                d.setHours(h, m, 0, 0);
+                inp._flatpickr.setDate(d, true);
+            }
+        });
+    }
+    function runSyncAfterFlatpickr() {
+        setTimeout(syncScheduleTimesFromServer, 0);
+        setTimeout(syncScheduleTimesFromServer, 200);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runSyncAfterFlatpickr);
+    } else {
+        runSyncAfterFlatpickr();
+    }
+
     // Schedule toggles
     form.querySelectorAll('.schedule-open-toggle').forEach(function(cb) {
         cb.addEventListener('change', function() {
@@ -1357,7 +1444,7 @@
         var closeInp = firstRow.querySelector('input[name="business_hours[1][close]"]');
         var openVal = openInp ? openInp.value : '08:00';
         var closeVal = closeInp ? closeInp.value : '18:00';
-        [2,3,4,5].forEach(function(day) {
+        [2,3,4,5,6,7].forEach(function(day) {
             var row = form.querySelector('.schedule-row[data-day="' + day + '"]');
             if (!row) return;
             var toggle = row.querySelector('.schedule-open-toggle');
@@ -1425,6 +1512,61 @@
         if (el) el.addEventListener('input', updateProgress);
     });
     updateProgress();
+
+    // Detalhes do arquivo selecionado (logo e capa)
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    function updateFileDetails(inputId, detailsId) {
+        var input = document.getElementById(inputId);
+        var detailsEl = document.getElementById(detailsId);
+        if (!input || !detailsEl) return;
+        var file = input.files && input.files[0];
+        if (!file) {
+            detailsEl.classList.remove('has-file');
+            detailsEl.innerHTML = '';
+            return;
+        }
+        var isImage = file.type.indexOf('image/') === 0;
+        var html = '<div class="file-detail-row">';
+        if (isImage) {
+            var url = URL.createObjectURL(file);
+            html += '<img src="' + url + '" alt="" class="file-detail-preview" aria-hidden="true">';
+        }
+        html += '<div><span class="file-detail-name">' + (file.name || 'Arquivo') + '</span>';
+        html += '<div class="file-detail-meta">' + formatFileSize(file.size) + ' • ' + (file.type || '') + '</div></div></div>';
+        detailsEl.innerHTML = html;
+        detailsEl.classList.add('has-file');
+        if (isImage && detailsEl.querySelector('img')) {
+            detailsEl.querySelector('img').onload = function() { URL.revokeObjectURL(url); };
+        }
+    }
+    function setupFileInputWithDetails(inputId, detailsId, zoneId) {
+        var input = document.getElementById(inputId);
+        var detailsEl = document.getElementById(detailsId);
+        var zone = zoneId ? document.getElementById(zoneId) : null;
+        if (!input || !detailsEl) return;
+        input.addEventListener('change', function() { updateFileDetails(inputId, detailsId); });
+        if (zone) {
+            zone.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); zone.style.borderColor = 'var(--c-primary)'; });
+            zone.addEventListener('dragleave', function(e) { e.preventDefault(); zone.style.borderColor = ''; });
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.style.borderColor = '';
+                if (e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        }
+    }
+    setupFileInputWithDetails('logo-input', 'logo-file-details', 'logo-upload-zone');
+    setupFileInputWithDetails('cover-input', 'cover-file-details', 'cover-upload-zone');
 })();
 </script>
 @endsection

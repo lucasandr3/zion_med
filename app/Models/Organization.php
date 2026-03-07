@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Organization extends Model
 {
@@ -127,6 +128,30 @@ class Organization extends Model
             return 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($this->address);
         }
         return null;
+    }
+
+    /** URL assinada (15 min) para a logo no MinIO. Fallback para storage público se path antigo. */
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (! $this->logo_path) {
+            return null;
+        }
+        if (Storage::disk('minio_assets')->exists($this->logo_path)) {
+            return Storage::disk('minio_assets')->temporaryUrl($this->logo_path, now()->addMinutes(15));
+        }
+        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->logo_path, '/');
+    }
+
+    /** URL assinada (15 min) para a capa no MinIO. Fallback para storage público se path antigo. */
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        if (! $this->cover_image_path) {
+            return null;
+        }
+        if (Storage::disk('minio_assets')->exists($this->cover_image_path)) {
+            return Storage::disk('minio_assets')->temporaryUrl($this->cover_image_path, now()->addMinutes(15));
+        }
+        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->cover_image_path, '/');
     }
 
     public function getSpecialtiesList(): array
