@@ -79,11 +79,12 @@
             $url     = $data['url'] ?? null;
 
             $iconColor = match($type) {
-                'novo_protocolo'   => 'var(--c-primary)',
+                'novo_protocolo'     => 'var(--c-primary)',
                 'protocolo_aprovado' => '#10b981',
                 'protocolo_reprovado' => '#ef4444',
-                'novo_comentario'  => '#f59e0b',
-                default            => 'var(--c-muted)',
+                'novo_comentario'    => '#f59e0b',
+                'novo_lead'          => 'var(--c-primary)',
+                default              => 'var(--c-muted)',
             };
         @endphp
 
@@ -119,7 +120,7 @@
                            style="font-size:0.75rem;font-weight:600;color:var(--c-primary);text-decoration:none"
                            onmouseover="this.style.textDecoration='underline'"
                            onmouseout="this.style.textDecoration='none'">
-                            Ver protocolo →
+                            {{ $type === 'novo_lead' ? 'Ver leads' : 'Ver protocolo' }} →
                         </a>
                     @endif
                     @if(!$isRead)
