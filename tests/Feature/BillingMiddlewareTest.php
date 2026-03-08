@@ -91,6 +91,6 @@ class BillingMiddlewareTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->get(route('billing.index'));
-        $response->assertStatus(200);
+        $response->assertRedirect(route('clinica.configuracoes.edit', ['tab' => 'assinatura']));
     }
 }

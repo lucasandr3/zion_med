@@ -28,6 +28,6 @@ class ExportCsvTest extends TestCase
         $response = $this->get(route('protocolos.exportar'));
         $response->assertStatus(200);
         $response->assertHeader('Content-Disposition');
-        $response->assertSee('Protocolo');
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
     }
 }

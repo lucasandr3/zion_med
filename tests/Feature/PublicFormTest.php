@@ -29,13 +29,31 @@ class PublicFormTest extends TestCase
         $template = FormTemplate::withoutGlobalScopes()->first();
         $token = str_repeat('b', 32);
         $template->update(['public_enabled' => true, 'public_token' => $token]);
-        $field = $template->fields()->where('type', 'text')->first();
-        $this->assertNotNull($field);
-        $response = $this->post(route('formulario-publico.submit', $token), [
+        $template->load('fields');
+        $payload = [
             '_token' => csrf_token(),
             '_submitter_name' => 'Joao Teste',
-            $field->name_key => 'Resposta',
-        ]);
+        ];
+        foreach ($template->fields as $field) {
+            if ($field->type === 'file' || $field->type === 'signature') {
+                continue;
+            }
+            if ($field->required) {
+                $payload[$field->name_key] = match ($field->type) {
+                    'date' => '2025-01-15',
+                    'number' => 1,
+                    'textarea' => 'Resposta texto',
+                    'select', 'radio' => null,
+                    'checkbox' => '1',
+                    default => 'Resposta',
+                };
+                if (in_array($field->type, ['select', 'radio'], true) && $field->options_json) {
+                    $opts = $field->options_json['options'] ?? [];
+                    $payload[$field->name_key] = is_array($opts) ? ($opts[0] ?? 'Sim') : 'Sim';
+                }
+            }
+        }
+        $response = $this->post(route('formulario-publico.submit', $token), $payload);
         $response->assertRedirect();
         $this->assertDatabaseHas('form_submissions', ['template_id' => $template->id]);
     }
