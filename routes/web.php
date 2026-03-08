@@ -10,6 +10,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Platform\TenantController as PlatformTenantController;
 use App\Http\Controllers\Platform\BillingOverviewController;
+use App\Http\Controllers\Platform\DemonstrationRequestController;
+use App\Http\Controllers\Platform\PlanController as PlatformPlanController;
+use App\Http\Controllers\Platform\PlatformSettingsController;
+use App\Http\Controllers\DemonstracaoController;
 use App\Http\Controllers\FormSubmissionController;
 use App\Http\Controllers\FormTemplateController;
 use App\Http\Controllers\LinkBioController;
@@ -20,6 +24,7 @@ use App\Http\Controllers\Webhook\AsaasWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('landing'))->name('home');
+Route::post('/demonstracao', [DemonstracaoController::class, 'store'])->name('demonstracao.store');
 
 Route::get('/privacidade', fn () => view('legal.privacidade'))->name('privacidade');
 Route::get('/termos-de-uso', fn () => view('legal.termos'))->name('termos');
@@ -42,8 +47,20 @@ Route::middleware(['auth', 'platform'])
         Route::get('/tenants', [PlatformTenantController::class, 'index'])->name('tenants.index');
         Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show'])->name('tenants.show');
 
+        Route::get('/leads', [DemonstrationRequestController::class, 'index'])->name('leads.index');
+
         Route::get('/assinaturas', [BillingOverviewController::class, 'subscriptions'])->name('subscriptions.index');
         Route::get('/faturas', [BillingOverviewController::class, 'payments'])->name('payments.index');
+
+        Route::get('/planos', [PlatformPlanController::class, 'index'])->name('plans.index');
+        Route::get('/planos/criar', [PlatformPlanController::class, 'create'])->name('plans.create');
+        Route::post('/planos', [PlatformPlanController::class, 'store'])->name('plans.store');
+        Route::get('/planos/{plan}/editar', [PlatformPlanController::class, 'edit'])->name('plans.edit');
+        Route::put('/planos/{plan}', [PlatformPlanController::class, 'update'])->name('plans.update');
+        Route::delete('/planos/{plan}', [PlatformPlanController::class, 'destroy'])->name('plans.destroy');
+
+        Route::get('/configuracoes', [PlatformSettingsController::class, 'index'])->name('settings.index');
+        Route::put('/configuracoes', [PlatformSettingsController::class, 'update'])->name('settings.update');
     });
 
 Route::get('/l/{slug}', [LinkBioController::class, 'public'])->name('link-bio.public');
@@ -56,6 +73,17 @@ Route::prefix('f')->name('formulario-publico.')->group(function () {
 });
 
 Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])->name('webhooks.asaas');
+
+// Notificações: acessível por qualquer usuário autenticado (cliente ou admin da plataforma). Cada um vê só as suas.
+Route::middleware('auth')->group(function () {
+    Route::prefix('notificacoes')->name('notificacoes.')->group(function () {
+        Route::get('/',                  [NotificationController::class, 'index'])->name('index');
+        Route::match(['get', 'patch'], '/{id}/lida', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::post('/marcar-todas',     [NotificationController::class, 'markAllAsRead'])->name('read.all');
+        Route::delete('/limpar-tudo',    [NotificationController::class, 'destroyAll'])->name('destroy.all');
+        Route::delete('/{id}',           [NotificationController::class, 'destroy'])->name('destroy');
+    });
+});
 
 Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
@@ -73,6 +101,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::put('/links/{link}', [LinkBioController::class, 'update'])->name('links.update');
         Route::delete('/links/{link}', [LinkBioController::class, 'destroy'])->name('links.destroy');
         Route::post('/links/reorder', [LinkBioController::class, 'reorder'])->name('links.reorder');
+        Route::put('/aparencia', [LinkBioController::class, 'updateAparencia'])->name('aparencia.update');
     });
 
     Route::prefix('clinica')->name('clinica.')->group(function () {
@@ -113,14 +142,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::delete('/{template}/campos/{campo}', [FormTemplateController::class, 'destroyCampo'])->name('campos.destroy');
         Route::post('/{template}/link-publico', [FormTemplateController::class, 'gerarLink'])->name('link.gerar');
         Route::delete('/{template}/link-publico', [FormTemplateController::class, 'desativarLink'])->name('link.desativar');
-    });
-
-    Route::prefix('notificacoes')->name('notificacoes.')->group(function () {
-        Route::get('/',                  [NotificationController::class, 'index'])->name('index');
-        Route::match(['get', 'patch'], '/{id}/lida', [NotificationController::class, 'markAsRead'])->name('read');
-        Route::post('/marcar-todas',     [NotificationController::class, 'markAllAsRead'])->name('read.all');
-        Route::delete('/limpar-tudo',    [NotificationController::class, 'destroyAll'])->name('destroy.all');
-        Route::delete('/{id}',           [NotificationController::class, 'destroy'])->name('destroy');
     });
 
     Route::prefix('protocolos')->name('protocolos.')->group(function () {

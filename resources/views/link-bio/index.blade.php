@@ -98,6 +98,7 @@
             <div class="link-bio-tab active" data-tab="links" onclick="switchTab(this,'links')"><span class="material-symbols-outlined">link</span> Links</div>
             <div class="link-bio-tab" data-tab="forms" onclick="switchTab(this,'forms')"><span class="material-symbols-outlined">description</span> Formulários</div>
             <div class="link-bio-tab" data-tab="stats" onclick="switchTab(this,'stats')"><span class="material-symbols-outlined">bar_chart</span> Estatísticas</div>
+            <div class="link-bio-tab" data-tab="aparencia" onclick="switchTab(this,'aparencia')"><span class="material-symbols-outlined">palette</span> Aparência</div>
         </div>
 
         {{-- Tab Links --}}
@@ -271,6 +272,154 @@
                 </div>
             </div>
         </div>
+
+        {{-- Tab Aparência --}}
+        <div id="tab-aparencia" class="hidden">
+            <form action="{{ route('link-bio.aparencia.update') }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-5">
+                @csrf @method('PUT')
+
+                {{-- Tema de cor --}}
+                <div class="card p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider mb-4" style="color:var(--c-muted)">Tema de cor da página</p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px" id="aparencia-theme-grid">
+                        @php $currentPublicTheme = old('public_theme', $clinic->public_theme ?? ''); @endphp
+                        {{-- Opção padrão --}}
+                        <label class="theme-card {{ $currentPublicTheme === '' ? 'selected' : '' }}" style="border:2px solid var(--c-border);border-radius:10px;padding:10px;cursor:pointer;position:relative;background:var(--c-surface){{ $currentPublicTheme === '' ? ';border-color:var(--c-primary)' : '' }}">
+                            <input type="radio" name="public_theme" value="" {{ $currentPublicTheme === '' ? 'checked' : '' }} class="sr-only">
+                            <div style="height:28px;border-radius:5px;margin-bottom:7px;background:#f0ede8;display:flex;gap:2px;align-items:flex-end;padding:4px">
+                                <div style="background:#1a1a2e;border-radius:2px;width:5px;height:10px"></div>
+                                <div style="background:#1a1a2e;border-radius:2px;width:5px;height:16px"></div>
+                                <div style="background:#1a1a2e;border-radius:2px;width:5px;height:22px"></div>
+                            </div>
+                            <div style="width:20px;height:20px;border-radius:50%;background:#1a1a2e;margin-bottom:5px"></div>
+                            <div style="font-size:10.5px;font-weight:500;color:var(--c-text)">Padrão</div>
+                            @if($currentPublicTheme === '')<span style="position:absolute;top:4px;right:6px;font-size:10px;color:var(--c-primary);font-weight:700">✓</span>@endif
+                        </label>
+                        @foreach($availableThemes as $key => $meta)
+                            @php $p = $meta['primary']; @endphp
+                            <label class="theme-card {{ $currentPublicTheme === $key ? 'selected' : '' }}" style="border:2px solid var(--c-border);border-radius:10px;padding:10px;cursor:pointer;position:relative;background:var(--c-surface){{ $currentPublicTheme === $key ? ';border-color:var(--c-primary)' : '' }}">
+                                <input type="radio" name="public_theme" value="{{ $key }}" {{ $currentPublicTheme === $key ? 'checked' : '' }} class="sr-only">
+                                <div style="height:28px;border-radius:5px;margin-bottom:7px;background:{{ $p }}22;display:flex;gap:2px;align-items:flex-end;padding:4px">
+                                    <div style="background:{{ $p }};border-radius:2px;width:5px;height:10px"></div>
+                                    <div style="background:{{ $p }};border-radius:2px;width:5px;height:16px"></div>
+                                    <div style="background:{{ $p }};border-radius:2px;width:5px;height:22px"></div>
+                                </div>
+                                <div style="width:20px;height:20px;border-radius:50%;background:{{ $p }};margin-bottom:5px"></div>
+                                <div style="font-size:10.5px;font-weight:500;color:var(--c-text)">{{ $meta['label'] }}</div>
+                                @if($currentPublicTheme === $key)<span style="position:absolute;top:4px;right:6px;font-size:10px;color:var(--c-primary);font-weight:700">✓</span>@endif
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="text-[11px] mt-3" style="color:var(--c-muted)">Afeta o logo, botões e indicador de horário aberto. Independente do tema do sistema.</p>
+                </div>
+
+                {{-- Banner de capa --}}
+                <div class="card p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider mb-4" style="color:var(--c-muted)">Banner de capa</p>
+
+                    @if($clinic->cover_image_url)
+                        <div class="mb-4">
+                            <p class="text-[11px] mb-2" style="color:var(--c-muted)">Imagem atual:</p>
+                            <img src="{{ $clinic->cover_image_url }}" alt="Capa" style="width:100%;max-height:80px;border-radius:8px;object-fit:cover;border:1px solid var(--c-border)">
+                        </div>
+                    @elseif($clinic->cover_color)
+                        <div class="mb-4">
+                            <p class="text-[11px] mb-2" style="color:var(--c-muted)">Cor atual:</p>
+                            <div style="width:100%;height:48px;border-radius:8px;background:{{ $clinic->cover_color }};border:1px solid var(--c-border)"></div>
+                        </div>
+                    @endif
+
+                    {{-- Tipo de capa --}}
+                    <div class="flex gap-2 mb-4" id="ap-cover-type">
+                        <button type="button" class="ap-cover-btn {{ !$clinic->cover_color ? 'ap-active' : '' }}" data-type="image"
+                            style="flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--c-border);background:{{ !$clinic->cover_color ? 'var(--c-soft)' : 'transparent' }};color:var(--c-text);transition:all .15s">
+                            <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">image</span>Imagem
+                        </button>
+                        <button type="button" class="ap-cover-btn {{ $clinic->cover_color ? 'ap-active' : '' }}" data-type="color"
+                            style="flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--c-border);background:{{ $clinic->cover_color ? 'var(--c-soft)' : 'transparent' }};color:var(--c-text);transition:all .15s">
+                            <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">format_paint</span>Cor sólida
+                        </button>
+                        <button type="button" class="ap-cover-btn {{ !$clinic->cover_color && !$clinic->cover_image_path ? 'ap-active' : '' }}" data-type="none"
+                            style="flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--c-border);background:{{ !$clinic->cover_color && !$clinic->cover_image_path ? 'var(--c-soft)' : 'transparent' }};color:var(--c-text);transition:all .15s">
+                            <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">block</span>Nenhum
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="ap-cover-clear-flag" name="_cover_color_clear" value="{{ $clinic->cover_color ? '0' : '1' }}">
+                    <input type="hidden" id="ap-cover-none-flag" name="_cover_none" value="0">
+
+                    <div id="ap-panel-image" style="{{ $clinic->cover_color ? 'display:none' : '' }}">
+                        <div style="border:2px dashed var(--c-border);border-radius:10px;padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('ap-cover-input').click()">
+                            <span class="material-symbols-outlined" style="font-size:28px;color:var(--c-muted)">upload_file</span>
+                            <p class="text-sm font-medium mt-1" style="color:var(--c-text)">Arraste ou <span style="color:var(--c-primary)">clique para escolher</span></p>
+                            <p class="text-[11px] mt-0.5" style="color:var(--c-muted)">PNG, JPG • Recomendado 1200×400px • Máx 3MB</p>
+                        </div>
+                        <input type="file" name="cover_image" id="ap-cover-input" accept="image/*" class="sr-only" onchange="showApCoverPreview(this)">
+                        <div id="ap-cover-preview" class="mt-2 hidden">
+                            <img id="ap-cover-preview-img" src="" alt="" style="width:100%;max-height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--c-border)">
+                        </div>
+                    </div>
+
+                    <div id="ap-panel-color" style="{{ $clinic->cover_color ? '' : 'display:none' }}">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                            <input type="color" id="ap-color-picker" value="{{ old('cover_color', $clinic->cover_color ?? '#1a1a2e') }}"
+                                style="width:44px;height:38px;border:1px solid var(--c-border);border-radius:8px;padding:3px;cursor:pointer;background:var(--c-surface)">
+                            <input type="text" name="cover_color" id="ap-color-text" value="{{ old('cover_color', $clinic->cover_color ?? '#1a1a2e') }}"
+                                class="form-input" placeholder="#1a1a2e" maxlength="7" pattern="^#[0-9a-fA-F]{6}$"
+                                style="flex:1;min-width:100px">
+                            <div id="ap-color-preview" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--c-border);background:{{ $clinic->cover_color ?? '#1a1a2e' }};flex-shrink:0"></div>
+                        </div>
+                        <div class="mt-2" style="font-size:11px;color:var(--c-muted)">Sugestões:
+                            @foreach(['#1a1a2e','#1e40af','#4f46e5','#10b981','#f43f5e','#f59e0b','#8b5cf6','#14b8a6','#475569'] as $sc)
+                                <button type="button" onclick="setApColor('{{ $sc }}')" title="{{ $sc }}"
+                                    style="display:inline-block;width:15px;height:15px;border-radius:50%;background:{{ $sc }};border:1px solid rgba(0,0,0,.12);margin-left:4px;cursor:pointer;vertical-align:middle"></button>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Informações da página --}}
+                <div class="card p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider mb-4" style="color:var(--c-muted)">Informações exibidas na página</p>
+                    <div class="flex flex-col gap-4">
+                        <div>
+                            <label class="form-label">Descrição / Slogan</label>
+                            <input type="text" name="short_description" value="{{ old('short_description', $clinic->short_description) }}"
+                                class="form-input" placeholder="Ex: Cuidando da sua saúde com excelência" maxlength="200">
+                        </div>
+                        <div>
+                            <label class="form-label">Especialidades</label>
+                            <input type="text" name="specialties" value="{{ old('specialties', $clinic->specialties) }}"
+                                class="form-input" placeholder="Clínica geral, Pediatria, Dermatologia (vírgula para separar)">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label">Ano de fundação</label>
+                                <input type="number" name="founded_year" value="{{ old('founded_year', $clinic->founded_year) }}"
+                                    class="form-input" placeholder="2010" min="1900" max="{{ date('Y') }}">
+                            </div>
+                            <div>
+                                <label class="form-label">E-mail de contato público</label>
+                                <input type="email" name="contact_email" value="{{ old('contact_email', $clinic->contact_email) }}"
+                                    class="form-input" placeholder="contato@empresa.com">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">Link do Google Maps</label>
+                            <input type="url" name="maps_url" value="{{ old('maps_url', $clinic->maps_url) }}"
+                                class="form-input" placeholder="https://maps.google.com/...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="submit" class="btn-primary px-5 py-2 text-sm inline-flex items-center gap-2">
+                        <span class="material-symbols-outlined" style="font-size:16px">save</span>
+                        Salvar aparência
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     {{-- Preview celular --}}
@@ -302,18 +451,23 @@ function copyFormLink(btn) {
 function switchTab(el, tab) {
     document.querySelectorAll('.link-bio-tab').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
-    ['links','forms','stats'].forEach(function(name) {
+    ['links','forms','stats','aparencia'].forEach(function(name) {
         var box = document.getElementById('tab-' + name);
         if (!box) return;
         if (name === tab) {
             box.classList.remove('hidden');
             box.classList.add('flex');
-            if (name === 'stats') box.classList.add('block');
+            if (name === 'stats' || name === 'aparencia') { box.classList.remove('flex'); box.classList.add('block'); }
         } else {
             box.classList.add('hidden');
-            box.classList.remove('flex');
+            box.classList.remove('flex', 'block');
         }
     });
+    // Recarregar iframe da prévia ao trocar para aparência
+    if (tab === 'aparencia') {
+        var fr = document.querySelector('.link-bio-phone-screen');
+        if (fr) fr.src = fr.src;
+    }
 }
 function toggleAddForm() {
     var el = document.getElementById('add-form');
@@ -379,6 +533,83 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({ ids: ids })
         });
     });
+})();
+// ── Aba Aparência: seletor de tema ──────────────────────────────────────
+document.querySelectorAll('#aparencia-theme-grid .theme-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('#aparencia-theme-grid .theme-card').forEach(function(c) {
+            c.style.borderColor = 'var(--c-border)';
+            var ck = c.querySelector('.sr-only + span, span[style*="position:absolute"]');
+            if (ck) ck.remove();
+        });
+        this.style.borderColor = 'var(--c-primary)';
+    });
+});
+
+// ── Aba Aparência: seletor tipo de capa ─────────────────────────────────
+function setApCoverType(type) {
+    document.querySelectorAll('.ap-cover-btn').forEach(function(btn) {
+        var isActive = btn.getAttribute('data-type') === type;
+        btn.style.background = isActive ? 'var(--c-soft)' : 'transparent';
+        btn.style.borderColor = isActive ? 'var(--c-primary)' : 'var(--c-border)';
+        btn.style.color = isActive ? 'var(--c-primary)' : 'var(--c-text)';
+    });
+    var panelImage = document.getElementById('ap-panel-image');
+    var panelColor = document.getElementById('ap-panel-color');
+    var clearFlag  = document.getElementById('ap-cover-clear-flag');
+    var noneFlag   = document.getElementById('ap-cover-none-flag');
+    if (panelImage) panelImage.style.display = type === 'image' ? '' : 'none';
+    if (panelColor) panelColor.style.display = type === 'color' ? '' : 'none';
+    if (clearFlag)  clearFlag.value  = type === 'color' ? '0' : '1';
+    if (noneFlag)   noneFlag.value   = type === 'none'  ? '1' : '0';
+}
+document.querySelectorAll('.ap-cover-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { setApCoverType(this.getAttribute('data-type')); });
+});
+
+// ── Aba Aparência: color picker sincronizado ─────────────────────────────
+function setApColor(val) {
+    var picker  = document.getElementById('ap-color-picker');
+    var text    = document.getElementById('ap-color-text');
+    var preview = document.getElementById('ap-color-preview');
+    if (picker)  picker.value  = val;
+    if (text)    text.value    = val;
+    if (preview) preview.style.background = val;
+}
+(function() {
+    var picker  = document.getElementById('ap-color-picker');
+    var text    = document.getElementById('ap-color-text');
+    var preview = document.getElementById('ap-color-preview');
+    if (picker) picker.addEventListener('input', function() { setApColor(this.value); });
+    if (text) {
+        text.addEventListener('input', function() {
+            if (/^#[0-9a-fA-F]{6}$/.test(this.value)) {
+                if (picker) picker.value = this.value;
+                if (preview) preview.style.background = this.value;
+            }
+        });
+    }
+})();
+
+// ── Aba Aparência: preview upload capa ──────────────────────────────────
+function showApCoverPreview(input) {
+    if (!input.files || !input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = document.getElementById('ap-cover-preview-img');
+        var box = document.getElementById('ap-cover-preview');
+        if (img) img.src = e.target.result;
+        if (box) box.classList.remove('hidden');
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+// ── Aparência: recarregar prévia após salvar ─────────────────────────────
+(function() {
+    @if(session('success') && request()->routeIs('link-bio.index'))
+    var apTab = document.querySelector('[data-tab="aparencia"]');
+    if (apTab) switchTab(apTab, 'aparencia');
+    @endif
 })();
 </script>
 @endsection

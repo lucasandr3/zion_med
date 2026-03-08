@@ -693,10 +693,6 @@
             <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;margin-right:4px">description</span>
             Dados Gerais
         </button>
-        <button type="button" class="config-tab" role="tab" aria-selected="false" data-tab="publica">
-            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;margin-right:4px">public</span>
-            Página Pública
-        </button>
         <button type="button" class="config-tab" role="tab" aria-selected="false" data-tab="visual">
             <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;margin-right:4px">palette</span>
             Tema Visual
@@ -923,64 +919,6 @@
                     <div class="file-selected-details" id="logo-file-details" data-for="logo-input" data-file-feedback="self" aria-live="polite"></div>
                     <input type="file" name="logo" id="logo-input" accept="image/*" class="sr-only" aria-hidden="true">
                     @error('logo')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                </div>
-            </div>
-        </div>
-
-        {{-- Painel: Página Pública --}}
-        <div id="panel-publica" class="config-panel" role="tabpanel" hidden>
-            <div class="section-card">
-                <div class="section-header">
-                    <div class="icon-wrap">
-                        <span class="material-symbols-outlined">public</span>
-                    </div>
-                    <span class="section-title">Página Pública (Link Bio)</span>
-                </div>
-                <div class="section-body">
-                    <div class="field">
-                        <label>Descrição / Slogan <span class="opt">opcional</span></label>
-                        <input type="text" name="short_description" value="{{ old('short_description', $clinic->short_description) }}" class="form-input" placeholder="Ex: Cuidando da sua saúde com excelência" maxlength="200">
-                        @error('short_description')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="field">
-                        <label>Especialidades <span class="opt">opcional</span></label>
-                        <input type="text" name="specialties" value="{{ old('specialties', $clinic->specialties) }}" class="form-input" placeholder="Clínica geral, Pediatria, Dermatologia (separadas por vírgula)">
-                        @error('specialties')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="field-row">
-                        <div class="field">
-                            <label>Ano de fundação <span class="opt">opcional</span></label>
-                            <input type="number" name="founded_year" value="{{ old('founded_year', $clinic->founded_year) }}" class="form-input" placeholder="2010" min="1900" max="{{ date('Y') }}">
-                            @error('founded_year')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                        </div>
-                        <div class="field">
-                            <label>Link do Google Maps <span class="opt">opcional</span></label>
-                            <input type="url" name="maps_url" value="{{ old('maps_url', $clinic->maps_url) }}" class="form-input" placeholder="https://maps.google.com/...">
-                            @error('maps_url')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>Meta description (SEO) <span class="opt">opcional</span></label>
-                        <textarea name="meta_description" rows="3" class="form-input" placeholder="Breve descrição para buscadores e redes sociais" maxlength="300" style="resize:vertical">{{ old('meta_description', $clinic->meta_description) }}</textarea>
-                        <div class="hint">Recomendado: até 160 caracteres.</div>
-                        @error('meta_description')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="field">
-                        <label>Imagem de capa</label>
-                        @if($clinic->cover_image_url)
-                            <div style="margin-bottom:8px">
-                                <img src="{{ $clinic->cover_image_url }}" alt="Capa" style="max-height:120px;border-radius:8px;border:1px solid var(--c-border);object-fit:cover">
-                            </div>
-                        @endif
-                        <div class="upload-zone" id="cover-upload-zone" onclick="document.getElementById('cover-input').click()">
-                            <span class="material-symbols-outlined">upload_file</span>
-                            <div class="upload-label">Arraste a capa ou <span style="color:var(--c-primary)">clique para escolher</span></div>
-                            <div class="upload-hint">Banner do topo do Link Bio • Recomendado: 1200×400px</div>
-                        </div>
-                        <div class="file-selected-details" id="cover-file-details" data-for="cover-input" data-file-feedback="self" aria-live="polite"></div>
-                        <input type="file" name="cover_image" id="cover-input" accept="image/*" class="sr-only" aria-hidden="true">
-                        @error('cover_image')<p style="color:#f87171;font-size:0.75rem;margin-top:4px">{{ $message }}</p>@enderror
-                    </div>
                 </div>
             </div>
         </div>
@@ -1457,13 +1395,16 @@
         });
     });
 
-    // Theme cards: visual selected state
-    form.querySelectorAll('.theme-card').forEach(function(card) {
-        card.addEventListener('click', function() {
-            form.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('selected'); });
-            this.classList.add('selected');
+    // Theme cards: visual selected state (sistema)
+    var systemThemeGrid = document.getElementById('themeGrid');
+    if (systemThemeGrid) {
+        systemThemeGrid.querySelectorAll('.theme-card').forEach(function(card) {
+            card.addEventListener('click', function() {
+                systemThemeGrid.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('selected'); });
+                this.classList.add('selected');
+            });
         });
-    });
+    }
 
     // Dark mode toggle visual
     var darkCb = form.querySelector('#dark_mode');
@@ -1566,7 +1507,6 @@
         }
     }
     setupFileInputWithDetails('logo-input', 'logo-file-details', 'logo-upload-zone');
-    setupFileInputWithDetails('cover-input', 'cover-file-details', 'cover-upload-zone');
 })();
 </script>
 @endsection

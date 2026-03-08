@@ -23,18 +23,18 @@ return [
     'plans' => [
         'core' => [
             'name' => 'Core',
-            'value' => 99.90,
-            'description' => 'Recursos essenciais para sua clínica.',
+            'value' => 127.00,
+            'description' => 'Para clínicas pequenas e médias que precisam padronizar formulários e evidências com baixo atrito de entrada.',
         ],
         'executive' => [
             'name' => 'Executive',
-            'value' => 199.90,
-            'description' => 'Mais recursos e integrações.',
+            'value' => 247.00,
+            'description' => 'Para operações com alguns fluxos, aprovações, rastreabilidade e treinamento inicial do time.',
         ],
         'enterprise' => [
             'name' => 'Enterprise',
-            'value' => 399.90,
-            'description' => 'Solução completa e suporte prioritário.',
+            'value' => 497.00,
+            'description' => 'Para multiunidade, integrações e operações que exigem mais controle, suporte e flexibilidade.',
         ],
     ],
 

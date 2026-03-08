@@ -17,11 +17,16 @@
             @endif
         </p>
         <div class="flex justify-center gap-3 mt-4">
-            <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('dashboard') }}"
+            @php
+                $dashboardRoute = auth()->user() && method_exists(auth()->user(), 'isPlatformAdmin') && auth()->user()->isPlatformAdmin()
+                    ? route('platform.dashboard')
+                    : route('dashboard');
+            @endphp
+            <a href="{{ url()->previous() !== url()->current() ? url()->previous() : $dashboardRoute }}"
                class="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-100 hover:bg-slate-700">
                 Voltar
             </a>
-            <a href="{{ route('dashboard') }}"
+            <a href="{{ $dashboardRoute }}"
                class="px-4 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500">
                 Ir para o painel
             </a>

@@ -20,10 +20,13 @@ class NotificationController extends Controller
 
         $notifications = $query->latest()->paginate(20)->withQueryString();
 
+        $layout = $user->isPlatformAdmin() ? 'layouts.platform' : 'layouts.app';
+
         return view('notificacoes.index', [
             'notifications'  => $notifications,
             'unreadCount'    => $user->unreadNotifications()->count(),
             'filter'         => $filter,
+            'layout'         => $layout,
         ]);
     }
 

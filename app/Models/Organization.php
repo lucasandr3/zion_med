@@ -25,6 +25,8 @@ class Organization extends Model
         'founded_year',
         'meta_description',
         'cover_image_path',
+        'public_theme',
+        'cover_color',
         'maps_url',
         'business_hours',
         'theme',

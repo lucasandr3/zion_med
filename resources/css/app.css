@@ -635,6 +635,12 @@ body.sidebar-collapsed .sidebar-clinic > div {
     justify-content: center;
 }
 
+/* Platform admin: ícones dark/light conforme .dark no body (evita ícone errado no first paint) */
+#platform-dark-mode-icon-dark { display: none !important; }
+#platform-dark-mode-icon-light { display: inline-flex !important; }
+body.dark #platform-dark-mode-icon-dark { display: inline-flex !important; }
+body.dark #platform-dark-mode-icon-light { display: none !important; }
+
 /* Link "Trocar clínica": sempre clicável (largura total, cursor) */
 .clinic-switcher-link {
     cursor: pointer;
@@ -795,6 +801,80 @@ body.sidebar-collapsed .clinic-switcher-link {
     border: 1px solid var(--c-border);
     border-radius: 0.75rem;
     padding: 1.25rem;
+}
+
+/* Tabelas da área platform (admin) — usam variáveis para tema claro/escuro */
+.platform-table {
+    min-width: 100%;
+    font-size: 0.75rem;
+    text-align: left;
+    color: var(--c-text);
+}
+.platform-table thead tr {
+    border-bottom: 1px solid var(--c-border);
+    background-color: var(--c-soft);
+}
+.platform-table th {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: var(--c-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.platform-table tbody tr {
+    border-top: 1px solid var(--c-border);
+}
+.platform-table tbody tr:hover td {
+    background-color: var(--c-soft);
+}
+.platform-table td {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--c-text);
+    vertical-align: middle;
+}
+.platform-table .cell-muted { color: var(--c-muted); }
+.platform-table a { color: var(--c-primary); text-decoration: none; }
+.platform-table a:hover { text-decoration: underline; }
+.platform-table .btn-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.platform-table .btn-cell:hover {
+    border-color: var(--c-primary);
+    background: color-mix(in srgb, var(--c-primary) 12%, var(--c-surface));
+    color: var(--c-primary);
+}
+
+/* btn-cell fora de tabela (ex.: cards da área platform) */
+a.btn-cell, .btn-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+a.btn-cell:hover, .btn-cell:hover {
+    border-color: var(--c-primary);
+    background: color-mix(in srgb, var(--c-primary) 12%, var(--c-surface));
+    color: var(--c-primary);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

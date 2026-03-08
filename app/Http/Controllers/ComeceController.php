@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ComeceController extends Controller
@@ -47,14 +48,18 @@ class ComeceController extends Controller
         }
 
         $validated = $request->validate([
-            'company_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'plan_key' => ['required', 'string', 'in:core,executive,enterprise'],
+            'company_name'     => ['required', 'string', 'max:255'],
+            'responsible_name' => ['required', 'string', 'max:255'],
+            'email'            => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password'         => ['required', 'string', 'min:8', 'confirmed'],
+            'plan_key'         => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
+            'accepted_terms'   => ['accepted'],
         ], [
-            'company_name.required' => 'Informe o nome da empresa.',
-            'email.unique' => 'Este e-mail já está em uso. Faça login ou use outro e-mail.',
-            'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
+            'company_name.required'     => 'Informe o nome da empresa.',
+            'responsible_name.required' => 'Informe o seu nome (responsável).',
+            'email.unique'              => 'Este e-mail já está em uso. Faça login ou use outro e-mail.',
+            'password.min'              => 'A senha deve ter no mínimo 8 caracteres.',
+            'accepted_terms.accepted'   => 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar.',
         ]);
 
         $trialDays = (int) config('asaas.trial_days', 14);
@@ -81,11 +86,11 @@ class ComeceController extends Controller
 
         $user = User::create([
             'organization_id' => $clinic->id,
-            'name' => $validated['company_name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => Role::Owner,
-            'active' => true,
+            'name'            => $validated['responsible_name'],
+            'email'           => $validated['email'],
+            'password'        => Hash::make($validated['password']),
+            'role'            => Role::Owner,
+            'active'          => true,
         ]);
 
         FormTemplateSeeder::seedTemplatesForClinic($clinic, $user);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
+use App\Models\DemonstrationRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\View\View;
@@ -16,6 +17,7 @@ class DashboardController extends Controller
             'tenantsCount' => Tenant::count(),
             'clinicsCount' => Clinic::count(),
             'usersCount' => User::count(),
+            'leadsCount' => DemonstrationRequest::count(),
         ]);
     }
 }

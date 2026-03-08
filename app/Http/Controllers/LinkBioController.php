@@ -8,6 +8,7 @@ use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\LinkBioLinkClick;
 use App\Models\LinkBioPageView;
+use App\Services\ThemeService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -17,6 +18,7 @@ use Illuminate\View\View;
 
 class LinkBioController extends Controller
 {
+    public function __construct(private ThemeService $themeService) {}
     public function index(): View|RedirectResponse
     {
         $this->authorize('manage-clinic');
@@ -121,6 +123,7 @@ class LinkBioController extends Controller
             'formTemplatesForTab'    => $formTemplatesForTab,
             'publicUrl'              => $publicUrl,
             'availableIcons'         => ClinicLink::availableIcons(),
+            'availableThemes'        => $this->themeService->getAvailableThemes(),
             'visitasHoje'            => $visitasHoje,
             'totalViews'              => $totalViews,
             'totalClicks'            => $totalClicks,
@@ -203,6 +206,74 @@ class LinkBioController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    public function updateAparencia(Request $request): RedirectResponse
+    {
+        $this->authorize('manage-clinic');
+
+        $clinicId = session('current_clinic_id');
+        $clinic   = Clinic::findOrFail($clinicId);
+
+        $validThemes = array_keys($this->themeService->getAvailableThemes());
+
+        $data = $request->validate([
+            'public_theme'      => ['nullable', 'string', \Illuminate\Validation\Rule::in(array_merge([''], $validThemes))],
+            'cover_color'       => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'short_description' => ['nullable', 'string', 'max:200'],
+            'specialties'       => ['nullable', 'string', 'max:500'],
+            'founded_year'      => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')],
+            'contact_email'     => ['nullable', 'email', 'max:255'],
+            'maps_url'          => ['nullable', 'url', 'max:500'],
+            'cover_image'       => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:3072'],
+        ]);
+
+        // Upload da nova capa
+        if ($request->hasFile('cover_image')) {
+            if ($clinic->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
+            }
+            $data['cover_image_path'] = $request->file('cover_image')->store(
+                'organizations/' . $clinic->id . '/covers',
+                'minio_assets'
+            );
+            $data['cover_color'] = null; // imagem tem prioridade → limpa cor
+        }
+        unset($data['cover_image']);
+
+        // Limpar imagem quando escolheu cor sólida
+        if ($request->input('_cover_color_clear') === '0' && ! $request->hasFile('cover_image')) {
+            if ($clinic->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
+            }
+            $data['cover_image_path'] = null;
+        }
+
+        // Remover tudo quando escolheu "Nenhum"
+        if ($request->input('_cover_none') === '1') {
+            if ($clinic->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
+            }
+            $data['cover_image_path'] = null;
+            $data['cover_color']      = null;
+        }
+
+        // Limpar cover_color quando escolheu imagem
+        if ($request->input('_cover_color_clear') === '1') {
+            $data['cover_color'] = null;
+        }
+
+        // Normalizar campos em branco para null
+        foreach (['public_theme', 'cover_color', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
+            if (isset($data[$key]) && trim((string) $data[$key]) === '') {
+                $data[$key] = null;
+            }
+        }
+
+        $clinic->update($data);
+
+        return redirect()->route('link-bio.index')
+            ->with('success', 'Aparência da página atualizada.');
     }
 
     public function public(string $slug): View

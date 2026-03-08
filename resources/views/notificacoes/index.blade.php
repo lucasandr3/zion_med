@@ -1,6 +1,7 @@
-@extends('layouts.app')
+@extends($layout ?? 'layouts.app')
 
 @section('title', 'Notificações')
+@section('subtitle', '')
 
 @section('content')
 <div style="margin:0 auto">

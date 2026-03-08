@@ -109,11 +109,26 @@ class ClinicSettingsController extends Controller
             $data['business_hours'] = ! empty($cleaned) ? $cleaned : null;
         }
 
-        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document'] as $key) {
+        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color'] as $key) {
             if (isset($data[$key]) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
         }
+
+        // Limpar cover_color quando o usuário escolheu "Imagem" como tipo de capa
+        if ($request->input('_cover_color_clear') === '1') {
+            $data['cover_color'] = null;
+        }
+
+        // Limpar cover_image_path quando o usuário escolheu "Cor sólida" (sem novo upload)
+        if ($request->input('_cover_color_clear') === '0' && ! $request->hasFile('cover_image')) {
+            if ($clinic->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($clinic->cover_image_path);
+            }
+            $data['cover_image_path'] = null;
+        }
+        unset($data['_cover_color_clear']);
 
         $data['whatsapp_notifications_enabled'] = $request->boolean('whatsapp_notifications_enabled');
         $data['whatsapp_notify_cobranca'] = $request->boolean('whatsapp_notify_cobranca');

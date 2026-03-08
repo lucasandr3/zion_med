@@ -21,6 +21,13 @@
 </head>
 <body class="{{ $themeBodyClasses ?? 'theme-ocean-blue' }} min-h-screen"
       style="background-color:var(--c-bg);color:var(--c-text)">
+    {{-- Anti-FOUC: aplicar dark e tema antes do primeiro paint (mesma chave do app) --}}
+    <script>
+    (function(){ try {
+        if (localStorage.getItem('zionmed_dark_mode') === '1') document.body.classList.add('dark');
+        if (localStorage.getItem('zionmed_sidebar_collapsed') === '1') document.body.classList.add('sidebar-collapsed');
+    } catch(e) {} })();
+    </script>
 
     {{-- Sidebar + estrutura igual ao app --}}
     <aside id="sidebar"
@@ -60,6 +67,13 @@
                 <span class="sidebar-label">Clientes (tenants)</span>
             </a>
 
+            <a href="{{ route('platform.leads.index') }}"
+               class="nav-link {{ request()->routeIs('platform.leads.*') ? 'active' : '' }}"
+               data-tooltip="Leads">
+                <span class="material-symbols-outlined shrink-0" style="font-size:19px">request_quote</span>
+                <span class="sidebar-label">Leads</span>
+            </a>
+
             <a href="{{ route('platform.subscriptions.index') }}"
                class="nav-link {{ request()->routeIs('platform.subscriptions.*') ? 'active' : '' }}"
                data-tooltip="Assinaturas">
@@ -72,6 +86,35 @@
                data-tooltip="Faturas / cobranças">
                 <span class="material-symbols-outlined shrink-0" style="font-size:19px">payments</span>
                 <span class="sidebar-label">Faturas / cobranças</span>
+            </a>
+
+            <a href="{{ route('notificacoes.index') }}"
+               class="nav-link {{ request()->routeIs('notificacoes.*') ? 'active' : '' }}"
+               data-tooltip="Notificações"
+               style="position:relative">
+                <span class="material-symbols-outlined shrink-0" style="font-size:19px">notifications</span>
+                <span class="sidebar-label">Notificações</span>
+                @if(($unreadNotifications ?? 0) > 0)
+                    <span class="sidebar-label" style="margin-left:auto;min-width:18px;height:18px;border-radius:9px;background:var(--c-primary);color:#fff;font-size:0.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px">
+                        {{ ($unreadNotifications ?? 0) > 99 ? '99+' : ($unreadNotifications ?? 0) }}
+                    </span>
+                @endif
+            </a>
+
+            <p class="sidebar-section-label mt-4 mb-2">PLATAFORMA</p>
+
+            <a href="{{ route('platform.plans.index') }}"
+               class="nav-link {{ request()->routeIs('platform.plans.*') ? 'active' : '' }}"
+               data-tooltip="Planos">
+                <span class="material-symbols-outlined shrink-0" style="font-size:19px">subscriptions</span>
+                <span class="sidebar-label">Planos</span>
+            </a>
+
+            <a href="{{ route('platform.settings.index') }}"
+               class="nav-link {{ request()->routeIs('platform.settings.*') ? 'active' : '' }}"
+               data-tooltip="Configurações da plataforma">
+                <span class="material-symbols-outlined shrink-0" style="font-size:19px">settings</span>
+                <span class="sidebar-label">Configurações</span>
             </a>
         </nav>
 
@@ -129,9 +172,14 @@
                     <span class="material-symbols-outlined" style="font-size:21px">menu</span>
                 </button>
 
-                <h2 class="font-semibold" style="font-size:0.9375rem;color:var(--c-text)">
-                    @yield('title', 'Administração da plataforma')
-                </h2>
+                <div>
+                    <h2 class="font-semibold" style="font-size:0.9375rem;color:var(--c-text)">
+                        @yield('title', 'Administração da plataforma')
+                    </h2>
+                    @hasSection('subtitle')
+                        <p class="text-xs mt-0.5" style="color:var(--c-muted)">@yield('subtitle')</p>
+                    @endif
+                </div>
             </div>
 
             <div class="flex items-center gap-2">
@@ -144,12 +192,12 @@
                         aria-label="Alternar modo escuro"
                         onmouseover="this.style.background='var(--c-soft)';this.style.color='var(--c-text)'"
                         onmouseout="this.style.background='transparent';this.style.color='var(--c-muted)'">
-                    <span class="material-symbols-outlined" id="platform-dark-mode-icon" style="font-size:19px">
-                        {{ (bool) (request()->user()?->getAttribute('dark_mode') ?? false) ? 'light_mode' : 'dark_mode' }}
-                    </span>
+                    {{-- Ícone definido por CSS conforme .dark no body (anti-FOUC já aplicou a classe) --}}
+                    <span class="material-symbols-outlined platform-dm-icon" id="platform-dark-mode-icon-dark" style="font-size:19px;display:none">light_mode</span>
+                    <span class="material-symbols-outlined platform-dm-icon" id="platform-dark-mode-icon-light" style="font-size:19px">dark_mode</span>
                 </button>
 
-                {{-- Notificações (usa mesma rota do app) --}}
+                {{-- Notificações (igual à visão cliente: mesmo estilo de badge e link para lista) --}}
                 <a href="{{ route('notificacoes.index') }}"
                    id="platform-notif-btn"
                    style="position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--c-border);background:transparent;cursor:pointer;color:var(--c-muted);transition:all 0.15s;text-decoration:none"
@@ -158,6 +206,13 @@
                    onmouseover="this.style.background='var(--c-soft)';this.style.color='var(--c-text)'"
                    onmouseout="this.style.background='transparent';this.style.color='var(--c-muted)'">
                     <span class="material-symbols-outlined" style="font-size:19px">notifications</span>
+                    @if(($unreadNotifications ?? 0) > 0)
+                        <span style="position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;border-radius:8px;background:var(--c-primary);border:2px solid var(--c-bg);display:flex;align-items:center;justify-content:center;padding:0 3px;box-sizing:border-box">
+                            <span style="font-size:0.55rem;font-weight:700;color:#fff;line-height:1">
+                                {{ ($unreadNotifications ?? 0) > 99 ? '99+' : ($unreadNotifications ?? 0) }}
+                            </span>
+                        </span>
+                    @endif
                 </a>
 
                 {{-- Sair --}}
@@ -278,26 +333,11 @@
                 closeUserDrop();
         });
 
-        // Dark mode plataforma
+        // Dark mode plataforma (ícones alternados por CSS; anti-FOUC já aplicou .dark no início do body)
         var dmBtn = document.getElementById('platform-dark-mode-toggle');
-        var dmIcon = document.getElementById('platform-dark-mode-icon');
-
-        function syncPlatformDark() {
-            var isDark = body.classList.contains('dark');
-            if (dmIcon) dmIcon.textContent = isDark ? 'light_mode' : 'dark_mode';
-        }
-
-        // aplica preferência salva
-        try {
-            var saved = localStorage.getItem('zionmed_dark_mode');
-            if (saved === '1') body.classList.add('dark');
-        } catch (e) {}
-        syncPlatformDark();
-
         if (dmBtn) {
             dmBtn.addEventListener('click', function () {
                 var isDark = body.classList.toggle('dark');
-                syncPlatformDark();
                 try { localStorage.setItem('zionmed_dark_mode', isDark ? '1' : '0'); } catch (e) {}
             });
         }

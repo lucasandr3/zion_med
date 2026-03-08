@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\User;
+use App\Services\PlatformConfigService;
 use App\View\Composers\ThemeComposer;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -31,6 +32,12 @@ class AppServiceProvider extends ServiceProvider
     {
         App::setLocale('pt_BR');
 
+        try {
+            PlatformConfigService::mergeIntoConfig();
+        } catch (\Throwable) {
+            // Tabelas platform_settings/plans podem ainda não existir (ex.: durante migrate)
+        }
+
         Event::listen(\App\Events\AuditEvent::class, \App\Listeners\LogAuditListener::class);
 
         RateLimiter::for('api', function (Request $request) {
@@ -45,6 +52,11 @@ class AppServiceProvider extends ServiceProvider
             });
 
         View::composer('layouts.app', ThemeComposer::class);
+
+        View::composer('layouts.platform', function (\Illuminate\View\View $view): void {
+            $user = request()->user();
+            $view->with('unreadNotifications', $user ? $user->unreadNotifications()->count() : 0);
+        });
 
         Gate::define('manage-clinic', function (User $user) {
             return $user->role->canManageClinic();
