@@ -30,6 +30,31 @@ Route::post('/demonstracao', [DemonstracaoController::class, 'store'])->name('de
 Route::get('/privacidade', fn () => view('legal.privacidade'))->name('privacidade');
 Route::get('/termos-de-uso', fn () => view('legal.termos'))->name('termos');
 
+Route::get('/robots.txt', function () {
+    $base = config('app.url');
+    return response("User-agent: *\nDisallow:\n\nSitemap: {$base}/sitemap.xml\n", 200, [
+        'Content-Type' => 'text/plain; charset=UTF-8',
+    ]);
+})->name('robots');
+
+Route::get('/sitemap.xml', function () {
+    $base = rtrim(config('app.url'), '/');
+    $urls = [
+        ['loc' => $base . '/', 'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => $base . '/comece', 'priority' => '0.9', 'changefreq' => 'monthly'],
+        ['loc' => $base . '/privacidade', 'priority' => '0.3', 'changefreq' => 'monthly'],
+        ['loc' => $base . '/termos-de-uso', 'priority' => '0.3', 'changefreq' => 'monthly'],
+        ['loc' => $base . '/login', 'priority' => '0.5', 'changefreq' => 'monthly'],
+    ];
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+    foreach ($urls as $u) {
+        $xml .= '  <url><loc>' . htmlspecialchars($u['loc']) . '</loc><changefreq>' . $u['changefreq'] . '</changefreq><priority>' . $u['priority'] . '</priority></url>' . "\n";
+    }
+    $xml .= '</urlset>';
+    return response($xml, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+})->name('sitemap');
+
 Route::get('/comece', [ComeceController::class, 'show'])->name('comece.show');
 Route::post('/comece', [ComeceController::class, 'store'])->name('comece.store');
 

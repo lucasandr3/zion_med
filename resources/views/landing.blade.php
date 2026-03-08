@@ -4,6 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ZionMed — Governança e Segurança Documental para Clínicas</title>
+  <meta name="description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <link rel="canonical" href="{{ url()->current() }}" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ZionMed" />
+  <meta property="og:title" content="ZionMed — Governança e Segurança Documental para Clínicas" />
+  <meta property="og:description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <meta property="og:url" content="{{ url()->current() }}" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:image" content="{{ asset('assets/images/logo/zionmed_logo.png') }}" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ZionMed — Governança e Segurança Documental para Clínicas" />
+  <meta name="twitter:description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <meta name="twitter:image" content="{{ asset('assets/images/logo/zionmed_logo.png') }}" />
+
   <link rel="icon" type="image/png" href="{{ asset('favicon-96x96.png') }}" sizes="96x96" />
   <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}" />
   <link rel="shortcut icon" href="{{ asset('favicon.ico') }}" />
@@ -11,8 +29,34 @@
   <meta name="apple-mobile-web-app-title" content="ZionMed" />
   <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
 
+  <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
+
   <!-- Tailwind via CDN (MVP). Em produção, prefira build com tailwind.config. -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- JSON-LD: Organization + WebSite -->
+  <script type="application/ld+json">
+  {
+    "@@context": "https://schema.org",
+    "@@graph": [
+      {
+        "@@type": "Organization",
+        "@@id": "{{ url('/') }}#organization",
+        "name": "ZionMed",
+        "url": "{{ url('/') }}",
+        "logo": "{{ asset('assets/images/logo/zionmed_logo.png') }}",
+        "description": "Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria."
+      },
+      {
+        "@@type": "WebSite",
+        "name": "ZionMed",
+        "url": "{{ url('/') }}",
+        "description": "Governança e segurança documental para clínicas que operam em alto padrão.",
+        "publisher": { "@@id": "{{ url('/') }}#organization" }
+      }
+    ]
+  }
+  </script>
 
   <script>
     // Tailwind config inline (CDN) — Zion Blue (#1e40af, #2563eb)
@@ -678,6 +722,36 @@
       </div>
     </div>
   </section>
+
+  <!-- JSON-LD: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@@context": "https://schema.org",
+    "@@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@@type": "Question",
+        "name": "O ZionMed substitui meu ERP/prontuário?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Não. Ele complementa: organiza processos operacionais, consentimentos, checklists e evidências com rastreabilidade." }
+      },
+      {
+        "@@type": "Question",
+        "name": "Dá para usar links públicos com segurança?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Links são gerados com token longo e podem ser revogados. Além disso, aplicamos rate limit para reduzir abuso." }
+      },
+      {
+        "@@type": "Question",
+        "name": "O PDF tem protocolo e data/hora?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Cada protocolo pode gerar PDF automático com assinatura e dados do formulário." }
+      },
+      {
+        "@@type": "Question",
+        "name": "Quanto tempo leva para implantar?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Em geral, a base é configurada rapidamente. O tempo depende do número de templates e ajustes do fluxo de aprovação." }
+      }
+    ]
+  }
+  </script>
 
   <!-- Final CTA -->
   <section id="demo" class="bg-accent-600 text-white">

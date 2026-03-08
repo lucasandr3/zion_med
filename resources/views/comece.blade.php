@@ -189,6 +189,12 @@
           Preencha os dados abaixo. Seu trial de {{ (int) config('asaas.trial_days', 14) }} dias começa imediatamente após o cadastro.
         </p>
 
+        @if(session('error'))
+          <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {{ session('error') }}
+          </div>
+        @endif
+
         @if($errors->any())
           <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <p class="font-semibold mb-1">Verifique os campos abaixo:</p>

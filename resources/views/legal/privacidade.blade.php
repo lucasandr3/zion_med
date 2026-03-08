@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Política de Privacidade - Zion Med</title>
+    <meta name="description" content="Política de privacidade do Zion Med: como tratamos dados de formulários, consentimentos e LGPD para clínicas." />
+    <link rel="canonical" href="{{ url()->current() }}" />
+    <meta property="og:title" content="Política de Privacidade - Zion Med" />
+    <meta property="og:description" content="Política de privacidade do Zion Med: como tratamos dados de formulários, consentimentos e LGPD para clínicas." />
+    <meta property="og:url" content="{{ url()->current() }}" />
+    <meta property="og:type" content="website" />
     <link rel="icon" type="image/png" href="{{ asset('favicon-96x96.png') }}" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}" />
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}" />
