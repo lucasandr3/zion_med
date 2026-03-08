@@ -49,7 +49,6 @@
                     </button>
                 @endif
                 @endcan
-            </div>
         </div>
     </div>
 

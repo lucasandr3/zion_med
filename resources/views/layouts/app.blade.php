@@ -144,7 +144,7 @@
 
             @can('manage-clinic')
             <a href="{{ route('clinica.configuracoes.edit') }}"
-               class="nav-link {{ request()->routeIs('clinica.configuracoes.*') ? 'active' : '' }}"
+               class="nav-link {{ request()->routeIs('clinica.configuracoes.*', 'clinica.logs.*') ? 'active' : '' }}"
                data-tooltip="Empresa">
                 <span class="material-symbols-outlined shrink-0" style="font-size:19px">business</span>
                 <span class="sidebar-label">Empresa</span>

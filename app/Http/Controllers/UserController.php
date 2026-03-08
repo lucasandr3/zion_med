@@ -34,14 +34,15 @@ class UserController extends Controller
     public function store(UserStoreRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $data['clinic_id'] = $request->user()->clinic_id ?? session('current_clinic_id');
+        $organizationId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $data['organization_id'] = $organizationId;
         $data['role'] = Role::from($data['role']);
         $data['active'] = true;
         $data['can_switch_clinic'] = $request->user()->can('grant-clinic-switch')
             ? $request->boolean('can_switch_clinic')
             : false;
         $user = User::create($data);
-        Event::dispatch(new AuditEvent('user.created', User::class, $user->id, null, $user->clinic_id, $request->user()->id));
+        Event::dispatch(new AuditEvent('user.created', User::class, $user->id, null, $organizationId, $request->user()->id));
         return redirect()->route('usuarios.index')->with('success', 'Usuário criado.');
     }
 

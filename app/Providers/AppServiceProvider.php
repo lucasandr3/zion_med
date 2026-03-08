@@ -15,7 +15,6 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
@@ -38,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
             // Tabelas platform_settings/plans podem ainda não existir (ex.: durante migrate)
         }
 
-        Event::listen(\App\Events\AuditEvent::class, \App\Listeners\LogAuditListener::class);
+        // Listener AuditEvent → LogAuditListener registrado apenas por descoberta automática (app/Listeners)
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());

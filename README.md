@@ -135,6 +135,21 @@ ASAAS_PRODUCT_NAME=ZionMed
 
 Rotas sempre permitidas (mesmo com bloqueio): `/billing`, `/billing/*`, `/logout`, `/webhooks/asaas`, `/f/*` (formulário público).
 
+## Deploy em produção (Easy Panel)
+
+O build usa **Dockerfile** + **Supervisor**. No arranque do container (entrypoint) o seguinte já roda de forma automática:
+
+| O quê | Como |
+|-------|------|
+| **Migrações** | `php artisan migrate --force` no entrypoint (single-instance). |
+| **Queue worker** | Processo `php artisan queue:work` via Supervisor (webhooks, jobs assíncronos). |
+| **Scheduler** | Loop a cada 60s `php artisan schedule:run` via Supervisor (ex.: `platform:notify-billing` diário). |
+| **Webhook ASAAS** | Rota `POST /webhooks/asaas` excluída do CSRF em `bootstrap/app.php`. |
+
+No Easy Panel basta configurar as **variáveis de ambiente** de produção (APP_ENV=production, APP_DEBUG=false, APP_URL, DB_*, ASAAS_* produção, MinIO, etc.) e fazer o deploy. Não é necessário rodar queue ou cron manualmente.
+
+Se usar mais de um container (réplicas), rode `migrate` apenas em um job de deploy e desative o `migrate` no entrypoint.
+
 ## Comandos úteis
 
 ```bash

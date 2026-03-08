@@ -707,6 +707,12 @@
             <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;margin-right:4px">payments</span>
             Assinatura
         </button>
+        @can('manage-clinic')
+        <a href="{{ route('clinica.logs.index') }}" class="config-tab" style="text-decoration:none" role="tab">
+            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;margin-right:4px">history</span>
+            Logs
+        </a>
+        @endcan
     </div>
 
     {{-- Avisos da sessão sempre abaixo das tabs --}}

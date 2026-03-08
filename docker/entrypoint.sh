@@ -11,6 +11,9 @@ chmod -R 775 storage bootstrap/cache
 # evita cache congelado do build
 php artisan optimize:clear || true
 
+# migrações (produção single-instance; em multi-replica rodar migrate fora do entrypoint)
+php artisan migrate --force --no-interaction || true
+
 # se existir APP_KEY, pode cachear
 php artisan config:cache || true
 php artisan route:cache || true

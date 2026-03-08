@@ -20,6 +20,7 @@ use App\Http\Controllers\LinkBioController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Webhook\AsaasWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,6 +62,8 @@ Route::middleware(['auth', 'platform'])
 
         Route::get('/configuracoes', [PlatformSettingsController::class, 'index'])->name('settings.index');
         Route::put('/configuracoes', [PlatformSettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('/logs', [AuditLogController::class, 'platformIndex'])->name('logs.index');
     });
 
 Route::get('/l/{slug}', [LinkBioController::class, 'public'])->name('link-bio.public');
@@ -110,6 +113,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/configuracoes', [ClinicSettingsController::class, 'edit'])->name('configuracoes.edit');
         Route::put('/configuracoes', [ClinicSettingsController::class, 'update'])->name('configuracoes.update');
         Route::post('/empresas', [ClinicSettingsController::class, 'storeEmpresa'])->name('empresas.store');
+        Route::get('/logs', [AuditLogController::class, 'index'])->name('logs.index');
         Route::get('/integracoes', [IntegrationsController::class, 'index'])->name('integracoes.index');
         Route::post('/integracoes/tokens', [IntegrationsController::class, 'createToken'])->name('integracoes.tokens.store');
         Route::delete('/integracoes/tokens/{token}', [IntegrationsController::class, 'revokeToken'])->name('integracoes.tokens.destroy');

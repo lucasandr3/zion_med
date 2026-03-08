@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/asaas',
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\SetClinic::class,
             \App\Http\Middleware\EnsureClinicBillingIsActive::class,

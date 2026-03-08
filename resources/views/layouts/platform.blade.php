@@ -116,6 +116,13 @@
                 <span class="material-symbols-outlined shrink-0" style="font-size:19px">settings</span>
                 <span class="sidebar-label">Configurações</span>
             </a>
+
+            <a href="{{ route('platform.logs.index') }}"
+               class="nav-link {{ request()->routeIs('platform.logs.*') ? 'active' : '' }}"
+               data-tooltip="Meus logs de auditoria">
+                <span class="material-symbols-outlined shrink-0" style="font-size:19px">history</span>
+                <span class="sidebar-label">Logs</span>
+            </a>
         </nav>
 
         {{-- Rodapé: usuário --}}
