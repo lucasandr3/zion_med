@@ -49,7 +49,7 @@
         </div>
         <div class="leading-tight">
           <div class="text-sm font-semibold tracking-tight text-slate-900">ZionMed</div>
-          <div class="hidden text-xs text-slate-500 sm:block">Governança e Segurança Documental</div>
+          <div class="hidden text-xs text-slate-500 sm:block">Fichas e Consentimentos Digitais</div>
         </div>
       </a>
       <div class="flex items-center gap-2 shrink-0">
@@ -89,20 +89,20 @@
 
         <div>
           <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Governança documental para clínicas que levam a sério.
+            Fichas e consentimentos digitais para a sua clínica.
           </h2>
           <p class="mt-3 text-base text-slate-600 leading-relaxed">
-            A ZionMed centraliza formulários, evidências e trilhas de auditoria para que sua clínica opere com segurança, conformidade e rastreabilidade — sem burocracia extra.
+            O ZionMed digitaliza fichas de cadastro, termos de consentimento e checklists, com assinatura eletrônica, protocolo e PDF automático — sem substituir o ERP ou prontuário que você já usa.
           </p>
         </div>
 
         {{-- Benefícios --}}
         <div class="space-y-3">
           @foreach([
-            ['icon' => 'verified_user',  'color' => 'text-indigo-500',  'bg' => 'bg-indigo-50',  'title' => 'Documentação com força jurídica',      'desc' => 'Formulários assinados digitalmente com trilha de auditoria imutável.'],
+            ['icon' => 'description',     'color' => 'text-indigo-500',  'bg' => 'bg-indigo-50',  'title' => 'Fichas e consentimentos sem papel',     'desc' => 'Pacientes recebem um link, preenchem e assinam digitalmente antes da consulta.'],
             ['icon' => 'bolt',           'color' => 'text-amber-500',   'bg' => 'bg-amber-50',   'title' => 'Acesso imediato, sem burocracia',        'desc' => 'Sua conta é criada na hora. Comece a usar em minutos, sem instalação.'],
-            ['icon' => 'assignment',     'color' => 'text-sky-500',     'bg' => 'bg-sky-50',     'title' => 'Fluxos prontos para clínicas',           'desc' => 'Templates de formulários e checklists prontos para uso desde o primeiro dia.'],
-            ['icon' => 'notifications',  'color' => 'text-rose-500',    'bg' => 'bg-rose-50',    'title' => 'Alertas e notificações automáticas',     'desc' => 'Saiba em tempo real quando documentos venceram ou precisam ser renovados.'],
+            ['icon' => 'assignment',     'color' => 'text-sky-500',     'bg' => 'bg-sky-50',     'title' => 'Templates prontos para clínicas',        'desc' => 'Fichas de cadastro, anamneses e consentimentos prontos para uso desde o primeiro dia.'],
+            ['icon' => 'picture_as_pdf', 'color' => 'text-rose-500',    'bg' => 'bg-rose-50',    'title' => 'PDF e protocolo automáticos',            'desc' => 'Cada envio gera PDF com protocolo único, data/hora e evidência de assinatura.'],
             ['icon' => 'corporate_fare', 'color' => 'text-emerald-500', 'bg' => 'bg-emerald-50', 'title' => 'Multi-unidade e multi-equipe',           'desc' => 'Gerencie várias unidades e equipes com permissões granulares por perfil.'],
           ] as $benefit)
           <div class="flex items-start gap-3">

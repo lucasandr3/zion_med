@@ -34,9 +34,11 @@ class ComeceController extends Controller
         }
 
         $plans = config('asaas.plans', []);
-        $selectedPlan = $request->query('plan', 'core');
-        if (! array_key_exists($selectedPlan, $plans)) {
-            $selectedPlan = 'core';
+        // Para o teste com preço único, sempre usamos o primeiro plano configurado como padrão.
+        $selectedPlan = $request->query('plan');
+        $defaultPlanKey = ! empty($plans) ? array_key_first($plans) : null;
+        if (! $selectedPlan || ! isset($plans[$selectedPlan])) {
+            $selectedPlan = $defaultPlanKey;
         }
 
         return view('comece', [

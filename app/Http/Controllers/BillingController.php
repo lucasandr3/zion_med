@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Clinic;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\Plan;
 use App\Services\AsaasService;
 use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Client\RequestException;
@@ -12,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
 
 class BillingController extends Controller
 {
@@ -42,12 +44,19 @@ class BillingController extends Controller
         $log('checkout entry', ['plan_key_raw'=>$request->input('plan_key'),'has_csrf'=>$request->has('_token')], 'A');
         // #endregion
 
+        // Chaves de plano válidas vêm dos planos ativos no banco;
+        // se não houver nenhum, usamos os planos da config como fallback.
+        $allowedPlanKeys = Plan::activeKeys();
+        if (empty($allowedPlanKeys)) {
+            $allowedPlanKeys = array_keys(config('asaas.plans', []));
+        }
+
         try {
             $request->validate([
-                'plan_key' => ['required', 'string', 'in:core,executive,enterprise'],
+                'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
             ], [
                 'plan_key.required' => 'Nenhum plano foi selecionado.',
-                'plan_key.in' => 'Plano inválido. Escolha Core, Executive ou Enterprise.',
+                'plan_key.in' => 'Plano inválido. Escolha um dos planos disponíveis.',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $log('validation failed', ['errors'=>$e->errors(),'plan_key'=>$request->input('plan_key')], 'A');
@@ -70,9 +79,10 @@ class BillingController extends Controller
         }
 
         $plans = config('asaas.plans', []);
-        $plan = $plans[$request->input('plan_key')] ?? null;
+        $planKey = $request->input('plan_key');
+        $plan = $plans[$planKey] ?? null;
         if (! $plan) {
-            return redirect()->route('clinica.configuracoes.edit', ['tab' => 'assinatura'])->with('error', 'Plano selecionado não existe. Escolha Core, Executive ou Enterprise.');
+            return redirect()->route('clinica.configuracoes.edit', ['tab' => 'assinatura'])->with('error', 'Plano selecionado não existe. Escolha um dos planos disponíveis.');
         }
 
         $doc = preg_replace('/\D/', '', $clinic->billing_document ?? '');
@@ -83,7 +93,7 @@ class BillingController extends Controller
         try {
             $payload = $this->asaasService->createSubscription(
                 $clinic,
-                $request->input('plan_key'),
+                $planKey,
                 (float) $plan['value'],
                 'BOLETO'
             );

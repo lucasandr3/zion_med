@@ -3,23 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ZionMed — Governança e Segurança Documental para Clínicas</title>
-  <meta name="description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <title>ZionMed — Fichas e Consentimentos Digitais para Clínicas</title>
+  <meta name="description" content="Digitalize fichas e consentimentos da sua clínica: pacientes recebem um link, preenchem antes da consulta e assinam digitalmente. Protocolo, PDF automático e histórico organizado. Trial grátis." />
   <link rel="canonical" href="{{ url()->current() }}" />
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="ZionMed" />
-  <meta property="og:title" content="ZionMed — Governança e Segurança Documental para Clínicas" />
-  <meta property="og:description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <meta property="og:title" content="ZionMed — Fichas e Consentimentos Digitais para Clínicas" />
+  <meta property="og:description" content="Digitalize fichas e consentimentos da sua clínica: pacientes recebem um link, preenchem antes da consulta e assinam digitalmente. Protocolo, PDF automático e histórico organizado. Trial grátis." />
   <meta property="og:url" content="{{ url()->current() }}" />
   <meta property="og:locale" content="pt_BR" />
   <meta property="og:image" content="{{ asset('assets/images/logo/zionmed_logo.png') }}" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="ZionMed — Governança e Segurança Documental para Clínicas" />
-  <meta name="twitter:description" content="Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria. Trial grátis." />
+  <meta name="twitter:title" content="ZionMed — Fichas e Consentimentos Digitais para Clínicas" />
+  <meta name="twitter:description" content="Digitalize fichas e consentimentos da sua clínica: pacientes recebem um link, preenchem antes da consulta e assinam digitalmente. Protocolo, PDF automático e histórico organizado. Trial grátis." />
   <meta name="twitter:image" content="{{ asset('assets/images/logo/zionmed_logo.png') }}" />
 
   <link rel="icon" type="image/png" href="{{ asset('favicon-96x96.png') }}" sizes="96x96" />
@@ -45,13 +45,13 @@
         "name": "ZionMed",
         "url": "{{ url('/') }}",
         "logo": "{{ asset('assets/images/logo/zionmed_logo.png') }}",
-        "description": "Plataforma de governança e segurança documental para clínicas: formulários, consentimentos, assinatura eletrônica, PDF e trilha de auditoria."
+        "description": "Fichas e consentimentos digitais para clínicas: pacientes preenchem e assinam antes da consulta. Protocolo, PDF automático e histórico organizado."
       },
       {
         "@@type": "WebSite",
         "name": "ZionMed",
         "url": "{{ url('/') }}",
-        "description": "Governança e segurança documental para clínicas que operam em alto padrão.",
+        "description": "Fichas e consentimentos digitais para clínicas — sem papel na recepção.",
         "publisher": { "@@id": "{{ url('/') }}#organization" }
       }
     ]
@@ -138,11 +138,11 @@
 
 <body class="bg-base-50 text-base-950 antialiased">
   <!-- Top announcement -->
-  <div class="bg-accent-600 text-white">
+    <div class="bg-accent-600 text-white">
     <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 text-xs sm:text-sm">
       <p class="flex items-center gap-2">
         <span class="inline-flex h-2 w-2 rounded-full bg-emeraldish-500"></span>
-        Plataforma de governança documental para clínicas com rastreabilidade e controle.
+        Fichas e consentimentos digitais para clínicas — sem papel, com protocolo e assinatura eletrônica.
       </p>
 
       <button type="button" id="themeToggle" aria-label="Alternar tema"
@@ -162,16 +162,15 @@
           </div>
           <div class="leading-tight">
             <div class="text-sm font-semibold tracking-tight">ZionMed</div>
-            <div class="text-xs text-slate-500">Governança e Segurança Documental</div>
+            <div class="text-xs text-slate-500">Fichas e Consentimentos Digitais</div>
           </div>
         </a>
       </div>
 
       <nav class="hidden items-center gap-6 text-sm text-slate-600 md:flex">
-        <a href="#solucao" class="hover:text-slate-900">Solução</a>
-        <a href="#governanca" class="hover:text-slate-900">Governança</a>
         <a href="#como-funciona" class="hover:text-slate-900">Como funciona</a>
-        <a href="#seguranca" class="hover:text-slate-900">Segurança</a>
+        <a href="#beneficios" class="hover:text-slate-900">Benefícios</a>
+        <a href="#governanca" class="hover:text-slate-900">Governança</a>
         <a href="#integracoes" class="hover:text-slate-900">Integrações</a>
         <a href="#precos" class="hover:text-slate-900">Planos</a>
       </nav>
@@ -196,94 +195,96 @@
       <div class="grid items-center gap-10 lg:grid-cols-2">
         <div>
           <div class="inline-flex items-center gap-2 rounded-full border border-base-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-            <span class="h-2 w-2 rounded-full bg-accent-600"></span>
-            Para clínicas que exigem padronização, auditoria e rastreabilidade
+            <span class="h-2 w-2 rounded-full bg-emeraldish-500"></span>
+            Fichas e consentimentos 100% digitais para clínicas
           </div>
 
           <h1 class="mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-            Governança e segurança documental<br class="hidden sm:block" />
-            para clínicas que operam em alto padrão.
+            Elimine o papel da<br class="hidden sm:block" />
+            recepção da sua clínica.
           </h1>
 
           <p class="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-            O ZionMed centraliza formulários operacionais, consentimentos e checklists com assinatura eletrônica,
-            PDF automático e trilha de auditoria — sem substituir seu ERP ou prontuário.
+            Pacientes recebem um link, preenchem a ficha antes da consulta e assinam digitalmente o consentimento.
+            Sua clínica recebe tudo com protocolo, PDF automático e histórico organizado — sem trocar o sistema atual.
           </p>
 
           <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <a id="cta"
               href="{{ route('comece.show') }}"
               class="btn-cta-primary inline-flex items-center justify-center rounded-lg bg-accent-600 px-6 py-3 text-sm font-semibold text-white shadow-soft hover:bg-accent-500">
-              Começar trial grátis
+              Começar teste grátis
             </a>
-            <a href="#precos"
+            <a href="#demo"
               class="inline-flex items-center justify-center rounded-lg border border-base-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-base-100">
-              Ver planos e preços
+              Ver demonstração
             </a>
           </div>
 
           <div class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div class="rounded-xl border border-base-200 bg-white p-4 shadow-sm">
-              <div class="text-sm font-semibold">Trilha de auditoria</div>
-              <div class="mt-1 text-xs text-slate-500">Ações por usuário, data e contexto</div>
+              <div class="text-sm font-semibold">Sem papel</div>
+              <div class="mt-1 text-xs text-slate-500">Fichas e consentimentos 100% digitais</div>
             </div>
             <div class="rounded-xl border border-base-200 bg-white p-4 shadow-sm">
               <div class="text-sm font-semibold">Assinatura + PDF</div>
-              <div class="mt-1 text-xs text-slate-500">Registro formal com comprovação</div>
+              <div class="mt-1 text-xs text-slate-500">Registro formal com protocolo automático</div>
             </div>
             <div class="rounded-xl border border-base-200 bg-white p-4 shadow-sm">
-              <div class="text-sm font-semibold">Fluxo de aprovação</div>
-              <div class="mt-1 text-xs text-slate-500">Pendente → aprovado/reprovado</div>
+              <div class="text-sm font-semibold">Histórico organizado</div>
+              <div class="mt-1 text-xs text-slate-500">Documentos fáceis de localizar e exportar</div>
             </div>
           </div>
         </div>
 
-        <!-- Hero visual -->
+        <!-- Hero visual: fluxo do paciente -->
         <div class="relative">
           <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-soft">
             <div class="flex items-center justify-between">
               <div>
-                <div class="text-sm font-semibold text-slate-900">Painel executivo</div>
-                <div class="text-xs text-slate-500">Visão consolidada de processos</div>
+                <div class="text-sm font-semibold text-slate-900">Fluxo do paciente</div>
+                <div class="text-xs text-slate-500">Do link até o protocolo final</div>
               </div>
               <div class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">
-                Padrão premium
+                100% digital
               </div>
             </div>
 
-            <div class="mt-6 grid gap-4 sm:grid-cols-2">
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-xs text-slate-500">Protocolos pendentes</div>
-                <div class="mt-2 text-2xl font-semibold">18</div>
-                <div class="mt-1 text-xs text-slate-500">últimas 24h</div>
+            <div class="mt-6 space-y-3">
+              <div class="flex items-start gap-3 rounded-xl border border-base-200 bg-base-50 p-4">
+                <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-600 text-xs font-bold text-white">1</div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">Recepção envia o link</div>
+                  <div class="mt-0.5 text-xs text-slate-500">Via WhatsApp, SMS ou e-mail, antes da consulta</div>
+                </div>
               </div>
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-xs text-slate-500">Conformidade</div>
-                <div class="mt-2 text-2xl font-semibold">98%</div>
-                <div class="mt-1 text-xs text-slate-500">checklists completos</div>
+              <div class="flex items-start gap-3 rounded-xl border border-base-200 bg-base-50 p-4">
+                <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-600 text-xs font-bold text-white">2</div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">Paciente preenche a ficha</div>
+                  <div class="mt-0.5 text-xs text-slate-500">No celular ou computador, sem instalar nada</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 rounded-xl border border-base-200 bg-base-50 p-4">
+                <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-600 text-xs font-bold text-white">3</div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">Assina digitalmente</div>
+                  <div class="mt-0.5 text-xs text-slate-500">Consentimento com data/hora e evidência formal</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 rounded-xl border border-emeraldish-500/30 bg-emeraldish-500/5 p-4">
+                <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emeraldish-600 text-xs font-bold text-white">4</div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">Clínica recebe protocolo e PDF</div>
+                  <div class="mt-0.5 text-xs text-slate-500">Tudo organizado com trilha de auditoria</div>
+                </div>
               </div>
             </div>
 
-            <div class="mt-6">
-              <div class="text-xs font-medium text-slate-600">Fluxo operacional</div>
-              <div class="mt-2 flex items-center gap-2 text-xs">
-                <span class="rounded-full bg-accent-600 px-2 py-1 text-white">Pendente</span>
-                <span class="text-slate-400">→</span>
-                <span class="rounded-full border border-base-200 bg-white px-2 py-1 text-slate-700">Em revisão</span>
-                <span class="text-slate-400">→</span>
-                <span class="rounded-full bg-emeraldish-600 px-2 py-1 text-white">Aprovado</span>
-              </div>
-            </div>
-
-            <div class="mt-6 rounded-xl border border-base-200 bg-white p-4">
-              <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold text-slate-900">Termo de consentimento</div>
-                <div class="text-xs text-slate-500">PDF + assinatura</div>
-              </div>
-              <div class="mt-3 h-16 rounded-lg border border-dashed border-base-200 bg-base-50"></div>
-              <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <div class="mt-5 rounded-xl border border-base-200 bg-white p-4">
+              <div class="flex items-center justify-between text-xs text-slate-500">
                 <span>Paciente: A*** S***</span>
-                <span>Protocolo #10482</span>
+                <span class="rounded-full bg-emeraldish-600/10 px-2 py-0.5 text-xs font-medium text-emeraldish-600">Protocolo #10482 · PDF gerado</span>
               </div>
             </div>
           </div>
@@ -300,107 +301,291 @@
     <div class="mx-auto max-w-7xl px-4 py-8">
       <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <div class="text-sm font-semibold text-slate-900">Projetado para ambientes com exigência de conformidade</div>
-          <div class="text-sm text-slate-600">Rastreabilidade, padronização e evidência documental sob controle.</div>
+          <div class="text-sm font-semibold text-slate-900">Complementar ao ERP e prontuário que você já usa</div>
+          <div class="text-sm text-slate-600">O ZionMed não substitui nada — ele digitaliza o que ainda está em papel na recepção.</div>
         </div>
         <div class="flex flex-wrap gap-2">
-          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Multiusuário</span>
-          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Logs</span>
-          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">PDF</span>
-          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Assinatura</span>
-          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Exportação</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Fichas digitais</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Consentimentos</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Assinatura digital</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">PDF automático</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Protocolo</span>
+          <span class="rounded-full border border-base-200 bg-base-50 px-3 py-1 text-xs font-medium text-slate-600">Auditoria</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Solution -->
-  <section id="solucao" class="bg-base-50">
+  <!-- Problema -->
+  <section id="problema" class="bg-base-50">
     <div class="mx-auto max-w-7xl px-4 py-16">
       <div class="max-w-3xl">
         <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-          ZionMed organiza o que o ERP não cobre: processos e evidências.
+          Sua clínica ainda depende de papel para fichas e consentimentos?
         </h2>
         <p class="mt-4 text-base leading-relaxed text-slate-600">
-          Não é prontuário. Não é faturamento. É governança documental operacional: termos, checklists, triagens,
-          solicitações internas e aprovações com histórico completo.
+          Papéis na recepção parecem inofensivos, mas no dia a dia trazem lentidão, perda de informação e risco jurídico.
+          O ZionMed foi criado para resolver exatamente esses problemas.
         </p>
       </div>
 
-      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-sm font-semibold text-slate-900">Formulários padronizados</div>
-          <p class="mt-2 text-sm text-slate-600">
-            Templates por especialidade, campos dinâmicos e link público controlado quando necessário.
-          </p>
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-500">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Fichas em papel na recepção</div>
+          <p class="mt-2 text-sm text-slate-600">Pacientes preenchem tudo na hora, formando fila e causando retrabalho à equipe.</p>
         </div>
 
         <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-sm font-semibold text-slate-900">Assinatura + PDF automático</div>
-          <p class="mt-2 text-sm text-slate-600">
-            Registro formal com data/hora, protocolo e anexos — pronto para arquivo e auditoria.
-          </p>
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Consentimentos sem padrão</div>
+          <p class="mt-2 text-sm text-slate-600">Cada profissional usando um modelo diferente, sem controle de versão nem registro formal.</p>
         </div>
 
         <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-sm font-semibold text-slate-900">Fluxo e rastreabilidade</div>
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-50 text-yellow-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Documentos difíceis de localizar</div>
+          <p class="mt-2 text-sm text-slate-600">Pastas físicas, arquivos espalhados e busca manual que consome tempo precioso da equipe.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-500">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Risco jurídico por falta de comprovação</div>
+          <p class="mt-2 text-sm text-slate-600">Assinaturas ilegíveis, datas imprecisas e documentos sem cópia digital geram exposição legal.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Tempo da equipe consumido com papelada</div>
+          <p class="mt-2 text-sm text-slate-600">Impressão, coleta, arquivamento e busca manual drenam a produtividade da recepção.</p>
+        </div>
+
+        <div class="flex flex-col justify-between rounded-2xl border border-accent-600/20 bg-accent-600/5 p-6 shadow-sm">
+          <div>
+            <div class="text-sm font-semibold text-accent-600">O ZionMed resolve isso</div>
+            <p class="mt-2 text-sm text-slate-600">Fichas e consentimentos digitais, assinatura com evidência, PDF automático e histórico organizado — sem trocar o sistema atual.</p>
+          </div>
+          <a href="{{ route('comece.show') }}" class="btn-cta-primary mt-6 inline-flex items-center justify-center rounded-lg bg-accent-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-500">
+            Começar teste grátis
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="como-funciona" class="bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-16">
+      <div class="max-w-3xl">
+        <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+          Como o ZionMed funciona na prática
+        </h2>
+        <p class="mt-4 text-base leading-relaxed text-slate-600">
+          Em quatro passos simples, sua clínica digitaliza fichas e consentimentos, mantendo tudo organizado com evidência jurídica — sem trocar o sistema atual.
+        </p>
+      </div>
+
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-2xl border border-base-200 bg-base-50 p-6 shadow-sm">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600 text-sm font-bold text-white">1</div>
+          <div class="mt-4 text-base font-semibold text-slate-900">A clínica envia um link</div>
           <p class="mt-2 text-sm text-slate-600">
-            Pendências, aprovações e trilha de auditoria por usuário, setor e período.
+            A recepção gera o link do formulário e envia ao paciente por WhatsApp, SMS ou e-mail antes da consulta.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-base-50 p-6 shadow-sm">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600 text-sm font-bold text-white">2</div>
+          <div class="mt-4 text-base font-semibold text-slate-900">Paciente preenche a ficha</div>
+          <p class="mt-2 text-sm text-slate-600">
+            Ele acessa no celular ou computador, sem instalar nada, e preenche os dados com comodidade antes de chegar.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-base-50 p-6 shadow-sm">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600 text-sm font-bold text-white">3</div>
+          <div class="mt-4 text-base font-semibold text-slate-900">Assina o consentimento</div>
+          <p class="mt-2 text-sm text-slate-600">
+            O paciente lê e assina digitalmente. O ZionMed registra data/hora, IP e evidências de forma segura.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-emeraldish-500/30 bg-emeraldish-500/5 p-6 shadow-sm">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emeraldish-600 text-sm font-bold text-white">4</div>
+          <div class="mt-4 text-base font-semibold text-slate-900">Clínica recebe protocolo e PDF</div>
+          <p class="mt-2 text-sm text-slate-600">
+            Cada envio gera protocolo único, PDF automático e entra no histórico — pronto para consulta e auditoria.
           </p>
         </div>
       </div>
 
-      <div class="mt-10 rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+      <div class="mt-10 rounded-2xl border border-base-200 bg-base-50 p-6">
         <div class="grid gap-6 lg:grid-cols-3">
           <div>
-            <div class="text-xs font-medium text-slate-500">Casos de uso</div>
+            <div class="text-xs font-medium text-slate-500">Casos de uso incluídos</div>
             <ul class="mt-3 space-y-2 text-sm text-slate-700">
-              <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Termo de consentimento com assinatura</li>
-              <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Anamnese e triagem operacional</li>
-              <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Checklist de sala e equipamentos</li>
-              <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Solicitações internas e controle de pendências</li>
-              <li class="flex gap-2"><span class="mt-1 h-2 w-2 rounded-full bg-accent-600"></span> Pesquisa de satisfação (NPS)</li>
+              <li class="flex gap-2"><span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-600"></span> Ficha de cadastro do paciente</li>
+              <li class="flex gap-2"><span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-600"></span> Termo de consentimento com assinatura</li>
+              <li class="flex gap-2"><span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-600"></span> Anamnese e triagem antes da consulta</li>
+              <li class="flex gap-2"><span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-600"></span> Checklist de sala e equipamentos</li>
+              <li class="flex gap-2"><span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent-600"></span> Pesquisa de satisfação do paciente (NPS)</li>
             </ul>
           </div>
-
           <div class="lg:col-span-2">
-            <div class="text-xs font-medium text-slate-500">O que muda na prática</div>
+            <div class="text-xs font-medium text-slate-500">O que muda na rotina da clínica</div>
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-sm font-semibold">Menos risco</div>
-                <div class="mt-1 text-sm text-slate-600">Evidências documentais rastreáveis por protocolo.</div>
+              <div class="rounded-xl border border-base-200 bg-white p-4">
+                <div class="text-sm font-semibold">Recepção mais ágil</div>
+                <div class="mt-1 text-sm text-slate-600">Paciente chega com ficha preenchida e consentimento assinado.</div>
               </div>
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-sm font-semibold">Mais controle</div>
-                <div class="mt-1 text-sm text-slate-600">Aprovação e histórico por perfil e responsabilidade.</div>
+              <div class="rounded-xl border border-base-200 bg-white p-4">
+                <div class="text-sm font-semibold">Documentos sempre acessíveis</div>
+                <div class="mt-1 text-sm text-slate-600">Localização rápida por paciente, data, tipo ou protocolo.</div>
               </div>
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-sm font-semibold">Padronização</div>
-                <div class="mt-1 text-sm text-slate-600">Processos iguais em todas as unidades e equipes.</div>
+              <div class="rounded-xl border border-base-200 bg-white p-4">
+                <div class="text-sm font-semibold">Evidência jurídica</div>
+                <div class="mt-1 text-sm text-slate-600">Assinatura digital com protocolo e registro formal de cada documento.</div>
               </div>
-              <div class="rounded-xl border border-base-200 bg-base-50 p-4">
-                <div class="text-sm font-semibold">Eficiência</div>
-                <div class="mt-1 text-sm text-slate-600">Localização e exportação rápida quando solicitado.</div>
+              <div class="rounded-xl border border-base-200 bg-white p-4">
+                <div class="text-sm font-semibold">Sem trocar o ERP</div>
+                <div class="mt-1 text-sm text-slate-600">Complementar ao sistema atual, sem migração ou substituição.</div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </section>
 
+  <!-- Benefícios -->
+  <section id="beneficios" class="bg-base-50">
+    <div class="mx-auto max-w-7xl px-4 py-16">
+      <div class="max-w-3xl">
+        <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+          Benefícios diretos para a rotina da clínica
+        </h2>
+        <p class="mt-4 text-base leading-relaxed text-slate-600">
+          Menos papel, recepção mais rápida e documentação organizada com evidência jurídica.
+        </p>
+      </div>
+
+      <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emeraldish-500/10 text-emeraldish-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Menos papel e menos impressões</div>
+          <p class="mt-2 text-sm text-slate-600">Fichas e consentimentos digitais reduzem custo com impressão, arquivo físico e risco de perda de documentos.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600/10 text-accent-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Recepção mais rápida</div>
+          <p class="mt-2 text-sm text-slate-600">Paciente chega com ficha preenchida e consentimento assinado — a equipe só precisa confirmar e atender.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Documentos organizados e fáceis de localizar</div>
+          <p class="mt-2 text-sm text-slate-600">Protocolos e PDFs organizados por paciente, data e tipo de formulário — encontrados em segundos.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Protocolo e PDF automáticos</div>
+          <p class="mt-2 text-sm text-slate-600">Cada envio gera automaticamente protocolo único, data/hora e PDF — sem nenhum trabalho manual.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Proteção jurídica reforçada</div>
+          <p class="mt-2 text-sm text-slate-600">Assinaturas digitais com evidência e trilha de auditoria reduzem a exposição em questionamentos futuros.</p>
+        </div>
+
+        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          </div>
+          <div class="text-sm font-semibold text-slate-900">Auditoria e rastreabilidade completas</div>
+          <p class="mt-2 text-sm text-slate-600">Logs por usuário, setor e período mostram quem fez o quê, quando e em qual documento.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo visual -->
+  <section id="demonstracao-video" class="bg-white border-y border-base-200">
+    <div class="mx-auto max-w-7xl px-4 py-16">
+      <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+            Veja o ZionMed funcionando em menos de 1 minuto
+          </h2>
+          <p class="mt-4 text-base leading-relaxed text-slate-600">
+            Veja o fluxo completo: do envio do link para o paciente até o protocolo e PDF gerados na clínica.
+          </p>
+          <ul class="mt-6 space-y-3 text-sm text-slate-700">
+            <li class="flex gap-3">
+              <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emeraldish-600 text-white text-xs">✓</span>
+              Paciente recebendo e preenchendo o formulário no celular
+            </li>
+            <li class="flex gap-3">
+              <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emeraldish-600 text-white text-xs">✓</span>
+              Assinatura digital e geração do consentimento
+            </li>
+            <li class="flex gap-3">
+              <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emeraldish-600 text-white text-xs">✓</span>
+              Protocolo, PDF e histórico disponíveis na clínica
+            </li>
+          </ul>
+          <a href="#demo" class="btn-cta-primary mt-8 inline-flex items-center gap-2 rounded-lg bg-accent-600 px-6 py-3 text-sm font-semibold text-white hover:bg-accent-500">
+            Agendar uma demonstração
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </a>
+        </div>
+        <div class="aspect-video rounded-2xl border border-base-200 bg-base-50 flex items-center justify-center shadow-soft">
+          {{-- Substitua pelo embed do vídeo quando disponível --}}
+          <div class="text-center p-8">
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-600/10 text-accent-600">
+              <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <p class="mt-4 text-sm font-medium text-slate-700">Demonstração do ZionMed</p>
+            <p class="mt-1 text-xs text-slate-500">Vídeo disponível em breve</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- Governance -->
-  <section id="governanca" class="bg-white">
+  <section id="governanca" class="bg-base-50">
     <div class="mx-auto max-w-7xl px-4 py-16">
       <div class="grid gap-10 lg:grid-cols-2">
         <div>
           <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Governança operacional: aprovações, trilhas e responsabilidades claras.
+            Governança e auditoria para além das fichas e consentimentos.
           </h2>
           <p class="mt-4 text-base leading-relaxed text-slate-600">
-            Clínicas maiores precisam de previsibilidade. O ZionMed cria estrutura para que processos não dependam de pessoas,
-            e sim de regras: quem envia, quem aprova, quando, e o que foi alterado.
+            Depois que fichas e consentimentos estão 100% digitais, sua clínica passa a contar com uma camada de governança:
+            perfis com permissões claras, fluxos de aprovação e trilha de auditoria completa por documento, usuário e período.
           </p>
 
             <div class="mt-8 space-y-4">
@@ -484,58 +669,17 @@
     </div>
   </section>
 
-  <!-- How it works -->
-  <section id="como-funciona" class="bg-base-50">
-    <div class="mx-auto max-w-7xl px-4 py-16">
-      <div class="max-w-3xl">
-        <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-          Implementação executiva — sem trocar o sistema atual.
-        </h2>
-        <p class="mt-4 text-base leading-relaxed text-slate-600">
-          O ZionMed é complementar ao seu ecossistema. Entramos para padronizar processos e criar evidências formais,
-          com implantação rápida e treinamento do time.
-        </p>
-      </div>
-
-      <div class="mt-10 grid gap-6 lg:grid-cols-3">
-        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Passo 1</div>
-          <div class="mt-2 text-lg font-semibold">Diagnóstico</div>
-          <p class="mt-2 text-sm text-slate-600">
-            Mapeamos seus processos críticos (consentimentos, checklists, solicitações e triagens).
-          </p>
-        </div>
-
-        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Passo 2</div>
-          <div class="mt-2 text-lg font-semibold">Configuração</div>
-          <p class="mt-2 text-sm text-slate-600">
-            Templates e fluxos são configurados conforme o padrão da clínica e responsabilidades.
-          </p>
-        </div>
-
-        <div class="rounded-2xl border border-base-200 bg-white p-6 shadow-sm">
-          <div class="text-xs font-medium text-slate-500">Passo 3</div>
-          <div class="mt-2 text-lg font-semibold">Adoção</div>
-          <p class="mt-2 text-sm text-slate-600">
-            Treinamento rápido e go-live. Uso imediato com rastreabilidade desde o primeiro dia.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Security -->
   <section id="seguranca" class="bg-white">
     <div class="mx-auto max-w-7xl px-4 py-16">
       <div class="grid gap-10 lg:grid-cols-2">
         <div>
           <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Segurança e controle de acesso em nível corporativo.
+            Segurança e controle de acesso para dados sensíveis de pacientes.
           </h2>
           <p class="mt-4 text-base leading-relaxed text-slate-600">
-            O ZionMed foi desenhado para reduzir exposição e aumentar controle: permissões por perfil, links públicos
-            com token seguro e registros de auditoria.
+            Como lidamos com dados sensíveis de pacientes e documentos com impacto jurídico, o ZionMed foi desenhado
+            com foco em segurança: permissões por perfil, links com token seguro e registro completo de auditoria.
           </p>
 
           <div class="mt-8 grid gap-4 sm:grid-cols-2">
@@ -594,8 +738,8 @@
           O ZionMed integra com outros sistemas
         </h2>
         <p class="mt-4 text-base leading-relaxed text-slate-600">
-          Quem assina o ZionMed pode conectar ERPs, prontuários e sistemas internos por meio de <strong>API REST</strong> e <strong>webhooks</strong>. 
-          A integração é pensada para ser simples: token de API, documentação OpenAPI e notificações em tempo real.
+          Quem assina o ZionMed pode conectá-lo ao ERP, prontuário ou outros sistemas da clínica por meio de <strong>API REST</strong> e <strong>webhooks</strong>.
+          Assim, o fluxo de fichas e consentimentos conversa com o que você já usa hoje, sem precisar trocar nada.
         </p>
       </div>
       <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -638,10 +782,11 @@
     <div class="mx-auto max-w-7xl px-4 py-16">
       <div class="max-w-3xl">
         <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-          Planos para clínicas com operação profissional.
+          Um plano simples para começar a digitalizar sua documentação.
         </h2>
         <p class="mt-4 text-base leading-relaxed text-slate-600">
-          Trial de {{ $landingTrialDays }} dias. Planos mensais pensados para facilitar a adoção inicial e crescer junto com a complexidade da sua operação.
+          Comece com fichas e consentimentos digitais, assinatura, protocolo e PDF automático.
+          Trial de {{ $landingTrialDays }} dias sem cartão de crédito.
         </p>
       </div>
 
@@ -668,7 +813,7 @@
             @endif
 
             <a href="{{ route('comece.show', ['plan' => $planKey]) }}" class="mt-8 inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold {{ $isRecommended ? 'btn-cta-primary bg-white text-accent-600 hover:bg-white/95' : 'border border-base-200 bg-base-50 text-slate-800 hover:bg-base-100' }}">
-              Começar trial
+              Começar teste grátis
             </a>
           </div>
         @endforeach
@@ -681,8 +826,8 @@
       @endif
 
       <div class="mt-8 space-y-2 text-sm text-slate-500">
-        <p>* Trial de {{ $landingTrialDays }} dias. Após o cadastro, sua clínica pode concluir a ativação comercial do plano escolhido.</p>
-        <p>* Implantação inicial: R$ 500 a R$ 1.500 para clínica pequena; R$ 1.500 a R$ 3.000 para operação com alguns fluxos e treinamento; R$ 3.000 a R$ 6.000 para multiunidade ou integrações.</p>
+        <p>* Trial de {{ $landingTrialDays }} dias sem cartão de crédito. Após o cadastro, sua clínica testa o ZionMed na prática e só continua se fizer sentido para a operação.</p>
+        <p>* A implantação inicial é dimensionada conforme o número de unidades, volume de documentos e necessidade de integração. Clínica pequena: R$ 500–R$ 1.500. Com fluxos e treinamento: R$ 1.500–R$ 3.000. Multiunidade ou integrações: R$ 3.000–R$ 6.000.</p>
       </div>
     </div>
   </section>
@@ -693,30 +838,44 @@
       <h2 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Perguntas frequentes</h2>
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
         <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
-          <summary class="cursor-pointer text-sm font-semibold text-slate-900">O ZionMed substitui meu ERP/prontuário?</summary>
+          <summary class="cursor-pointer text-sm font-semibold text-slate-900">O ZionMed substitui meu ERP ou prontuário?</summary>
           <p class="mt-3 text-sm text-slate-600">
-            Não. Ele complementa: organiza processos operacionais, consentimentos, checklists e evidências com rastreabilidade.
+            Não. O ZionMed é complementar: ele digitaliza fichas, consentimentos e processos operacionais, com assinatura, protocolo e PDF automático — sem mexer no faturamento ou prontuário que você já usa.
+          </p>
+        </details>
+
+        <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-900">O paciente precisa instalar algum aplicativo?</summary>
+          <p class="mt-3 text-sm text-slate-600">
+            Não. Ele acessa o formulário por um link, no navegador do celular ou computador, preenche e assina digitalmente em poucos minutos — sem instalar nada.
+          </p>
+        </details>
+
+        <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-900">Os documentos gerados têm protocolo e data/hora?</summary>
+          <p class="mt-3 text-sm text-slate-600">
+            Sim. Cada envio gera protocolo único, data/hora e um PDF automático vinculado ao formulário e à assinatura do paciente.
+          </p>
+        </details>
+
+        <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-900">Consigo localizar rapidamente um documento assinado?</summary>
+          <p class="mt-3 text-sm text-slate-600">
+            Sim. Você pode buscar por paciente, data, tipo de formulário ou protocolo, e visualizar o histórico completo daquele documento em segundos.
           </p>
         </details>
 
         <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
           <summary class="cursor-pointer text-sm font-semibold text-slate-900">Dá para usar links públicos com segurança?</summary>
           <p class="mt-3 text-sm text-slate-600">
-            Sim. Links são gerados com token longo e podem ser revogados. Além disso, aplicamos rate limit para reduzir abuso.
-          </p>
-        </details>
-
-        <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
-          <summary class="cursor-pointer text-sm font-semibold text-slate-900">O PDF tem protocolo e data/hora?</summary>
-          <p class="mt-3 text-sm text-slate-600">
-            Sim. Cada protocolo pode gerar PDF automático com assinatura e dados do formulário.
+            Sim. Links são gerados com token longo e podem ser revogados a qualquer momento. Aplicamos também rate limit para reduzir abuso.
           </p>
         </details>
 
         <details class="rounded-2xl border border-base-200 bg-base-50 p-6">
           <summary class="cursor-pointer text-sm font-semibold text-slate-900">Quanto tempo leva para implantar?</summary>
           <p class="mt-3 text-sm text-slate-600">
-            Em geral, a base é configurada rapidamente. O tempo depende do número de templates e ajustes do fluxo de aprovação.
+            A base pode ser configurada rapidamente — você já consegue usar fichas e consentimentos básicos logo no início do trial. O prazo total depende da quantidade de templates, fluxos e unidades envolvidas.
           </p>
         </details>
       </div>
@@ -731,23 +890,33 @@
     "mainEntity": [
       {
         "@@type": "Question",
-        "name": "O ZionMed substitui meu ERP/prontuário?",
-        "acceptedAnswer": { "@@type": "Answer", "text": "Não. Ele complementa: organiza processos operacionais, consentimentos, checklists e evidências com rastreabilidade." }
+        "name": "O ZionMed substitui meu ERP ou prontuário?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Não. O ZionMed é complementar: ele digitaliza fichas, consentimentos e processos operacionais, com assinatura, protocolo e PDF automático — sem mexer no faturamento ou prontuário que você já usa." }
+      },
+      {
+        "@@type": "Question",
+        "name": "O paciente precisa instalar algum aplicativo?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Não. Ele acessa o formulário por um link, no navegador do celular ou computador, preenche e assina digitalmente em poucos minutos — sem instalar nada." }
+      },
+      {
+        "@@type": "Question",
+        "name": "Os documentos gerados têm protocolo e data/hora?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Cada envio gera protocolo único, data/hora e um PDF automático vinculado ao formulário e à assinatura do paciente." }
+      },
+      {
+        "@@type": "Question",
+        "name": "Consigo localizar rapidamente um documento assinado?",
+        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Você pode buscar por paciente, data, tipo de formulário ou protocolo, e visualizar o histórico completo daquele documento em segundos." }
       },
       {
         "@@type": "Question",
         "name": "Dá para usar links públicos com segurança?",
-        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Links são gerados com token longo e podem ser revogados. Além disso, aplicamos rate limit para reduzir abuso." }
-      },
-      {
-        "@@type": "Question",
-        "name": "O PDF tem protocolo e data/hora?",
-        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Cada protocolo pode gerar PDF automático com assinatura e dados do formulário." }
+        "acceptedAnswer": { "@@type": "Answer", "text": "Sim. Links são gerados com token longo e podem ser revogados a qualquer momento. Aplicamos também rate limit para reduzir abuso." }
       },
       {
         "@@type": "Question",
         "name": "Quanto tempo leva para implantar?",
-        "acceptedAnswer": { "@@type": "Answer", "text": "Em geral, a base é configurada rapidamente. O tempo depende do número de templates e ajustes do fluxo de aprovação." }
+        "acceptedAnswer": { "@@type": "Answer", "text": "A base pode ser configurada rapidamente — você já consegue usar fichas e consentimentos básicos logo no início do trial. O prazo total depende da quantidade de templates, fluxos e unidades envolvidas." }
       }
     ]
   }
@@ -759,23 +928,24 @@
       <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
         <div>
           <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Agende uma demonstração executiva do ZionMed.
+            Veja como sua clínica pode digitalizar fichas e consentimentos sem trocar o sistema atual.
           </h2>
           <p class="mt-4 text-base leading-relaxed text-white/75">
-            Em 20 minutos, mostramos como sua clínica pode padronizar processos e produzir evidências documentais com rastreabilidade.
+            Em uma demonstração rápida, mostramos o fluxo completo: envio do link para o paciente, preenchimento da ficha, assinatura digital, protocolo e PDF automático.
           </p>
 
           <div class="mt-8 flex flex-wrap gap-3">
-            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Governança</span>
-            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Auditoria</span>
-            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Assinatura</span>
-            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Padronização</span>
+            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Fichas digitais</span>
+            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Consentimentos</span>
+            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Assinatura digital</span>
+            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">PDF automático</span>
+            <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium">Protocolo</span>
           </div>
         </div>
 
         <div class="rounded-2xl bg-white p-6 text-slate-900 shadow-soft">
-          <div class="text-sm font-semibold">Solicitar proposta</div>
-          <p class="mt-1 text-sm text-slate-600">Preencha o formulário abaixo ou fale direto pelo WhatsApp.</p>
+          <div class="text-sm font-semibold">Quero ver uma demonstração do ZionMed</div>
+          <p class="mt-1 text-sm text-slate-600">Preencha o formulário ou fale direto pelo WhatsApp. Vamos entender sua clínica e mostrar como o ZionMed se encaixa na rotina atual.</p>
 
           <div class="mt-4 flex flex-wrap items-center gap-3">
             <a href="https://wa.me/5534996460818?text=Olá! Gostaria de agendar uma demonstração do ZionMed."
@@ -844,11 +1014,11 @@
             </div>
 
             <button type="submit" class="btn-cta-primary inline-flex w-full items-center justify-center rounded-lg bg-accent-600 px-4 py-3 text-sm font-semibold text-white hover:bg-accent-500">
-              Enviar e agendar
+              Quero ver uma demonstração
             </button>
 
             <p class="text-xs text-slate-500">
-              Ao enviar, você concorda em ser contatado para agendamento. Não enviamos spam.
+              Ao enviar, você concorda em ser contatado para agendamento da demonstração. Não enviamos spam.
             </p>
           </form>
         </div>
@@ -865,7 +1035,7 @@
           </div>
           <div>
             <div class="text-sm font-semibold text-white">ZionMed</div>
-            <div class="text-xs text-white/60">Governança e Segurança Documental</div>
+            <div class="text-xs text-white/60">Fichas e Consentimentos Digitais para Clínicas</div>
           </div>
         </div>
 

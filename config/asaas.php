@@ -21,20 +21,11 @@ return [
     'multi_empresa_plan' => env('ASAAS_MULTI_EMPRESA_PLAN', 'enterprise'),
 
     'plans' => [
-        'core' => [
-            'name' => 'Core',
-            'value' => 127.00,
-            'description' => 'Para clínicas pequenas e médias que precisam padronizar formulários e evidências com baixo atrito de entrada.',
-        ],
+        // Teste com preço único e plano principal simplificado para a landing e o fluxo de cadastro.
         'executive' => [
-            'name' => 'Executive',
+            'name' => 'ZionMed Clínica',
             'value' => 247.00,
-            'description' => 'Para operações com alguns fluxos, aprovações, rastreabilidade e treinamento inicial do time.',
-        ],
-        'enterprise' => [
-            'name' => 'Enterprise',
-            'value' => 497.00,
-            'description' => 'Para multiunidade, integrações e operações que exigem mais controle, suporte e flexibilidade.',
+            'description' => 'Plano único com fichas e consentimentos digitais, assinatura, protocolo automático, PDF e templates prontos.',
         ],
     ],
 
