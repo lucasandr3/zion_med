@@ -25,6 +25,11 @@ class PlatformSettingsController extends Controller
             'blockMode' => $asaas['block_mode'] ?? null,
             'multiEmpresaPlan' => $asaas['multi_empresa_plan'] ?? null,
             'apiConfigured' => ! empty($asaas['api_key']),
+            'serviceStatus' => PlatformSetting::get('service_status', 'operational'),
+            'serviceStatusSeverity' => PlatformSetting::get('service_status_severity', 'none'),
+            'serviceStatusMessage' => PlatformSetting::get('service_status_message', ''),
+            'serviceComponents' => json_decode(PlatformSetting::get('service_status_components', '{}'), true) ?: [],
+            'componentOptions' => PlatformSetting::SERVICE_COMPONENTS,
         ]);
     }
 

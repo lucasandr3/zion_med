@@ -34,6 +34,11 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+            // API ou Accept: application/json → deixar o Laravel retornar JSON (evita renderizar layout platform sem user).
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return null;
+            }
+
             $status = $e->getStatusCode();
             $view = 'errors.' . $status;
 

@@ -32,13 +32,6 @@ class AuthController extends Controller
 
         $user = Auth::guard('web')->user();
 
-        if (! $user->isTenantUser()) {
-            Auth::guard('web')->logout();
-            throw ValidationException::withMessages([
-                'email' => ['Acesso via API é permitido apenas para usuários de clínica.'],
-            ]);
-        }
-
         $user->tokens()->where('name', 'spa')->delete();
         $token = $user->createToken('spa')->plainTextToken;
 

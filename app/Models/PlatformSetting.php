@@ -56,4 +56,43 @@ class PlatformSetting extends Model
             ['value' => is_string($value) ? $value : json_encode($value)]
         );
     }
+
+    public const SERVICE_COMPONENTS = [
+        'platform' => 'Plataforma (App)',
+        'api' => 'API REST',
+        'forms' => 'Formulários Públicos',
+        'billing' => 'Pagamentos & Billing',
+    ];
+
+    /**
+     * Retorna o payload completo da página de status do serviço.
+     */
+    public static function getServiceStatusPayload(): array
+    {
+        $name = static::get('product_name', config('app.name'));
+        $status = static::get('service_status', 'operational');
+        $severity = static::get('service_status_severity', 'none');
+        $message = static::get('service_status_message');
+        $raw = static::get('service_status_components');
+        $components = $raw ? json_decode($raw, true) : [];
+        $row = static::where('key', 'service_status')->first();
+
+        $componentList = [];
+        foreach (self::SERVICE_COMPONENTS as $key => $label) {
+            $componentList[] = [
+                'key' => $key,
+                'label' => $label,
+                'status' => $components[$key] ?? 'operational',
+            ];
+        }
+
+        return [
+            'service_name' => $name,
+            'status' => $status,
+            'severity' => $severity,
+            'message' => $message,
+            'components' => $componentList,
+            'updated_at' => $row?->updated_at?->toIso8601String(),
+        ];
+    }
 }

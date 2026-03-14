@@ -22,9 +22,12 @@ use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Webhook\AsaasWebhookController;
+use App\Http\Controllers\StatusPageController;
+use App\Http\Controllers\Platform\PlatformStatusController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => view('landing'))->name('home');
+Route::get('/', fn () => view('landing', ['serviceStatus' => \App\Models\PlatformSetting::getServiceStatusPayload()]))->name('home');
+Route::get('/status', [StatusPageController::class, 'show'])->name('status');
 Route::post('/demonstracao', [DemonstracaoController::class, 'store'])->name('demonstracao.store');
 
 Route::get('/privacidade', fn () => view('legal.privacidade'))->name('privacidade');
@@ -41,6 +44,7 @@ Route::get('/sitemap.xml', function () {
     $base = rtrim(config('app.url'), '/');
     $urls = [
         ['loc' => $base . '/', 'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => $base . '/status', 'priority' => '0.6', 'changefreq' => 'always'],
         ['loc' => $base . '/comece', 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => $base . '/privacidade', 'priority' => '0.3', 'changefreq' => 'monthly'],
         ['loc' => $base . '/termos-de-uso', 'priority' => '0.3', 'changefreq' => 'monthly'],
@@ -87,6 +91,8 @@ Route::middleware(['auth', 'platform'])
 
         Route::get('/configuracoes', [PlatformSettingsController::class, 'index'])->name('settings.index');
         Route::put('/configuracoes', [PlatformSettingsController::class, 'update'])->name('settings.update');
+
+        Route::put('/status', [PlatformStatusController::class, 'update'])->name('status.update');
 
         Route::get('/logs', [AuditLogController::class, 'platformIndex'])->name('logs.index');
     });

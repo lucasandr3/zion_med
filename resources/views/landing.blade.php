@@ -137,13 +137,39 @@
 </head>
 
 <body class="bg-base-50 text-base-950 antialiased">
-  <!-- Top announcement -->
-    <div class="bg-accent-600 text-white">
+  <!-- Top announcement — status dinâmico -->
+  @php
+      $ss = $serviceStatus ?? ['status' => 'operational', 'severity' => 'none', 'message' => null];
+      $ssIsOk = ($ss['status'] ?? 'operational') === 'operational';
+      $ssLabels = [
+          'operational' => 'Todos os sistemas operacionais',
+          'degraded'    => 'Desempenho degradado',
+          'outage'      => 'Interrupção nos serviços',
+          'maintenance' => 'Manutenção em andamento',
+      ];
+      $ssDots = [
+          'operational' => 'bg-emeraldish-500',
+          'degraded'    => 'bg-yellow-400',
+          'outage'      => 'bg-red-400',
+          'maintenance' => 'bg-indigo-400',
+      ];
+      $ssBgs = [
+          'operational' => 'bg-accent-600',
+          'degraded'    => 'bg-yellow-600',
+          'outage'      => 'bg-red-600',
+          'maintenance' => 'bg-indigo-600',
+      ];
+      $ssKey = $ss['status'] ?? 'operational';
+  @endphp
+  <div class="{{ $ssBgs[$ssKey] ?? 'bg-accent-600' }} text-white">
     <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 text-xs sm:text-sm">
-      <p class="flex items-center gap-2">
-        <span class="inline-flex h-2 w-2 rounded-full bg-emeraldish-500"></span>
-        Fichas e consentimentos digitais para clínicas — sem papel, com protocolo e assinatura eletrônica.
-      </p>
+      <a href="{{ route('status') }}" class="flex items-center gap-2 hover:underline">
+        <span class="inline-flex h-2 w-2 rounded-full {{ $ssDots[$ssKey] ?? 'bg-emeraldish-500' }}"></span>
+        {{ $ssLabels[$ssKey] ?? 'Todos os sistemas operacionais' }}
+        @if(!$ssIsOk && !empty($ss['message']))
+          <span class="hidden sm:inline text-white/70">— {{ Str::limit($ss['message'], 60) }}</span>
+        @endif
+      </a>
 
       <button type="button" id="themeToggle" aria-label="Alternar tema"
         class="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/20">
@@ -1040,6 +1066,8 @@
         </div>
 
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 text-xs">
+          <a href="{{ route('status') }}" class="text-white/70 hover:text-white transition-colors">Status do serviço</a>
+          <span class="hidden sm:inline text-white/40">·</span>
           <a href="{{ route('privacidade') }}" class="text-white/70 hover:text-white transition-colors">Política de Privacidade</a>
           <span class="hidden sm:inline text-white/40">·</span>
           <a href="{{ route('termos') }}" class="text-white/70 hover:text-white transition-colors">Termos de Uso</a>

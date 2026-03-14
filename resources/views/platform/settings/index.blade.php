@@ -80,5 +80,73 @@
 
             <button type="submit" class="btn-primary">Salvar configurações</button>
         </form>
+
+        {{-- Status do serviço (exibido em /status) --}}
+        <form action="{{ route('platform.status.update') }}" method="post" class="card space-y-4">
+            @csrf
+            @method('PUT')
+            <h3 class="text-xs font-semibold tracking-[0.1em] uppercase mb-3" style="color:var(--c-muted)">Status do serviço (/status)</h3>
+            <p class="text-xs" style="color:var(--c-muted)">O status, criticidade e componentes são exibidos na página pública em <a href="{{ route('status') }}" target="_blank" rel="noopener" class="underline" style="color:var(--c-primary)">{{ url('/status') }}</a> e no banner da landing page.</p>
+
+            @if(session('success_status'))
+                <p class="text-xs rounded px-3 py-2" style="background:var(--c-soft);color:var(--c-text)">{{ session('success_status') }}</p>
+            @endif
+
+            <div class="flex flex-wrap gap-6">
+                <div>
+                    <label for="service_status" class="block text-xs font-medium mb-1" style="color:var(--c-text)">Status geral</label>
+                    <select name="status" id="service_status" class="form-select w-48">
+                        <option value="operational" {{ old('status', $serviceStatus) === 'operational' ? 'selected' : '' }}>Operacional</option>
+                        <option value="degraded" {{ old('status', $serviceStatus) === 'degraded' ? 'selected' : '' }}>Degradado</option>
+                        <option value="outage" {{ old('status', $serviceStatus) === 'outage' ? 'selected' : '' }}>Indisponível</option>
+                        <option value="maintenance" {{ old('status', $serviceStatus) === 'maintenance' ? 'selected' : '' }}>Manutenção</option>
+                    </select>
+                    @error('status')
+                        <p class="text-xs mt-1" style="color:var(--c-primary)">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="service_severity" class="block text-xs font-medium mb-1" style="color:var(--c-text)">Criticidade</label>
+                    <select name="severity" id="service_severity" class="form-select w-40">
+                        <option value="none" {{ old('severity', $serviceStatusSeverity) === 'none' ? 'selected' : '' }}>Nenhuma</option>
+                        <option value="low" {{ old('severity', $serviceStatusSeverity) === 'low' ? 'selected' : '' }}>Baixa</option>
+                        <option value="medium" {{ old('severity', $serviceStatusSeverity) === 'medium' ? 'selected' : '' }}>Média</option>
+                        <option value="high" {{ old('severity', $serviceStatusSeverity) === 'high' ? 'selected' : '' }}>Alta</option>
+                        <option value="critical" {{ old('severity', $serviceStatusSeverity) === 'critical' ? 'selected' : '' }}>Crítica</option>
+                    </select>
+                    @error('severity')
+                        <p class="text-xs mt-1" style="color:var(--c-primary)">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <div>
+                <label for="service_status_message" class="block text-xs font-medium mb-1" style="color:var(--c-text)">Mensagem (opcional)</label>
+                <textarea name="message" id="service_status_message" rows="2" class="form-input w-full max-w-md" maxlength="500" placeholder="Ex: Manutenção programada amanhã 2h–4h">{{ old('message', $serviceStatusMessage) }}</textarea>
+                @error('message')
+                    <p class="text-xs mt-1" style="color:var(--c-primary)">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <p class="block text-xs font-medium mb-2" style="color:var(--c-text)">Componentes</p>
+                <div class="space-y-2">
+                    @foreach($componentOptions as $compKey => $compLabel)
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs w-40" style="color:var(--c-text)">{{ $compLabel }}</span>
+                            <select name="components[{{ $compKey }}]" class="form-select text-xs w-40">
+                                @php $compVal = old("components.$compKey", $serviceComponents[$compKey] ?? 'operational'); @endphp
+                                <option value="operational" {{ $compVal === 'operational' ? 'selected' : '' }}>Operacional</option>
+                                <option value="degraded" {{ $compVal === 'degraded' ? 'selected' : '' }}>Degradado</option>
+                                <option value="outage" {{ $compVal === 'outage' ? 'selected' : '' }}>Indisponível</option>
+                                <option value="maintenance" {{ $compVal === 'maintenance' ? 'selected' : '' }}>Manutenção</option>
+                            </select>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Atualizar status</button>
+        </form>
     </div>
 @endsection

@@ -16,6 +16,15 @@ class PlatformSettingsSeeder extends Seeder
             'grace_days' => (string) (config('asaas.grace_days') ?? 7),
             'block_mode' => config('asaas.block_mode', 'soft'),
             'multi_empresa_plan' => config('asaas.multi_empresa_plan', 'enterprise'),
+            'service_status' => 'operational',
+            'service_status_severity' => 'none',
+            'service_status_message' => '',
+            'service_status_components' => json_encode([
+                'platform' => 'operational',
+                'api' => 'operational',
+                'forms' => 'operational',
+                'billing' => 'operational',
+            ]),
         ];
 
         foreach ($defaults as $key => $value) {
