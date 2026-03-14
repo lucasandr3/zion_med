@@ -2,17 +2,25 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FormFieldRequest;
+use App\Http\Requests\FormTemplateRequest;
+use App\Http\Resources\Api\V1\FormFieldResource;
 use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\FormField;
 use App\Models\FormTemplate;
+use App\Services\PublicLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\Rule;
 
 class TemplateController extends Controller
 {
+    public function __construct(
+        private PublicLinkService $publicLinkService
+    ) {}
     /**
      * Lista templates da clínica.
      */
@@ -111,7 +119,191 @@ class TemplateController extends Controller
         $template->load('fields');
 
         return response()->json([
-            'data' => (new TemplateResource($template))->toArray($request),
+            'data' => array_merge(
+                (new TemplateResource($template))->toArray($request),
+                ['fields' => FormFieldResource::collection($template->fields)->resolve()]
+            ),
         ], 201);
+    }
+
+    /**
+     * Atualiza um template.
+     */
+    public function update(FormTemplateRequest $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $template->update($request->validated());
+        Event::dispatch(new AuditEvent('template.updated', FormTemplate::class, $template->id, null, $template->organization_id ?? $template->clinic_id, $request->user()->id));
+
+        return response()->json([
+            'data' => new TemplateResource($template->fresh()),
+        ]);
+    }
+
+    /**
+     * Remove um template.
+     */
+    public function destroy(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $templateId = $template->id;
+        $clinicId = $template->organization_id ?? $template->clinic_id;
+        $template->delete();
+        Event::dispatch(new AuditEvent('template.deleted', FormTemplate::class, $templateId, null, $clinicId, $request->user()?->id));
+
+        return response()->json(['data' => ['message' => 'Template removido.']], 200);
+    }
+
+    /**
+     * Cria um template a partir de outro (cópia).
+     */
+    public function storeFromTemplate(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('manage-templates');
+        $this->authorize('update-template', $template);
+
+        $clinicId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $newTemplate = FormTemplate::create([
+            'organization_id' => $clinicId,
+            'name' => $template->name,
+            'description' => $template->description,
+            'category' => null,
+            'is_active' => true,
+            'public_enabled' => false,
+            'created_by' => $request->user()->id,
+        ]);
+
+        foreach ($template->fields as $field) {
+            FormField::create([
+                'template_id' => $newTemplate->id,
+                'type' => $field->type,
+                'label' => $field->label,
+                'name_key' => $field->name_key,
+                'required' => $field->required,
+                'options_json' => $field->options_json,
+                'sort_order' => $field->sort_order,
+            ]);
+        }
+
+        Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $newTemplate->id, null, $newTemplate->organization_id ?? $newTemplate->clinic_id, $request->user()->id));
+        $newTemplate->load('fields');
+
+        return response()->json([
+            'data' => array_merge(
+                (new TemplateResource($newTemplate))->toArray($request),
+                ['fields' => FormFieldResource::collection($newTemplate->fields)->resolve()]
+            ),
+        ], 201);
+    }
+
+    /**
+     * Lista campos do template.
+     */
+    public function campos(FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $template->load('fields');
+
+        return response()->json([
+            'data' => FormFieldResource::collection($template->fields),
+        ]);
+    }
+
+    /**
+     * Adiciona um campo ao template.
+     */
+    public function storeCampo(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $data = $request->validate([
+            'type' => ['required', 'string', 'in:text,textarea,number,date,select,checkbox,radio,file,signature'],
+            'label' => ['required', 'string', 'max:255'],
+            'name_key' => [
+                'required',
+                'string',
+                'max:80',
+                'regex:/^[a-z0-9_]+$/',
+                Rule::unique('form_fields', 'name_key')->where('template_id', $template->id),
+            ],
+            'required' => ['nullable', 'boolean'],
+            'options' => ['nullable', 'array'],
+            'options.*' => ['string', 'max:255'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'name_key.regex' => 'A chave deve conter apenas letras minúsculas, números e underscore (ex: nome_completo).',
+            'name_key.unique' => 'Já existe um campo com esta chave neste template.',
+        ]);
+        $data['template_id'] = $template->id;
+        $data['required'] = (bool) ($data['required'] ?? $request->input('required', false));
+        if (! empty($data['options'])) {
+            $data['options_json'] = ['options' => array_values($data['options'])];
+        }
+        unset($data['options']);
+        $data['sort_order'] = $data['sort_order'] ?? $template->fields()->max('sort_order') + 1;
+        $campo = FormField::create($data);
+
+        return response()->json([
+            'data' => new FormFieldResource($campo),
+        ], 201);
+    }
+
+    /**
+     * Atualiza um campo.
+     */
+    public function updateCampo(FormFieldRequest $request, FormTemplate $template, FormField $campo): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $data = $request->validated();
+        unset($data['options_text']);
+        if (isset($data['options']) && is_array($data['options'])) {
+            $data['options_json'] = ['options' => array_values($data['options'])];
+            unset($data['options']);
+        }
+        $campo->update($data);
+
+        return response()->json([
+            'data' => new FormFieldResource($campo->fresh()),
+        ]);
+    }
+
+    /**
+     * Remove um campo.
+     */
+    public function destroyCampo(FormTemplate $template, FormField $campo): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $campo->delete();
+
+        return response()->json(['data' => ['message' => 'Campo removido.']], 200);
+    }
+
+    /**
+     * Gera link público do template.
+     */
+    public function gerarLink(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $this->publicLinkService->generateToken($template);
+        $url = $this->publicLinkService->getPublicUrl($template);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Link público gerado.',
+                'public_url' => $url,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Desativa o link público do template.
+     */
+    public function desativarLink(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $this->publicLinkService->disablePublicLink($template);
+
+        return response()->json([
+            'data' => ['message' => 'Link público desativado.'],
+        ], 200);
     }
 }

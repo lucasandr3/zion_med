@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "Zion Med API",
+    "description": "API REST do Zion Med para integração com o frontend (Angular).\n\n**Autenticação:**\n1. Use `POST /api/v1/auth/login` com email e password para obter o token.\n2. Nas requisições autenticadas, envie o header: `Authorization: Bearer {{token}}`\n3. Se o usuário puder trocar de clínica, use o header `X-Clinic-Id` com o ID da clínica desejada.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost/api" },
+    { "key": "token", "value": "" },
+    { "key": "x_clinic_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{token}}", "type": "string" } ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Accept", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@exemplo.com\",\n  \"password\": \"senha\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/auth/login",
+            "description": "Retorna token + user + clinics. Guarde o token para as próximas requisições."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Accept", "value": "application/json" } ],
+            "url": "{{base_url}}/v1/auth/logout",
+            "description": "Revoga o token atual."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "item": [
+        {
+          "name": "Me (usuário + clínica atual)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Clinic-Id", "value": "{{x_clinic_id}}", "disabled": true }
+            ],
+            "url": "{{base_url}}/v1/me",
+            "description": "Retorna o usuário autenticado e a clínica do contexto."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Accept", "value": "application/json" } ],
+            "url": "{{base_url}}/v1/dashboard",
+            "description": "Dados do dashboard (pendentes, por status, últimos templates, etc.)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários",
+      "item": [
+        { "name": "Listar usuários", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/usuarios" } },
+        { "name": "Listar roles", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/usuarios/roles" } },
+        { "name": "Criar usuário", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Nome\",\n  \"email\": \"novo@email.com\",\n  \"password\": \"senha123\",\n  \"password_confirmation\": \"senha123\",\n  \"role\": \"staff\",\n  \"can_switch_clinic\": false\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/usuarios" } },
+        { "name": "Ver usuário", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/usuarios/1" } },
+        { "name": "Atualizar usuário", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Nome\",\n  \"email\": \"email@atualizado.com\",\n  \"role\": \"manager\",\n  \"active\": true\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/usuarios/1" } },
+        { "name": "Desativar usuário", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/usuarios/1" } }
+      ]
+    },
+    {
+      "name": "Templates",
+      "item": [
+        { "name": "Listar templates", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates" } },
+        { "name": "Criar template", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Meu formulário\",\n  \"description\": \"Descrição\",\n  \"is_active\": true,\n  \"public_enabled\": false\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/templates" } },
+        { "name": "Criar a partir de template", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/a-partir-de/1" } },
+        { "name": "Ver template", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1" } },
+        { "name": "Atualizar template", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Nome atualizado\",\n  \"is_active\": true,\n  \"public_enabled\": false\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/templates/1" } },
+        { "name": "Excluir template", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1" } },
+        { "name": "Listar campos", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1/campos" } },
+        { "name": "Adicionar campo", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"type\": \"text\",\n  \"label\": \"Nome completo\",\n  \"name_key\": \"nome_completo\",\n  \"required\": true\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/templates/1/campos" } },
+        { "name": "Atualizar campo", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"type\": \"text\",\n  \"label\": \"Nome\",\n  \"name_key\": \"nome\",\n  \"required\": false\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/templates/1/campos/1" } },
+        { "name": "Excluir campo", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1/campos/1" } },
+        { "name": "Gerar link público", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1/link-publico" } },
+        { "name": "Desativar link público", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/templates/1/link-publico" } }
+      ]
+    },
+    {
+      "name": "Protocolos",
+      "item": [
+        { "name": "Listar protocolos", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/protocols?per_page=20&status=pending" } },
+        { "name": "Exportar CSV", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/protocols/exportar" } },
+        { "name": "Ver protocolo", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/protocols/1" } },
+        { "name": "PDF do protocolo", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/protocols/1/pdf" } },
+        { "name": "Revisar (aprovar/rejeitar)", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"status\": \"approved\",\n  \"review_comment\": \"Aprovado.\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/protocols/1/revisao" } },
+        { "name": "Adicionar comentário", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"body\": \"Comentário aqui.\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/protocols/1/comentario" } }
+      ]
+    },
+    {
+      "name": "Links públicos",
+      "item": [
+        { "name": "Listar links públicos", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/links-publicos" } }
+      ]
+    },
+    {
+      "name": "Link Bio",
+      "item": [
+        { "name": "Dados da página", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/link-bio" } },
+        { "name": "Adicionar link", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"label\": \"WhatsApp\",\n  \"url\": \"https://wa.me/5511999999999\",\n  \"icon\": \"chat\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/link-bio/links" } },
+        { "name": "Atualizar link", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"label\": \"WhatsApp\",\n  \"url\": \"https://wa.me/5511888888888\",\n  \"icon\": \"chat\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/link-bio/links/1" } },
+        { "name": "Excluir link", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/link-bio/links/1" } },
+        { "name": "Reordenar links", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"ids\": [2, 1, 3]\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/link-bio/links/reorder" } },
+        { "name": "Atualizar aparência", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"public_theme\": \"default\",\n  \"cover_color\": \"#1976d2\",\n  \"short_description\": \"Descrição\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/link-bio/aparencia" } }
+      ]
+    },
+    {
+      "name": "Clínica",
+      "item": [
+        { "name": "Listar clínicas (escolher)", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/escolher" } },
+        { "name": "Definir clínica", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"clinic_id\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/clinica/escolher" } },
+        { "name": "Configurações (dados)", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/configuracoes?tab=dados" } },
+        { "name": "Atualizar configurações", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Clínica\",\n  \"notification_email\": \"contato@clinica.com\",\n  \"contact_email\": \"contato@clinica.com\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/clinica/configuracoes" } },
+        { "name": "Logs de auditoria", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/logs" } },
+        { "name": "Integrações (tokens e webhooks)", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/integracoes" } },
+        { "name": "Criar token API", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Angular SPA\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/clinica/integracoes/tokens" } },
+        { "name": "Revogar token", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/integracoes/tokens/1" } },
+        { "name": "Criar webhook", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"url\": \"https://seu-servidor.com/webhook\",\n  \"events\": [\"submission.created\", \"submission.approved\"],\n  \"description\": \"Meu webhook\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/clinica/integracoes/webhooks" } },
+        { "name": "Atualizar webhook", "request": { "method": "PUT", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"url\": \"https://seu-servidor.com/webhook\",\n  \"events\": [\"submission.created\"],\n  \"is_active\": true\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/clinica/integracoes/webhooks/1" } },
+        { "name": "Excluir webhook", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/clinica/integracoes/webhooks/1" } }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        { "name": "Dados de assinatura", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/billing" } },
+        { "name": "Checkout (assinar plano)", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"plan_key\": \"basic\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{base_url}}/v1/billing/checkout" } }
+      ]
+    },
+    {
+      "name": "Notificações",
+      "item": [
+        { "name": "Listar notificações", "request": { "method": "GET", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/notificacoes?filtro=todas" } },
+        { "name": "Marcar como lida", "request": { "method": "PATCH", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/notificacoes/uuid-aqui/lida" } },
+        { "name": "Marcar todas como lidas", "request": { "method": "POST", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/notificacoes/marcar-todas" } },
+        { "name": "Excluir notificação", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/notificacoes/uuid-aqui" } },
+        { "name": "Limpar todas", "request": { "method": "DELETE", "header": [ { "key": "Accept", "value": "application/json" } ], "url": "{{base_url}}/v1/notificacoes/limpar-tudo" } }
+      ]
+    }
+  ]
+}

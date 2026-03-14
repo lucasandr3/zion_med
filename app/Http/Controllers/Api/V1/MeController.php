@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\V1\ClinicResource;
+use App\Http\Resources\Api\V1\UserResource;
 use App\Models\Clinic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,17 +22,8 @@ class MeController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role->value,
-                ],
-                'clinic' => $clinic ? [
-                    'id' => $clinic->id,
-                    'name' => $clinic->name,
-                    'slug' => $clinic->slug,
-                ] : null,
+                'user' => new UserResource($user),
+                'clinic' => $clinic ? new ClinicResource($clinic) : null,
             ],
         ]);
     }
