@@ -14,8 +14,6 @@ RUN apk add --no-cache \
     postgresql-dev \
     zip \
     unzip \
-    nodejs \
-    npm \
     && docker-php-ext-install \
     pdo \
     pdo_pgsql \
@@ -88,10 +86,7 @@ ENV TMPDIR=/var/www/html/storage/tmp
 # Instalar deps PHP
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Build do front
-RUN npm ci && npm run build && npm cache clean --force
-
-# chown final (IMPORTANTE depois de composer/npm)
+# chown final (IMPORTANTE depois de composer)
 RUN chown -R www:www /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
