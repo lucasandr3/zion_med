@@ -21,6 +21,68 @@ class LinkBioController extends Controller
     public function __construct(private ThemeService $themeService) {}
 
     /**
+     * Dados públicos da página Link Bio por slug (sem autenticação). Usado pelo front em /l/:slug.
+     */
+    public function publicBySlug(string $slug): JsonResponse
+    {
+        $clinic = Clinic::withoutGlobalScopes()
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $clinic) {
+            return response()->json(['message' => 'Link Bio não encontrado.'], 404);
+        }
+
+        LinkBioPageView::incrementForClinic($clinic->id);
+
+        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $bioLinks = $clinic->bioLinks()->orderBy('sort_order')->get();
+        $formLinks = FormTemplate::withoutGlobalScopes()
+            ->where('organization_id', $clinic->id)
+            ->where('public_enabled', true)
+            ->where('is_active', true)
+            ->whereNotNull('public_token')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'public_url' => $base . '/f/' . $t->public_token,
+            ]);
+
+        $accentHex = $clinic->public_theme
+            ? $this->themeService->getThemeColor($clinic->public_theme)
+            : null;
+
+        return response()->json([
+            'data' => [
+                'clinic' => [
+                    'id' => $clinic->id,
+                    'name' => $clinic->name,
+                    'slug' => $clinic->slug,
+                    'logo_url' => $clinic->logo_url,
+                    'public_theme' => $clinic->public_theme,
+                    'cover_color' => $clinic->cover_color,
+                    'cover_image_url' => $clinic->cover_image_url,
+                    'short_description' => $clinic->short_description,
+                    'specialties' => $clinic->specialties,
+                    'specialties_list' => $clinic->getSpecialtiesList(),
+                    'founded_year' => $clinic->founded_year,
+                    'contact_email' => $clinic->contact_email,
+                    'phone' => $clinic->phone,
+                    'meta_description' => $clinic->meta_description,
+                    'maps_url' => $clinic->getMapsUrl(),
+                    'accent_hex' => $accentHex,
+                    'is_open_now' => $clinic->isOpenNow(),
+                    'business_hours_grid' => $clinic->getBusinessHoursGrid(),
+                ],
+                'links' => ClinicLinkResource::collection($bioLinks),
+                'form_links' => $formLinks->values(),
+            ],
+        ]);
+    }
+
+    /**
      * Dados da página Link Bio (mesmo que a view web).
      */
     public function index(Request $request): JsonResponse
@@ -34,7 +96,8 @@ class LinkBioController extends Controller
 
         $clinic = Clinic::findOrFail($clinicId);
         $bioLinks = $clinic->bioLinks()->get();
-        $publicUrl = route('link-bio.public', $clinic->slug);
+        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $publicUrl = $base . '/l/' . $clinic->slug;
 
         $formLinksPublic = FormTemplate::withoutGlobalScopes()
             ->where('organization_id', $clinic->id)
@@ -90,12 +153,12 @@ class LinkBioController extends Controller
             }
         }
 
-        $formTemplatesForTab = $formLinksPublic->map(function ($t) {
+        $formTemplatesForTab = $formLinksPublic->map(function ($t) use ($base) {
             $submissions = FormSubmission::withoutGlobalScopes()->where('template_id', $t->id);
             return [
                 'id' => $t->id,
                 'name' => $t->name,
-                'public_url' => route('formulario-publico.show', ['token' => $t->public_token]),
+                'public_url' => $base . '/f/' . $t->public_token,
                 'submission_count' => (int) $submissions->count(),
                 'last_submission_at' => $submissions->max('submitted_at')?->toIso8601String(),
             ];

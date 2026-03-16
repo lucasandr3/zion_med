@@ -40,6 +40,10 @@ return [
     | n8n Webhooks
     |--------------------------------------------------------------------------
     */
+    'n8n_whatsapp' => [
+        'webhook_url' => env('N8N_WHATSAPP_WEBHOOK_URL'),
+    ],
+
     'n8n_webhook_erro_pagamento' => env(
         'N8N_WEBHOOK_ERRO_PAGAMENTO',
         'https://n8n-webhook.gestgo.com.br/webhook/erro-pagamento'

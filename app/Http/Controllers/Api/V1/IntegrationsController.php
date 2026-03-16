@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\DispatchWebhookJob;
 use App\Models\ClinicWebhook;
 use App\Models\WebhookDelivery;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +47,8 @@ class IntegrationsController extends Controller
                 'id' => $d->id,
                 'webhook_id' => $d->clinic_webhook_id,
                 'event' => $d->event,
-                'status_code' => $d->status_code,
+                'response_code' => $d->response_code,
+                'error_message' => $d->error_message,
                 'created_at' => $d->created_at?->toIso8601String(),
             ]);
 
@@ -151,7 +153,7 @@ class IntegrationsController extends Controller
     public function updateWebhook(Request $request, ClinicWebhook $webhook): JsonResponse
     {
         $this->authorize('manage-clinic');
-        if ((string) $webhook->clinic_id !== (string) session('current_clinic_id')) {
+        if ((string) $webhook->organization_id !== (string) session('current_clinic_id')) {
             abort(403);
         }
 
@@ -186,7 +188,7 @@ class IntegrationsController extends Controller
     public function destroyWebhook(ClinicWebhook $webhook): JsonResponse
     {
         $this->authorize('manage-clinic');
-        if ((string) $webhook->clinic_id !== (string) session('current_clinic_id')) {
+        if ((string) $webhook->organization_id !== (string) session('current_clinic_id')) {
             abort(403);
         }
         $webhook->delete();
@@ -194,5 +196,35 @@ class IntegrationsController extends Controller
         return response()->json([
             'data' => ['message' => 'Webhook removido.'],
         ], 200);
+    }
+
+    /**
+     * Reenvia uma entrega de webhook falha (retry).
+     */
+    public function retryWebhookDelivery(Request $request, WebhookDelivery $delivery): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $clinicId = session('current_clinic_id');
+        if (! $clinicId) {
+            return response()->json(['message' => 'Selecione uma clínica.'], 422);
+        }
+
+        $delivery->load('clinicWebhook');
+        if (! $delivery->clinicWebhook || (string) $delivery->clinicWebhook->organization_id !== (string) $clinicId) {
+            abort(404);
+        }
+
+        $payload = $delivery->payload;
+        if (is_array($payload)) {
+            unset($payload['event']);
+        } else {
+            $payload = [];
+        }
+
+        DispatchWebhookJob::dispatch($delivery->clinicWebhook, $delivery->event, $payload);
+
+        return response()->json([
+            'data' => ['message' => 'Reenvio do webhook agendado.'],
+        ]);
     }
 }

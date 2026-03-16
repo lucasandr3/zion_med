@@ -7,8 +7,10 @@ use App\Events\AuditEvent;
 use App\Models\Clinic;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
+use App\Models\FormTemplateVersion;
 use App\Models\SubmissionAttachment;
 use App\Models\SubmissionEvent;
+use App\Models\DocumentSend;
 use App\Models\SubmissionSignature;
 use App\Models\SubmissionValue;
 use App\Models\User;
@@ -29,7 +31,9 @@ class SubmissionService
 {
     public function __construct(
         protected WebhookService $webhookService,
-        protected ProtocolGeneratorService $protocolGenerator
+        protected ProtocolGeneratorService $protocolGenerator,
+        protected TemplateVersionService $templateVersionService,
+        protected DocumentSendService $documentSendService
     ) {}
 
     /**
@@ -41,16 +45,28 @@ class SubmissionService
             throw ValidationException::withMessages(['formulário' => ['Formulário não disponível para preenchimento público.']]);
         }
 
-        $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request) {
+        $signingChannel = $data['_signing_channel'] ?? 'web';
+        $locale = $data['_locale'] ?? 'pt_BR';
+        $timezone = $data['_timezone'] ?? config('app.timezone', 'America/Sao_Paulo');
+        $acceptedTextAt = isset($data['_accepted_text_at']) ? now()->parse($data['_accepted_text_at']) : now();
+
+        $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request, $signingChannel, $locale, $timezone, $acceptedTextAt) {
             $orgId = $template->organization_id ?? $template->clinic_id;
+            $templateVersion = $this->templateVersionService->getOrCreateCurrentVersion($template);
 
             $submission = FormSubmission::withoutGlobalScopes()->create([
                 'organization_id' => $orgId,
                 'template_id' => $template->id,
+                'template_version_id' => $templateVersion->id,
                 'status' => SubmissionStatus::Pending,
                 'submitter_name' => $data['_submitter_name'] ?? null,
                 'submitter_email' => $data['_submitter_email'] ?? null,
                 'submitted_at' => now(),
+                'signing_channel' => $signingChannel,
+                'signing_status' => 'completed',
+                'locale' => $locale,
+                'timezone' => $timezone,
+                'accepted_text_at' => $acceptedTextAt,
             ]);
             $submission->update([
                 'protocol_number' => $this->protocolGenerator->generate($template->organization_id ?? $template->clinic_id),
@@ -80,6 +96,29 @@ class SubmissionService
                     ]);
                 }
             }
+
+            $submission->load('values');
+            $valuesKeyed = $submission->values->keyBy('key')->map(fn ($v) => $v->value_json ?? $v->value_text)->all();
+            $documentSnapshot = [
+                'protocol_number' => $submission->protocol_number,
+                'template_version_id' => $templateVersion->id,
+                'template_name' => $template->name,
+                'template_description' => $template->description,
+                'fields_snapshot' => $templateVersion->fields_snapshot,
+                'values' => $valuesKeyed,
+                'submitted_at' => $submission->submitted_at->toIso8601String(),
+            ];
+            $documentSnapshotHash = hash('sha256', json_encode($documentSnapshot));
+            $documentHash = hash('sha256', implode('|', [
+                $submission->protocol_number,
+                (string) $templateVersion->id,
+                $documentSnapshotHash,
+                $submission->submitted_at->toIso8601String(),
+            ]));
+            $submission->update([
+                'document_hash' => $documentHash,
+                'document_snapshot_hash' => $documentSnapshotHash,
+            ]);
 
             foreach ($files as $fieldKey => $file) {
                 if ($file instanceof UploadedFile) {
@@ -111,14 +150,39 @@ class SubmissionService
                     $signedAt->toIso8601String(),
                     (string) $signedName,
                 ]);
-                SubmissionSignature::create([
+                $signatureHash = hash('sha256', $evidencePayload);
+                $evidencePackage = [
                     'submission_id' => $submission->id,
-                    'image_path' => $imagePath,
                     'field_key' => $fieldKey,
+                    'template_version_id' => $templateVersion->id,
                     'signed_name' => $signedName,
                     'signed_ip' => $request?->ip(),
                     'signed_user_agent' => $request ? Str::limit($request->userAgent(), 512) : null,
-                    'signed_hash' => hash('sha256', $evidencePayload),
+                    'signed_at' => $signedAt->toIso8601String(),
+                    'signed_hash' => $signatureHash,
+                    'document_hash' => $documentHash,
+                    'channel' => $signingChannel,
+                    'locale' => $locale,
+                    'timezone' => $timezone,
+                    'accepted_text_at' => $acceptedTextAt->toIso8601String(),
+                ];
+                $evidenceHash = hash('sha256', json_encode($evidencePackage));
+                SubmissionSignature::create([
+                    'submission_id' => $submission->id,
+                    'form_template_version_id' => $templateVersion->id,
+                    'image_path' => $imagePath,
+                    'field_key' => $fieldKey,
+                    'document_hash' => $documentHash,
+                    'evidence_hash' => $evidenceHash,
+                    'channel' => $signingChannel,
+                    'status' => 'completed',
+                    'accepted_text_at' => $acceptedTextAt,
+                    'locale' => $locale,
+                    'timezone' => $timezone,
+                    'signed_name' => $signedName,
+                    'signed_ip' => $request?->ip(),
+                    'signed_user_agent' => $request ? Str::limit($request->userAgent(), 512) : null,
+                    'signed_hash' => $signatureHash,
                     'signed_at' => $signedAt,
                 ]);
             }
@@ -133,6 +197,11 @@ class SubmissionService
                 'type' => 'created',
                 'user_id' => null,
                 'body' => null,
+                'meta_json' => [
+                    'channel' => $signingChannel,
+                    'locale' => $locale,
+                    'timezone' => $timezone,
+                ],
             ]);
 
             $this->sendNotificationEmail($submission);
@@ -145,6 +214,17 @@ class SubmissionService
         $this->notifyClinicUsersNewSubmission($submission);
 
         $orgId = $submission->organization_id ?? $submission->clinic_id;
+        if ($submission->submitter_email) {
+            $documentSend = DocumentSend::where('organization_id', $orgId)
+                ->where('form_template_id', $submission->template_id)
+                ->where('recipient_email', $submission->submitter_email)
+                ->whereNull('form_submission_id')
+                ->orderByDesc('sent_at')
+                ->first();
+            if ($documentSend) {
+                $this->documentSendService->linkSubmissionToSend($documentSend, $submission->id);
+            }
+        }
         $this->webhookService->dispatch($orgId, 'submission.created', $this->webhookPayload($submission));
         if ($submission->signatures()->exists()) {
             $this->webhookService->dispatch($orgId, 'submission.signed', $this->webhookPayload($submission));

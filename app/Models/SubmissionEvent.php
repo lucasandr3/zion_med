@@ -12,7 +12,15 @@ class SubmissionEvent extends Model
         'type',
         'user_id',
         'body',
+        'meta_json',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'meta_json' => 'array',
+        ];
+    }
 
     public function submission(): BelongsTo
     {
@@ -28,6 +36,9 @@ class SubmissionEvent extends Model
     {
         return match ($this->type) {
             'created' => 'Protocolo criado',
+            'viewed' => 'Documento visualizado',
+            'accepted' => 'Texto aceito',
+            'signed' => 'Assinado',
             'comment' => 'Comentário',
             'approved' => 'Aprovado',
             'rejected' => 'Reprovado',

@@ -8,16 +8,18 @@ use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\User;
 use App\Services\PlatformConfigService;
-use App\View\Composers\ThemeComposer;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,19 +45,57 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('auth', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        // Link de redefinição de senha no e-mail: apontar para o frontend (SPA) quando FRONTEND_URL estiver definida
+        $frontendUrl = config('app.frontend_url');
+        if ($frontendUrl !== null && $frontendUrl !== '') {
+            ResetPassword::createUrlUsing(function (object $notifiable, string $token) use ($frontendUrl) {
+                $base = rtrim($frontendUrl, '/');
+                $email = $notifiable->getEmailForPasswordReset();
+
+                return $base . '/redefinir-senha?' . http_build_query([
+                    'token' => $token,
+                    'email' => $email,
+                ]);
+            });
+
+            // Link de verificação de e-mail: assinatura gerada para a API; no e-mail enviamos o link do frontend com os mesmos query params.
+            VerifyEmail::createUrlUsing(function (object $notifiable) use ($frontendUrl) {
+                $apiUrl = URL::temporarySignedRoute(
+                    'verification.verify',
+                    now()->addMinutes(60),
+                    [
+                        'id' => $notifiable->getKey(),
+                        'hash' => sha1($notifiable->getEmailForVerification()),
+                    ]
+                );
+                $query = parse_url($apiUrl, PHP_URL_QUERY);
+
+                return rtrim($frontendUrl, '/') . '/verificar-email?' . $query;
+            });
+        }
+
+        // E-mail de verificação em português (assunto e corpo claros reduzem chance de spam).
+        VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
+            $appName = config('app.name');
+            return (new MailMessage)
+                ->subject('Confirme seu e-mail - ' . $appName)
+                ->greeting('Olá!')
+                ->line('Clique no botão abaixo para confirmar seu endereço de e-mail e ativar sua conta.')
+                ->action('Confirmar e-mail', $url)
+                ->line('Se você não criou uma conta, pode ignorar esta mensagem.')
+                ->salutation('Atenciosamente,' . "\n" . $appName);
+        });
+
         Scramble::configure()
             ->withDocumentTransformers(function (OpenApi $openApi) {
                 $openApi->secure(
                     SecurityScheme::http('bearer', 'JWT')->as('bearerAuth')->setDescription('Token de API (Sanctum). Header: Authorization: Bearer {token}')
                 );
             });
-
-        View::composer('layouts.app', ThemeComposer::class);
-
-        View::composer('layouts.platform', function (\Illuminate\View\View $view): void {
-            $user = request()->user();
-            $view->with('unreadNotifications', $user ? $user->unreadNotifications()->count() : 0);
-        });
 
         Gate::define('manage-clinic', function (User $user) {
             return $user->role->canManageClinic();

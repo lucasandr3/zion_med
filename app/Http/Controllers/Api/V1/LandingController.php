@@ -29,6 +29,9 @@ class LandingController extends Controller
             'data' => [
                 'trial_days' => $trialDays,
                 'plans' => $plans,
+                'headline' => config('landing.headline'),
+                'subheadline' => config('landing.subheadline'),
+                'niches' => config('landing.niches', ['estetica', 'odontologia']),
             ],
         ]);
     }

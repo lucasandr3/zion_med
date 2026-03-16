@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\TemplateResource;
+use App\Models\DocumentSend;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use Illuminate\Http\JsonResponse;
@@ -81,6 +82,19 @@ class DashboardController extends Controller
             }
         );
 
+        $documentSendsPendentes = DocumentSend::where('organization_id', $orgId)
+            ->whereNull('form_submission_id')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->count();
+
+        $documentSendsExpirados = DocumentSend::where('organization_id', $orgId)
+            ->whereNull('form_submission_id')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->count();
+
         return response()->json([
             'data' => [
                 'sem_clinica' => false,
@@ -90,6 +104,8 @@ class DashboardController extends Controller
                 'ultimos_7_dias' => $ultimos7Dias,
                 'ultimos_30_dias' => $ultimos30Dias,
                 'links_publicos_count' => $linksPublicosCount,
+                'documentos_pendentes_assinatura' => $documentSendsPendentes,
+                'documentos_expirados' => $documentSendsExpirados,
             ],
         ]);
     }

@@ -10,8 +10,16 @@ class SubmissionSignature extends Model
 {
     protected $fillable = [
         'submission_id',
+        'form_template_version_id',
         'image_path',
         'field_key',
+        'document_hash',
+        'evidence_hash',
+        'channel',
+        'status',
+        'accepted_text_at',
+        'locale',
+        'timezone',
         'signed_name',
         'signed_ip',
         'signed_user_agent',
@@ -23,12 +31,18 @@ class SubmissionSignature extends Model
     {
         return [
             'signed_at' => 'datetime',
+            'accepted_text_at' => 'datetime',
         ];
     }
 
     public function submission(): BelongsTo
     {
         return $this->belongsTo(FormSubmission::class, 'submission_id');
+    }
+
+    public function formTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(FormTemplateVersion::class, 'form_template_version_id');
     }
 
     public function getUrlAttribute(): string

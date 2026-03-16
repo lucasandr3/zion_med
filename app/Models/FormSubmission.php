@@ -18,6 +18,7 @@ class FormSubmission extends Model
     protected $fillable = [
         'organization_id',
         'template_id',
+        'template_version_id',
         'status',
         'submitted_by_user_id',
         'submitter_name',
@@ -27,6 +28,13 @@ class FormSubmission extends Model
         'approved_at',
         'review_comment',
         'protocol_number',
+        'document_hash',
+        'document_snapshot_hash',
+        'signing_channel',
+        'signing_status',
+        'locale',
+        'timezone',
+        'accepted_text_at',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -45,6 +53,7 @@ class FormSubmission extends Model
             'status' => SubmissionStatus::class,
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
+            'accepted_text_at' => 'datetime',
         ];
     }
 
@@ -62,6 +71,11 @@ class FormSubmission extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(FormTemplate::class, 'template_id');
+    }
+
+    public function templateVersion(): BelongsTo
+    {
+        return $this->belongsTo(FormTemplateVersion::class, 'template_version_id');
     }
 
     public function submittedByUser(): BelongsTo

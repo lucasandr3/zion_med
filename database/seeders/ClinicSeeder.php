@@ -50,23 +50,9 @@ class ClinicSeeder extends Seeder
                     'billing_status' => 'ok',
                 ]);
             }
-
-            $emails = [
-                'admin@demo.zionmed.com',      // Matriz
-                'admin-centro@demo.zionmed.com',
-                'admin-sul@demo.zionmed.com',
-            ];
-
-            User::create([
-                'organization_id' => $clinic->id,
-                'name' => 'Admin Demo',
-                'email' => $emails[$index],
-                'password' => bcrypt('senha123'),
-                'role' => Role::Owner,
-                'active' => true,
-            ]);
         }
 
+        // Apenas o dono da plataforma (sem usuários de clínica; templates são criados pelo FormTemplateSeeder).
         // Usuário PlatformAdmin: dono da plataforma, não está vinculado a tenant/clinic.
         User::withoutGlobalScopes()->firstOrCreate(
             ['email' => 'admin@zionmed.com'],

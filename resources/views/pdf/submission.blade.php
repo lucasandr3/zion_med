@@ -70,9 +70,17 @@
                     <p style="font-size:9px;color:#475569;margin:6px 0 2px 0">
                         @if($sig->signed_name) <strong>Nome:</strong> {{ $sig->signed_name }} @endif
                         @if($sig->signed_at) &nbsp;|&nbsp; <strong>Data/Hora:</strong> {{ $sig->signed_at->format('d/m/Y H:i:s') }} @endif
+                        @if($sig->channel) &nbsp;|&nbsp; <strong>Canal:</strong> {{ $sig->channel }} @endif
+                        @if($sig->locale) &nbsp;|&nbsp; <strong>Idioma:</strong> {{ $sig->locale }} @endif
                     </p>
                     @if($sig->signed_hash)
                         <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (evidência): {{ $sig->signed_hash }}</p>
+                    @endif
+                    @if($sig->evidence_hash ?? null)
+                        <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (pacote evidência): {{ $sig->evidence_hash }}</p>
+                    @endif
+                    @if($submission->document_hash ?? null)
+                        <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (documento): {{ $submission->document_hash }}</p>
                     @endif
                 </div>
             @endforeach

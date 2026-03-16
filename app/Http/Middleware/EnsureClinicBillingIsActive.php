@@ -14,6 +14,7 @@ class EnsureClinicBillingIsActive
         'logout',
         'webhooks',
         'webhooks/asaas',
+        'status',
         'f/',
     ];
 

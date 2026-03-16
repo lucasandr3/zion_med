@@ -168,6 +168,150 @@ class BillingController extends Controller
         ], 201);
     }
 
+    /**
+     * Cancela a assinatura atual da clínica (no ASAAS e localmente).
+     */
+    public function cancelSubscription(Request $request, Subscription $subscription): JsonResponse
+    {
+        $clinic = $this->currentClinic($request);
+        if (! $clinic) {
+            return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
+        }
+        if ((string) $subscription->organization_id !== (string) $clinic->id) {
+            abort(404);
+        }
+        if (in_array($subscription->status, ['CANCELED', 'DELETED'], true)) {
+            return response()->json([
+                'data' => ['message' => 'Esta assinatura já está cancelada.'],
+            ]);
+        }
+
+        if ($this->asaasService->isConfigured() && $subscription->asaas_subscription_id) {
+            try {
+                $this->asaasService->cancelSubscription($subscription->asaas_subscription_id);
+            } catch (\Throwable $e) {
+                Log::warning('Asaas cancelSubscription failed', [
+                    'subscription_id' => $subscription->id,
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Não foi possível cancelar no gateway. Tente novamente ou entre em contato com o suporte.',
+                ], 502);
+            }
+        }
+
+        $subscription->update(['status' => 'CANCELED']);
+        if ($clinic->plan_key === $subscription->plan_key) {
+            $clinic->update([
+                'plan_key' => null,
+                'subscription_status' => 'canceled',
+                'billing_status' => 'canceled',
+            ]);
+        }
+
+        return response()->json([
+            'data' => ['message' => 'Assinatura cancelada com sucesso.'],
+        ]);
+    }
+
+    /**
+     * Troca o plano da clínica: cancela a assinatura atual (se houver) e cria nova para o plan_key informado.
+     */
+    public function changePlan(Request $request): JsonResponse
+    {
+        $allowedPlanKeys = Plan::activeKeys();
+        if (empty($allowedPlanKeys)) {
+            $allowedPlanKeys = array_keys(config('asaas.plans', []));
+        }
+
+        $request->validate([
+            'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
+        ], [
+            'plan_key.required' => 'Nenhum plano foi selecionado.',
+            'plan_key.in' => 'Plano inválido.',
+        ]);
+
+        $clinic = $this->currentClinic($request);
+        if (! $clinic) {
+            return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
+        }
+        if (! $this->asaasService->isConfigured()) {
+            return response()->json(['message' => 'Gateway de pagamento não configurado.'], 503);
+        }
+
+        $plans = config('asaas.plans', []);
+        $planKey = $request->input('plan_key');
+        $plan = $plans[$planKey] ?? null;
+        if (! $plan) {
+            return response()->json(['message' => 'Plano não encontrado.'], 422);
+        }
+
+        $activeSubscription = $clinic->subscriptions()
+            ->whereIn('status', ['active', 'ACTIVE'])
+            ->whereNotNull('asaas_subscription_id')
+            ->first();
+
+        if ($activeSubscription) {
+            try {
+                $this->asaasService->cancelSubscription($activeSubscription->asaas_subscription_id);
+            } catch (\Throwable $e) {
+                Log::warning('Asaas cancelSubscription (changePlan) failed', [
+                    'subscription_id' => $activeSubscription->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            $activeSubscription->update(['status' => 'CANCELED']);
+        }
+
+        $doc = preg_replace('/\D/', '', $clinic->billing_document ?? '');
+        if (strlen($doc) !== 11 && strlen($doc) !== 14) {
+            return response()->json(['message' => 'Informe CPF ou CNPJ em Configurações > Dados para Faturamento.'], 422);
+        }
+
+        try {
+            $payload = $this->asaasService->createSubscription(
+                $clinic,
+                $planKey,
+                (float) $plan['value'],
+                'BOLETO'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Asaas createSubscription (changePlan) failed', ['clinic_id' => $clinic->id, 'error' => $e->getMessage()]);
+            return response()->json(['message' => $this->extractAsaasErrorMessage($e)], 422);
+        }
+
+        $asaasId = $payload['id'] ?? null;
+        if (! $asaasId) {
+            return response()->json(['message' => 'Gateway não retornou ID da assinatura.'], 502);
+        }
+
+        $subscription = Subscription::create([
+            'organization_id' => $clinic->id,
+            'asaas_subscription_id' => $asaasId,
+            'plan_key' => $planKey,
+            'status' => 'active',
+            'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+        ]);
+
+        $this->syncSubscriptionPaymentsFromAsaas($clinic, $subscription, $asaasId);
+
+        $clinic->update([
+            'plan_key' => $planKey,
+            'subscription_status' => 'active',
+            'billing_status' => 'ok',
+            'grace_ends_at' => null,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Plano alterado. Nova cobrança será gerada em breve.',
+                'subscription_id' => $subscription->id,
+                'plan_key' => $planKey,
+                'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+            ],
+        ], 200);
+    }
+
     private function currentClinic(Request $request): ?Clinic
     {
         $clinicId = session('current_clinic_id') ?? $request->user()?->clinic_id;

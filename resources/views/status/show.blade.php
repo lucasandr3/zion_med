@@ -37,6 +37,7 @@
 </head>
 
 @php
+    $frontUrl = config('app.frontend_url') ? rtrim(config('app.frontend_url'), '/') : null;
     $statusMap = [
         'operational'  => ['label' => 'Todos os sistemas operacionais', 'short' => 'Operacional',  'color' => 'emerald', 'icon' => 'check'],
         'degraded'     => ['label' => 'Desempenho degradado',           'short' => 'Degradado',     'color' => 'amber',   'icon' => 'alert'],
@@ -86,14 +87,16 @@
                     <p class="text-xs text-slate-500">Status dos serviços</p>
                 </div>
             </div>
+            @if($frontUrl)
             <div class="flex items-center gap-2">
-                <a href="{{ route('home') }}" class="text-xs font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors">
+                <a href="{{ $frontUrl }}" class="text-xs font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors">
                     Voltar ao site
                 </a>
-                <a href="{{ route('login') }}" class="text-xs font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors">
+                <a href="{{ $frontUrl }}/autenticacao" class="text-xs font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors">
                     Entrar
                 </a>
             </div>
+            @endif
         </div>
     </header>
 
@@ -247,15 +250,17 @@
     <footer class="border-t border-slate-200 bg-white">
         <div class="mx-auto max-w-2xl px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
             <span>&copy; {{ date('Y') }} {{ $service_name }}. Todos os direitos reservados.</span>
+            @if($frontUrl ?? null)
             <div class="flex items-center gap-4">
-                <a href="{{ route('home') }}" class="hover:text-slate-600 transition-colors">Página inicial</a>
+                <a href="{{ $frontUrl }}" class="hover:text-slate-600 transition-colors">Página inicial</a>
                 <span class="text-slate-300">·</span>
-                <a href="{{ route('login') }}" class="hover:text-slate-600 transition-colors">Entrar</a>
+                <a href="{{ $frontUrl }}/autenticacao" class="hover:text-slate-600 transition-colors">Entrar</a>
                 <span class="text-slate-300">·</span>
-                <a href="{{ url('/privacidade') }}" class="hover:text-slate-600 transition-colors">Privacidade</a>
+                <a href="{{ $frontUrl }}/privacidade" class="hover:text-slate-600 transition-colors">Privacidade</a>
                 <span class="text-slate-300">·</span>
-                <a href="{{ url('/termos-de-uso') }}" class="hover:text-slate-600 transition-colors">Termos</a>
+                <a href="{{ $frontUrl }}/termos-de-uso" class="hover:text-slate-600 transition-colors">Termos</a>
             </div>
+            @endif
         </div>
     </footer>
 

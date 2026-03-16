@@ -10,7 +10,9 @@ use App\Http\Resources\Api\V1\FormFieldResource;
 use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\FormField;
 use App\Models\FormTemplate;
+use App\Services\DocumentSendService;
 use App\Services\PublicLinkService;
+use App\Services\TemplateVersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -19,8 +21,42 @@ use Illuminate\Validation\Rule;
 class TemplateController extends Controller
 {
     public function __construct(
-        private PublicLinkService $publicLinkService
+        private PublicLinkService $publicLinkService,
+        private TemplateVersionService $templateVersionService,
+        private DocumentSendService $documentSendService
     ) {}
+    /**
+     * Lista sugestões da biblioteca por categoria (estética, odontologia, etc.) para criar templates.
+     */
+    public function biblioteca(Request $request): JsonResponse
+    {
+        $this->authorize('view-submissions');
+        $categories = FormTemplate::categoryLabels();
+        $biblioteca = [
+            'estetica' => [
+                'label' => $categories['estetica'] ?? 'Estética / Harmonização',
+                'templates' => [
+                    ['key' => 'consentimento_estetica', 'name' => 'Termo de Consentimento - Procedimento Estético', 'description' => 'Consentimento informado para procedimentos estéticos.'],
+                    ['key' => 'anamnese_estetica', 'name' => 'Anamnese - Clínica de Estética', 'description' => 'Ficha de anamnese para avaliação inicial.'],
+                    ['key' => 'uso_imagem_estetica', 'name' => 'Autorização de Uso de Imagem', 'description' => 'Termo de autorização para uso de imagens em divulgação.'],
+                ],
+            ],
+            'odontologia' => [
+                'label' => $categories['odontologia'] ?? 'Odontologia',
+                'templates' => [
+                    ['key' => 'consentimento_odontologia', 'name' => 'Termo de Consentimento - Procedimento Odontológico', 'description' => 'Consentimento informado para procedimentos odontológicos.'],
+                    ['key' => 'anamnese_odontologia', 'name' => 'Anamnese Odontológica', 'description' => 'Ficha de anamnese odontológica.'],
+                    ['key' => 'plano_tratamento', 'name' => 'Acordo de Plano de Tratamento', 'description' => 'Acordo e aceite do plano de tratamento proposto.'],
+                ],
+            ],
+        ];
+        if ($request->filled('category')) {
+            $cat = $request->category;
+            $biblioteca = isset($biblioteca[$cat]) ? [$cat => $biblioteca[$cat]] : $biblioteca;
+        }
+        return response()->json(['data' => $biblioteca]);
+    }
+
     /**
      * Lista templates da clínica.
      */
@@ -278,11 +314,12 @@ class TemplateController extends Controller
     }
 
     /**
-     * Gera link público do template.
+     * Gera link público do template e cria versão do template para evidência.
      */
     public function gerarLink(Request $request, FormTemplate $template): JsonResponse
     {
         $this->authorize('update-template', $template);
+        $this->templateVersionService->getOrCreateCurrentVersion($template);
         $this->publicLinkService->generateToken($template);
         $url = $this->publicLinkService->getPublicUrl($template);
 
@@ -292,6 +329,91 @@ class TemplateController extends Controller
                 'public_url' => $url,
             ],
         ], 200);
+    }
+
+    /**
+     * Envia o link do documento por e-mail ou WhatsApp (body: channel opcional, recipient_email ou recipient_phone).
+     */
+    public function enviarDocumento(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $validated = $request->validate([
+            'channel' => ['nullable', 'string', 'in:email,whatsapp'],
+            'recipient_email' => ['required_unless:channel,whatsapp', 'nullable', 'email'],
+            'recipient_phone' => ['required_if:channel,whatsapp', 'nullable', 'string', 'max:50'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+        $channel = $validated['channel'] ?? 'email';
+        $expiresAt = isset($validated['expires_at']) ? \Carbon\Carbon::parse($validated['expires_at']) : null;
+        if ($channel === 'whatsapp') {
+            $send = $this->documentSendService->sendByWhatsApp(
+                $template,
+                $validated['recipient_phone'] ?? '',
+                $expiresAt?->toDateTimeImmutable()
+            );
+            if (! $send) {
+                return response()->json(['message' => 'WhatsApp não configurado (N8N_WHATSAPP_WEBHOOK_URL).'], 503);
+            }
+            return response()->json([
+                'data' => [
+                    'message' => 'Link enviado por WhatsApp.',
+                    'id' => $send->id,
+                    'sent_at' => $send->sent_at->toIso8601String(),
+                ],
+            ], 201);
+        }
+        $send = $this->documentSendService->sendByEmail(
+            $template,
+            $validated['recipient_email'] ?? '',
+            $validated['recipient_phone'] ?? null,
+            $expiresAt?->toDateTimeImmutable()
+        );
+        return response()->json([
+            'data' => [
+                'message' => 'Link enviado por e-mail.',
+                'id' => $send->id,
+                'sent_at' => $send->sent_at->toIso8601String(),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Duplica o template (cópia com novo nome opcional).
+     */
+    public function duplicar(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('manage-templates');
+        $this->authorize('update-template', $template);
+        $name = $request->validate(['name' => ['nullable', 'string', 'max:255']])['name'] ?? ($template->name . ' (cópia)');
+        $clinicId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $newTemplate = FormTemplate::create([
+            'organization_id' => $clinicId,
+            'name' => $name,
+            'description' => $template->description,
+            'category' => $template->category,
+            'is_active' => true,
+            'public_enabled' => false,
+            'created_by' => $request->user()->id,
+        ]);
+        foreach ($template->fields as $field) {
+            FormField::create([
+                'template_id' => $newTemplate->id,
+                'type' => $field->type,
+                'label' => $field->label,
+                'name_key' => $field->name_key,
+                'required' => $field->required,
+                'options_json' => $field->options_json,
+                'sort_order' => $field->sort_order,
+            ]);
+        }
+        Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $newTemplate->id, null, $newTemplate->organization_id ?? $newTemplate->clinic_id, $request->user()->id));
+        $newTemplate->load('fields');
+        return response()->json([
+            'data' => array_merge(
+                (new TemplateResource($newTemplate))->toArray($request),
+                ['fields' => FormFieldResource::collection($newTemplate->fields)->resolve()]
+            ),
+        ], 201);
     }
 
     /**

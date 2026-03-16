@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\BillingController;
 use App\Http\Controllers\Api\V1\ChooseClinicController;
+use App\Http\Controllers\Api\V1\DocumentSendController;
 use App\Http\Controllers\Api\V1\ClinicSettingsController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\IntegrationsController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\V1\TemplateController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
 use App\Http\Controllers\Api\V1\LandingController;
 use App\Http\Controllers\Api\V1\PublicFormApiController;
+use App\Http\Controllers\Api\V1\PublicFormOtpController;
 use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\Platform\AuditLogController as PlatformAuditLogController;
@@ -26,25 +28,36 @@ use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanControlle
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
 use App\Http\Controllers\Platform\PlatformStatusController;
+use App\Models\DocumentSend;
 use App\Models\FormSubmission;
 use Illuminate\Support\Facades\Route;
 
 // Auth e formulário público (sem auth:sanctum)
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
-    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+    Route::middleware('throttle:auth')->group(function () {
+        Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+        Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.v1.auth.forgot-password');
+    });
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
+    Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
     Route::get('/landing', LandingController::class)->name('api.v1.landing');
     Route::get('/status', [StatusController::class, 'index'])->name('api.v1.status');
+    Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
     Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');
+    Route::post('/formulario-publico/{token}/otp/send', [PublicFormOtpController::class, 'send'])->name('api.v1.formulario-publico.otp.send');
+    Route::post('/formulario-publico/{token}/otp/verify', [PublicFormOtpController::class, 'verify'])->name('api.v1.formulario-publico.otp.verify');
 });
 
 Route::bind('protocol', fn ($value) => FormSubmission::findOrFail($value));
+Route::bind('documentSend', fn ($value) => DocumentSend::findOrFail($value));
 
 // Rotas que qualquer usuário autenticado pode acessar (incl. platform_admin): logout, me, notificações
 Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
+    Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('api.v1.notificacoes.index');
     Route::patch('/notificacoes/{id}/lida', [NotificationController::class, 'markAsRead'])->name('api.v1.notificacoes.read');
@@ -70,13 +83,14 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     });
 });
 
-// Rotas de clínica: apenas usuários de clínica (tenant). Dono da plataforma recebe 403.
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->group(function () {
+// Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
+Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
     Route::get('/usuarios/roles', [UserController::class, 'roles'])->name('api.v1.usuarios.roles');
     Route::apiResource('usuarios', UserController::class)->parameters(['usuarios' => 'usuario'])->names('api.v1.usuarios');
 
     Route::get('/templates', [TemplateController::class, 'index'])->name('api.v1.templates.index');
+    Route::get('/templates/biblioteca', [TemplateController::class, 'biblioteca'])->name('api.v1.templates.biblioteca');
     Route::post('/templates', [TemplateController::class, 'store'])->name('api.v1.templates.store');
     Route::post('/templates/a-partir-de/{template}', [TemplateController::class, 'storeFromTemplate'])->name('api.v1.templates.storeFromTemplate');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show');
@@ -88,11 +102,20 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->gro
     Route::delete('/templates/{template}/campos/{campo}', [TemplateController::class, 'destroyCampo'])->name('api.v1.templates.campos.destroy');
     Route::post('/templates/{template}/link-publico', [TemplateController::class, 'gerarLink'])->name('api.v1.templates.link.gerar');
     Route::delete('/templates/{template}/link-publico', [TemplateController::class, 'desativarLink'])->name('api.v1.templates.link.desativar');
+    Route::post('/templates/{template}/enviar', [TemplateController::class, 'enviarDocumento'])->name('api.v1.templates.enviar');
+    Route::post('/templates/{template}/duplicar', [TemplateController::class, 'duplicar'])->name('api.v1.templates.duplicar');
+
+    Route::get('/document-sends', [DocumentSendController::class, 'index'])->name('api.v1.document-sends.index');
+    Route::post('/document-sends', [DocumentSendController::class, 'store'])->name('api.v1.document-sends.store');
+    Route::post('/document-sends/{documentSend}/reenvio', [DocumentSendController::class, 'reenvio'])->name('api.v1.document-sends.reenvio');
+    Route::post('/document-sends/{documentSend}/cancel', [DocumentSendController::class, 'cancel'])->name('api.v1.document-sends.cancel');
 
     Route::get('/protocols/exportar', [ProtocolController::class, 'exportarCsv'])->name('api.v1.protocols.exportar');
     Route::get('/protocols', [ProtocolController::class, 'index'])->name('api.v1.protocols.index');
     Route::get('/protocols/{protocol}', [ProtocolController::class, 'show'])->name('api.v1.protocols.show');
+    Route::get('/protocols/{protocol}/timeline', [ProtocolController::class, 'timeline'])->name('api.v1.protocols.timeline');
     Route::get('/protocols/{protocol}/pdf', [ProtocolController::class, 'pdf'])->name('api.v1.protocols.pdf');
+    Route::get('/protocols/{protocol}/dossie', [ProtocolController::class, 'exportarDossie'])->name('api.v1.protocols.dossie');
     Route::post('/protocols/{protocol}/revisao', [ProtocolController::class, 'aprovar'])->name('api.v1.protocols.revisao');
     Route::post('/protocols/{protocol}/comentario', [ProtocolController::class, 'comentario'])->name('api.v1.protocols.comentario');
 
@@ -116,7 +139,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->gro
     Route::post('/clinica/integracoes/webhooks', [IntegrationsController::class, 'storeWebhook'])->name('api.v1.clinica.integracoes.webhooks.store');
     Route::put('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'updateWebhook'])->name('api.v1.clinica.integracoes.webhooks.update');
     Route::delete('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'destroyWebhook'])->name('api.v1.clinica.integracoes.webhooks.destroy');
+    Route::post('/clinica/integracoes/webhook-deliveries/{delivery}/retry', [IntegrationsController::class, 'retryWebhookDelivery'])->name('api.v1.clinica.integracoes.webhook-deliveries.retry');
 
     Route::get('/billing', [BillingController::class, 'index'])->name('api.v1.billing.index');
     Route::post('/billing/checkout', [BillingController::class, 'checkout'])->name('api.v1.billing.checkout');
+    Route::post('/billing/subscriptions/{subscription}/cancel', [BillingController::class, 'cancelSubscription'])->name('api.v1.billing.subscriptions.cancel');
+    Route::post('/billing/change-plan', [BillingController::class, 'changePlan'])->name('api.v1.billing.change-plan');
 });

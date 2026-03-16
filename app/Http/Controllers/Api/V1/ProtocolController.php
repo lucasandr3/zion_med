@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ProtocolDetailResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\FormSubmission;
+use App\Services\DossierService;
 use App\Services\PdfService;
 use App\Services\SubmissionService;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,8 @@ class ProtocolController extends Controller
 {
     public function __construct(
         private PdfService $pdfService,
-        private SubmissionService $submissionService
+        private SubmissionService $submissionService,
+        private DossierService $dossierService
     ) {}
     /**
      * Lista protocolos da clínica com filtros e paginação.
@@ -79,6 +81,25 @@ class ProtocolController extends Controller
         return response()->json([
             'data' => new ProtocolDetailResource($protocol),
         ]);
+    }
+
+    /**
+     * Timeline de eventos do protocolo (para monitoramento e evidência).
+     */
+    public function timeline(FormSubmission $protocol): JsonResponse
+    {
+        $this->authorize('view-submission', $protocol);
+        $protocol->load('events.user');
+        $events = $protocol->events->map(fn ($e) => [
+            'id' => $e->id,
+            'type' => $e->type,
+            'type_label' => $e->type_label,
+            'created_at' => $e->created_at->toIso8601String(),
+            'user_name' => $e->user?->name,
+            'body' => $e->body,
+            'meta' => $e->meta_json,
+        ]);
+        return response()->json(['data' => $events]);
     }
 
     /**
@@ -146,6 +167,30 @@ class ProtocolController extends Controller
         $this->authorize('view-submission', $protocol);
 
         return $this->pdfService->streamSubmissionPdf($protocol);
+    }
+
+    /**
+     * Exporta dossiê do protocolo (ZIP com PDF + JSON de evidências).
+     */
+    public function exportarDossie(FormSubmission $protocol): StreamedResponse
+    {
+        $this->authorize('view-submission', $protocol);
+
+        ['path' => $path, 'filename' => $filename] = $this->dossierService->streamDossierZip($protocol);
+
+        return response()->streamDownload(function () use ($path) {
+            $handle = fopen($path, 'r');
+            if ($handle) {
+                while (! feof($handle)) {
+                    echo fread($handle, 8192);
+                    flush();
+                }
+                fclose($handle);
+            }
+            @unlink($path);
+        }, $filename, [
+            'Content-Type' => 'application/zip',
+        ]);
     }
 
     /**

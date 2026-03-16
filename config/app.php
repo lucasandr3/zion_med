@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL (SPA)
+    |--------------------------------------------------------------------------
+    |
+    | URL base do frontend (ex.: Angular). Usada no link de redefinição de senha
+    | enviado por e-mail, para que o usuário caia na tela do SPA em vez da rota
+    | web do backend. Ex.: https://app.seudominio.com (sem barra final).
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:4200'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

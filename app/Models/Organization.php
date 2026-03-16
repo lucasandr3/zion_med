@@ -44,6 +44,7 @@ class Organization extends Model
         'whatsapp_notify_cobranca',
         'whatsapp_notify_faturas_boleto',
         'whatsapp_notify_avisos',
+        'signing_security_level',
     ];
 
     protected $casts = [

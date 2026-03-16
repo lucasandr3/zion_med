@@ -30,6 +30,8 @@ class PublicLinkService
         if (! $template->public_token) {
             return '';
         }
-        return route('formulario-publico.show', ['token' => $template->public_token]);
+        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+
+        return $base . '/f/' . $template->public_token;
     }
 }

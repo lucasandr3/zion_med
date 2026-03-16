@@ -23,11 +23,12 @@ class LinksPublicosController extends Controller
             ->orderBy('name')
             ->get();
 
-        $data = $templates->map(function (FormTemplate $t) {
+        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $data = $templates->map(function (FormTemplate $t) use ($base) {
             return [
                 'id' => $t->id,
                 'name' => $t->name,
-                'public_url' => route('formulario-publico.show', ['token' => $t->public_token]),
+                'public_url' => $base . '/f/' . $t->public_token,
                 'public_token' => $t->public_token,
             ];
         });
