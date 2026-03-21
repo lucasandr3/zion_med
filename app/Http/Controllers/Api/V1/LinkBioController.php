@@ -156,12 +156,15 @@ class LinkBioController extends Controller
 
         $formTemplatesForTab = $formLinksPublic->map(function ($t) use ($base) {
             $submissions = FormSubmission::withoutGlobalScopes()->where('template_id', $t->id);
+            $lastSubmissionAt = $submissions->max('submitted_at');
+            $lastSubmissionAtIso = $lastSubmissionAt ? Carbon::parse($lastSubmissionAt)->toIso8601String() : null;
+
             return [
                 'id' => $t->id,
                 'name' => $t->name,
                 'public_url' => $base . '/f/' . $t->public_token,
                 'submission_count' => (int) $submissions->count(),
-                'last_submission_at' => $submissions->max('submitted_at')?->toIso8601String(),
+                'last_submission_at' => $lastSubmissionAtIso,
             ];
         });
 
