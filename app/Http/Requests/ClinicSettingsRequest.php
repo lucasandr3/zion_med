@@ -53,6 +53,7 @@ class ClinicSettingsRequest extends FormRequest
             'theme'              => ['nullable', 'string', Rule::in($validThemes)],
             'public_theme'       => ['nullable', 'string', Rule::in(array_merge([''], $validThemes))],
             'cover_color'        => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'cover_mode'         => ['nullable', 'string', Rule::in(['banner', 'solid', 'none'])],
             'dark_mode'          => ['nullable', 'boolean'],
             'billing_name'       => ['nullable', 'string', 'max:255'],
             'billing_email'      => ['nullable', 'email', 'max:255'],

@@ -126,7 +126,7 @@ class ClinicSettingsController extends Controller
             $data['business_hours'] = ! empty($cleaned) ? $cleaned : null;
         }
 
-        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color'] as $key) {
+        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color', 'cover_mode'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }

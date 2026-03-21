@@ -63,6 +63,7 @@ class LinkBioController extends Controller
                     'logo_url' => $clinic->logo_url,
                     'public_theme' => $clinic->public_theme,
                     'cover_color' => $clinic->cover_color,
+                    'cover_mode' => $clinic->cover_mode ?? 'banner',
                     'cover_image_url' => $clinic->cover_image_url,
                     'short_description' => $clinic->short_description,
                     'specialties' => $clinic->specialties,
@@ -264,6 +265,7 @@ class LinkBioController extends Controller
         $data = $request->validate([
             'public_theme' => ['nullable', 'string', \Illuminate\Validation\Rule::in(array_merge([''], $validThemes))],
             'cover_color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'cover_mode' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['banner', 'solid', 'none'])],
             'short_description' => ['nullable', 'string', 'max:200'],
             'specialties' => ['nullable', 'string', 'max:500'],
             'founded_year' => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')],
@@ -271,7 +273,7 @@ class LinkBioController extends Controller
             'maps_url' => ['nullable', 'url', 'max:500'],
         ]);
 
-        foreach (['public_theme', 'cover_color', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
+        foreach (['public_theme', 'cover_color', 'cover_mode', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
