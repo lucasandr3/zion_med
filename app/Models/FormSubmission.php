@@ -17,6 +17,7 @@ class FormSubmission extends Model
 
     protected $fillable = [
         'organization_id',
+        'person_id',
         'template_id',
         'template_version_id',
         'status',
@@ -55,6 +56,11 @@ class FormSubmission extends Model
             'approved_at' => 'datetime',
             'accepted_text_at' => 'datetime',
         ];
+    }
+
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'person_id');
     }
 
     public function organization(): BelongsTo

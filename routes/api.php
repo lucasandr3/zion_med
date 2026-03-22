@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\LinkBioController;
 use App\Http\Controllers\Api\V1\LinksPublicosController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
 use App\Http\Controllers\Api\V1\TemplateController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
@@ -43,9 +44,13 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
     Route::get('/landing', LandingController::class)->name('api.v1.landing');
     Route::get('/status', [StatusController::class, 'index'])->name('api.v1.status');
+    Route::get('/link-bio/public/{slug}/go/{linkId}', [LinkBioController::class, 'publicRedirectLink'])
+        ->whereNumber('linkId')
+        ->name('api.v1.link-bio.public-go');
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
     Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
+    Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');
     Route::post('/formulario-publico/{token}/otp/send', [PublicFormOtpController::class, 'send'])->name('api.v1.formulario-publico.otp.send');
     Route::post('/formulario-publico/{token}/otp/verify', [PublicFormOtpController::class, 'verify'])->name('api.v1.formulario-publico.otp.verify');
@@ -104,6 +109,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'throttle
     Route::delete('/templates/{template}/link-publico', [TemplateController::class, 'desativarLink'])->name('api.v1.templates.link.desativar');
     Route::post('/templates/{template}/enviar', [TemplateController::class, 'enviarDocumento'])->name('api.v1.templates.enviar');
     Route::post('/templates/{template}/duplicar', [TemplateController::class, 'duplicar'])->name('api.v1.templates.duplicar');
+
+    Route::apiResource('pessoas', PersonController::class)->parameters(['pessoas' => 'pessoa'])->names('api.v1.pessoas');
 
     Route::get('/document-sends', [DocumentSendController::class, 'index'])->name('api.v1.document-sends.index');
     Route::post('/document-sends', [DocumentSendController::class, 'store'])->name('api.v1.document-sends.store');

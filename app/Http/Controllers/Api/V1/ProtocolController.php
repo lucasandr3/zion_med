@@ -27,7 +27,7 @@ class ProtocolController extends Controller
     {
         $this->authorize('view-submissions');
 
-        $query = FormSubmission::with('template')->latest();
+        $query = FormSubmission::with(['template', 'person'])->latest();
 
         if ($request->filled('template_id')) {
             $query->where('template_id', $request->template_id);
@@ -41,12 +41,21 @@ class ProtocolController extends Controller
         if ($request->filled('data_fim')) {
             $query->whereDate('created_at', '<=', $request->data_fim);
         }
+        if ($request->filled('person_id')) {
+            $query->where('person_id', $request->person_id);
+        }
         if ($request->filled('busca')) {
             $busca = '%' . $request->busca . '%';
             $query->where(function ($q) use ($busca) {
                 $q->where('protocol_number', 'like', $busca)
                     ->orWhere('submitter_name', 'like', $busca)
-                    ->orWhere('submitter_email', 'like', $busca);
+                    ->orWhere('submitter_email', 'like', $busca)
+                    ->orWhereHas('person', function ($pq) use ($busca) {
+                        $pq->where('name', 'like', $busca)
+                            ->orWhere('code', 'like', $busca)
+                            ->orWhere('phone', 'like', $busca)
+                            ->orWhere('email', 'like', $busca);
+                    });
             });
         }
 
@@ -76,7 +85,7 @@ class ProtocolController extends Controller
     public function show(FormSubmission $protocol): JsonResponse
     {
         $this->authorize('view-submission', $protocol);
-        $protocol->load(['template.fields', 'values', 'template']);
+        $protocol->load(['template.fields', 'values', 'template', 'person']);
 
         return response()->json([
             'data' => new ProtocolDetailResource($protocol),
@@ -122,12 +131,21 @@ class ProtocolController extends Controller
         if ($request->filled('data_fim')) {
             $query->whereDate('created_at', '<=', $request->data_fim);
         }
+        if ($request->filled('person_id')) {
+            $query->where('person_id', $request->person_id);
+        }
         if ($request->filled('busca')) {
             $busca = '%' . $request->busca . '%';
             $query->where(function ($q) use ($busca) {
                 $q->where('protocol_number', 'like', $busca)
                     ->orWhere('submitter_name', 'like', $busca)
-                    ->orWhere('submitter_email', 'like', $busca);
+                    ->orWhere('submitter_email', 'like', $busca)
+                    ->orWhereHas('person', function ($pq) use ($busca) {
+                        $pq->where('name', 'like', $busca)
+                            ->orWhere('code', 'like', $busca)
+                            ->orWhere('phone', 'like', $busca)
+                            ->orWhere('email', 'like', $busca);
+                    });
             });
         }
 

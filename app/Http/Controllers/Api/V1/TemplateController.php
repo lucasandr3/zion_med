@@ -111,6 +111,7 @@ class TemplateController extends Controller
             'category' => ['nullable', 'string', 'max:80'],
             'is_active' => ['boolean'],
             'public_enabled' => ['boolean'],
+            'public_require_person_link' => ['boolean'],
             'fields' => ['nullable', 'array'],
             'fields.*.type' => ['required', 'string', Rule::in(['text', 'textarea', 'select', 'checkbox', 'radio', 'date', 'number', 'file', 'signature'])],
             'fields.*.label' => ['required', 'string', 'max:255'],
@@ -133,6 +134,7 @@ class TemplateController extends Controller
             'category' => $validated['category'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
             'public_enabled' => $validated['public_enabled'] ?? false,
+            'public_require_person_link' => $validated['public_require_person_link'] ?? false,
             'created_by' => $request->user()->id,
         ]);
 
@@ -206,6 +208,7 @@ class TemplateController extends Controller
             'category' => null,
             'is_active' => true,
             'public_enabled' => false,
+            'public_require_person_link' => false,
             'created_by' => $request->user()->id,
         ]);
 
@@ -393,6 +396,7 @@ class TemplateController extends Controller
             'category' => $template->category,
             'is_active' => true,
             'public_enabled' => false,
+            'public_require_person_link' => $template->public_require_person_link ?? false,
             'created_by' => $request->user()->id,
         ]);
         foreach ($template->fields as $field) {

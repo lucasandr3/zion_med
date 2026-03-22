@@ -39,7 +39,7 @@ class SubmissionService
     /**
      * @param  array<string, string>  $signatures  field_key => base64 image
      */
-    public function createFromPublicForm(FormTemplate $template, array $data, array $files = [], array $signatures = [], ?Request $request = null): FormSubmission
+    public function createFromPublicForm(FormTemplate $template, array $data, array $files = [], array $signatures = [], ?Request $request = null, ?int $personId = null): FormSubmission
     {
         if (! $template->public_enabled || ! $template->public_token) {
             throw ValidationException::withMessages(['formulário' => ['Formulário não disponível para preenchimento público.']]);
@@ -50,12 +50,13 @@ class SubmissionService
         $timezone = $data['_timezone'] ?? config('app.timezone', 'America/Sao_Paulo');
         $acceptedTextAt = isset($data['_accepted_text_at']) ? now()->parse($data['_accepted_text_at']) : now();
 
-        $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request, $signingChannel, $locale, $timezone, $acceptedTextAt) {
+        $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request, $signingChannel, $locale, $timezone, $acceptedTextAt, $personId) {
             $orgId = $template->organization_id ?? $template->clinic_id;
             $templateVersion = $this->templateVersionService->getOrCreateCurrentVersion($template);
 
             $submission = FormSubmission::withoutGlobalScopes()->create([
                 'organization_id' => $orgId,
+                'person_id' => $personId,
                 'template_id' => $template->id,
                 'template_version_id' => $templateVersion->id,
                 'status' => SubmissionStatus::Pending,
@@ -223,6 +224,17 @@ class SubmissionService
                 ->first();
             if ($documentSend) {
                 $this->documentSendService->linkSubmissionToSend($documentSend, $submission->id);
+            }
+        }
+        if ($submission->person_id) {
+            $documentSendByPerson = DocumentSend::where('organization_id', $orgId)
+                ->where('form_template_id', $submission->template_id)
+                ->where('person_id', $submission->person_id)
+                ->whereNull('form_submission_id')
+                ->orderByDesc('sent_at')
+                ->first();
+            if ($documentSendByPerson) {
+                $this->documentSendService->linkSubmissionToSend($documentSendByPerson, $submission->id);
             }
         }
         $this->webhookService->dispatch($orgId, 'submission.created', $this->webhookPayload($submission));

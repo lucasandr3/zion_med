@@ -9,8 +9,10 @@ class DocumentSend extends Model
 {
     protected $fillable = [
         'organization_id',
+        'person_id',
         'form_template_id',
         'recipient_email',
+        'recipient_name',
         'recipient_phone',
         'channel',
         'sent_at',
@@ -44,6 +46,11 @@ class DocumentSend extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'person_id');
     }
 
     public function formTemplate(): BelongsTo

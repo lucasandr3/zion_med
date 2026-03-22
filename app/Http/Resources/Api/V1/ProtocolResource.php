@@ -15,6 +15,12 @@ class ProtocolResource extends JsonResource
             'status' => $this->status->value,
             'template_id' => $this->template_id,
             'template_name' => $this->whenLoaded('template', fn () => $this->template->name),
+            'person_id' => $this->person_id,
+            'person' => $this->whenLoaded('person', fn () => [
+                'id' => $this->person->id,
+                'code' => $this->person->code,
+                'name' => $this->person->name,
+            ]),
             'submitter_name' => $this->submitter_name,
             'submitter_email' => $this->submitter_email,
             'submitted_at' => $this->submitted_at?->toIso8601String(),

@@ -34,7 +34,7 @@ class ClinicSettingsRequest extends FormRequest
         }
 
         return [
-            'name'               => ['required', 'string', 'max:255'],
+            'name'               => ['sometimes', 'required', 'string', 'max:255'],
             'notification_email' => ['nullable', 'email', 'max:255'],
             'address'            => ['nullable', 'string', 'max:500'],
             'phone'              => ['nullable', 'string', 'max:30'],

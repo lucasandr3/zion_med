@@ -20,7 +20,9 @@ class DocumentSendService
         FormTemplate $template,
         string $recipientEmail,
         ?string $recipientPhone = null,
-        ?\DateTimeInterface $expiresAt = null
+        ?\DateTimeInterface $expiresAt = null,
+        ?int $personId = null,
+        ?string $recipientName = null
     ): DocumentSend {
         if (! $template->public_token || ! $template->public_enabled) {
             $this->publicLinkService->generateToken($template);
@@ -32,8 +34,10 @@ class DocumentSendService
 
         $send = DocumentSend::create([
             'organization_id' => $template->organization_id ?? $template->clinic_id,
+            'person_id' => $personId,
             'form_template_id' => $template->id,
             'recipient_email' => $recipientEmail,
+            'recipient_name' => $recipientName,
             'recipient_phone' => $recipientPhone,
             'channel' => 'email',
             'sent_at' => now(),
@@ -78,7 +82,9 @@ class DocumentSendService
             $template,
             $recipientEmail,
             $documentSend->recipient_phone,
-            $documentSend->expires_at?->toDateTimeImmutable()
+            $documentSend->expires_at?->toDateTimeImmutable(),
+            $documentSend->person_id,
+            $documentSend->recipient_name
         );
     }
 
@@ -139,7 +145,13 @@ class DocumentSendService
     /**
      * Envia o link por WhatsApp via webhook n8n (se configurado).
      */
-    public function sendByWhatsApp(FormTemplate $template, string $recipientPhone, ?\DateTimeInterface $expiresAt = null): ?DocumentSend
+    public function sendByWhatsApp(
+        FormTemplate $template,
+        string $recipientPhone,
+        ?\DateTimeInterface $expiresAt = null,
+        ?int $personId = null,
+        ?string $recipientName = null
+    ): ?DocumentSend
     {
         $webhookUrl = config('services.n8n_whatsapp.webhook_url');
         if (empty($webhookUrl) || ! filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
@@ -153,7 +165,9 @@ class DocumentSendService
         $expiresAt = $expiresAt ?? $template->public_token_expires_at?->toDateTimeImmutable();
         $send = DocumentSend::create([
             'organization_id' => $template->organization_id ?? $template->clinic_id,
+            'person_id' => $personId,
             'form_template_id' => $template->id,
+            'recipient_name' => $recipientName,
             'recipient_phone' => $recipientPhone,
             'channel' => 'whatsapp',
             'sent_at' => now(),

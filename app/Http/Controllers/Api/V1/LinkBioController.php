@@ -15,6 +15,7 @@ use App\Services\ThemeService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class LinkBioController extends Controller
 {
@@ -26,9 +27,36 @@ class LinkBioController extends Controller
     public function __construct(private ThemeService $themeService) {}
 
     /**
+     * Redireciona para a URL do link público e registra o clique (estatísticas).
+     */
+    public function publicRedirectLink(string $slug, int $linkId): Response
+    {
+        $clinic = Clinic::withoutGlobalScopes()
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $clinic) {
+            abort(404, 'Link Bio não encontrado.');
+        }
+
+        $clinicLink = ClinicLink::query()
+            ->where('id', $linkId)
+            ->where('organization_id', $clinic->id)
+            ->first();
+
+        if (! $clinicLink) {
+            abort(404, 'Link não encontrado.');
+        }
+
+        LinkBioLinkClick::incrementForLink((int) $clinicLink->id);
+
+        return redirect()->away($clinicLink->url);
+    }
+
+    /**
      * Dados públicos da página Link Bio por slug (sem autenticação). Usado pelo front em /l/:slug.
      */
-    public function publicBySlug(string $slug): JsonResponse
+    public function publicBySlug(Request $request, string $slug): JsonResponse
     {
         $clinic = Clinic::withoutGlobalScopes()
             ->where('slug', $slug)
@@ -38,7 +66,9 @@ class LinkBioController extends Controller
             return response()->json(['message' => 'Link Bio não encontrado.'], 404);
         }
 
-        LinkBioPageView::incrementForClinic($clinic->id);
+        if ($request->query('preview') !== '1') {
+            LinkBioPageView::incrementForClinic($clinic->id);
+        }
 
         $base = rtrim(config('app.frontend_url', config('app.url')), '/');
         $bioLinks = $clinic->bioLinks()->orderBy('sort_order')->get();

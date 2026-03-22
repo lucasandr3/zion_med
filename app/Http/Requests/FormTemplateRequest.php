@@ -18,6 +18,7 @@ class FormTemplateRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
             'public_enabled' => ['boolean'],
+            'public_require_person_link' => ['boolean'],
         ];
     }
 
@@ -28,6 +29,7 @@ class FormTemplateRequest extends FormRequest
             'description' => 'descrição',
             'is_active' => 'ativo',
             'public_enabled' => 'formulário público',
+            'public_require_person_link' => 'exigir código e data de nascimento no formulário público',
         ];
     }
 }

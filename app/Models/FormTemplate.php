@@ -21,6 +21,7 @@ class FormTemplate extends Model
         'category',
         'is_active',
         'public_enabled',
+        'public_require_person_link',
         'public_token',
         'public_token_expires_at',
         'created_by',
@@ -63,6 +64,7 @@ class FormTemplate extends Model
         return [
             'is_active' => 'boolean',
             'public_enabled' => 'boolean',
+            'public_require_person_link' => 'boolean',
             'public_token_expires_at' => 'datetime',
         ];
     }

@@ -189,6 +189,11 @@ class Organization extends Model
         return $this->hasMany(FormSubmission::class, 'organization_id');
     }
 
+    public function people(): HasMany
+    {
+        return $this->hasMany(Person::class, 'organization_id');
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'organization_id');

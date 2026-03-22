@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentSend;
 use App\Models\FormTemplate;
+use App\Models\Person;
 use App\Services\DocumentSendService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class DocumentSendController extends Controller
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
 
-        $query = DocumentSend::with(['formTemplate', 'formSubmission'])
+        $query = DocumentSend::with(['formTemplate', 'formSubmission', 'person'])
             ->where('organization_id', $orgId);
 
         if ($request->filled('caixa')) {
@@ -58,6 +59,13 @@ class DocumentSendController extends Controller
                 'id' => $s->id,
                 'form_template_id' => $s->form_template_id,
                 'template_name' => $s->formTemplate?->name,
+                'person_id' => $s->person_id,
+                'recipient_name' => $s->recipient_name,
+                'person' => $s->person ? [
+                    'id' => $s->person->id,
+                    'code' => $s->person->code,
+                    'name' => $s->person->name,
+                ] : null,
                 'recipient_email' => $s->recipient_email,
                 'recipient_phone' => $s->recipient_phone,
                 'channel' => $s->channel,
@@ -94,21 +102,44 @@ class DocumentSendController extends Controller
         $validated = $request->validate([
             'template_id' => ['required', 'exists:form_templates,id'],
             'channel' => ['required', 'string', 'in:email,whatsapp'],
-            'recipient_email' => ['required_if:channel,email', 'nullable', 'email'],
-            'recipient_phone' => ['required_if:channel,whatsapp', 'nullable', 'string', 'max:50'],
+            'person_id' => ['nullable', 'integer', 'exists:people,id'],
+            'recipient_email' => ['nullable', 'email'],
+            'recipient_phone' => ['nullable', 'string', 'max:50'],
             'expires_at' => ['nullable', 'date'],
         ]);
 
         $template = FormTemplate::findOrFail($validated['template_id']);
         $this->authorize('update-template', $template);
 
+        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        if (! $orgId) {
+            return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
+        }
+
+        $person = null;
+        if (! empty($validated['person_id'])) {
+            $person = Person::query()->where('id', $validated['person_id'])->firstOrFail();
+            if ((int) $person->organization_id !== (int) $orgId) {
+                abort(404);
+            }
+        }
+
+        $email = $validated['recipient_email'] ?? $person?->email;
+        $phone = $validated['recipient_phone'] ?? $person?->phone;
+        $recipientName = $person?->name;
+
         $expiresAt = isset($validated['expires_at']) ? \Carbon\Carbon::parse($validated['expires_at']) : null;
 
-        if (($validated['channel'] ?? 'email') === 'whatsapp') {
+        if ($validated['channel'] === 'whatsapp') {
+            if (! $phone || trim((string) $phone) === '') {
+                return response()->json(['message' => 'Informe o telefone ou selecione uma pessoa com telefone cadastrado.'], 422);
+            }
             $send = $this->documentSendService->sendByWhatsApp(
                 $template,
-                $validated['recipient_phone'] ?? '',
-                $expiresAt?->toDateTimeImmutable()
+                trim((string) $phone),
+                $expiresAt?->toDateTimeImmutable(),
+                $person?->id,
+                $recipientName
             );
             if (! $send) {
                 return response()->json(['message' => 'WhatsApp não configurado (N8N_WHATSAPP_WEBHOOK_URL).'], 503);
@@ -122,11 +153,17 @@ class DocumentSendController extends Controller
             ], 201);
         }
 
+        if (! $email || trim((string) $email) === '') {
+            return response()->json(['message' => 'Informe o e-mail ou selecione uma pessoa com e-mail cadastrado.'], 422);
+        }
+
         $send = $this->documentSendService->sendByEmail(
             $template,
-            $validated['recipient_email'] ?? '',
-            $validated['recipient_phone'] ?? null,
-            $expiresAt?->toDateTimeImmutable()
+            trim((string) $email),
+            $phone ? trim((string) $phone) : null,
+            $expiresAt?->toDateTimeImmutable(),
+            $person?->id,
+            $recipientName
         );
 
         return response()->json([
