@@ -21,7 +21,8 @@ class ClinicScopingTest extends TestCase
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
 
         $clinic1 = Clinic::first();
-        $user1 = User::withoutGlobalScopes()->where('organization_id', $clinic1->id)->first();
+        $user1 = $this->qaClinicOwnerUser();
+        $this->assertSame($clinic1->id, $user1->organization_id);
         $template1 = FormTemplate::withoutGlobalScopes()->where('organization_id', $clinic1->id)->first();
 
         $tenant2 = Tenant::create(['name' => 'Outra Clínica', 'slug' => 'outra-clinica']);

@@ -16,6 +16,8 @@ class ClinicResource extends JsonResource
             'logo_url' => $this->logo_path ? $this->logo_url : null,
             'cover_image_url' => $this->cover_image_path ? $this->cover_image_url : null,
             'cover_mode' => $this->cover_mode ?? 'banner',
+            'link_bio_model' => (int) ($this->link_bio_model ?? 1),
+            'link_bio_extra' => $this->link_bio_extra,
             'theme' => $this->theme,
             'dark_mode' => $this->dark_mode ?? false,
             'plan_key' => $this->plan_key,

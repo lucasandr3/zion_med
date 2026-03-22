@@ -26,6 +26,8 @@ class Organization extends Model
         'meta_description',
         'cover_image_path',
         'cover_mode',
+        'link_bio_model',
+        'link_bio_extra',
         'public_theme',
         'cover_color',
         'maps_url',
@@ -55,6 +57,7 @@ class Organization extends Model
         'whatsapp_notify_faturas_boleto' => 'boolean',
         'whatsapp_notify_avisos' => 'boolean',
         'business_hours' => 'array',
+        'link_bio_extra' => 'array',
         'trial_ends_at'   => 'datetime',
         'grace_ends_at'   => 'datetime',
     ];

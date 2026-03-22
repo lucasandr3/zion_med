@@ -2,9 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\Role;
-use App\Models\Clinic;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,7 +17,7 @@ class BillingMiddlewareTest extends TestCase
 
     public function test_user_on_trial_can_access_dashboard(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $clinic = $user->clinic;
         $clinic->update([
             'trial_ends_at' => now()->addDays(14),
@@ -34,7 +31,7 @@ class BillingMiddlewareTest extends TestCase
 
     public function test_expired_trial_without_subscription_redirects_to_billing(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $clinic = $user->clinic;
         $clinic->update([
             'trial_ends_at' => now()->subDay(),
@@ -52,7 +49,7 @@ class BillingMiddlewareTest extends TestCase
 
     public function test_past_due_within_grace_period_allows_access_with_warning(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $clinic = $user->clinic;
         $clinic->update([
             'subscription_status' => 'past_due',
@@ -67,7 +64,7 @@ class BillingMiddlewareTest extends TestCase
 
     public function test_past_due_after_grace_period_redirects_to_billing(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $clinic = $user->clinic;
         $clinic->update([
             'subscription_status' => 'past_due',
@@ -84,7 +81,7 @@ class BillingMiddlewareTest extends TestCase
 
     public function test_billing_page_always_accessible_when_authenticated(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $user->clinic->update([
             'subscription_status' => 'inactive',
             'billing_status' => 'blocked',

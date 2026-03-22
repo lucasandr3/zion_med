@@ -2,9 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\Role;
-use App\Models\Clinic;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,11 +24,11 @@ class AuthTest extends TestCase
 
     public function test_login_with_valid_credentials_redirects_to_dashboard(): void
     {
-        $user = User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        $user = $this->qaClinicOwnerUser();
         $this->assertNotNull($user);
 
         $response = $this->post(route('login'), [
-            'email' => 'admin@demo.zionmed.com',
+            'email' => 'qa-owner@zionmed.test',
             'password' => 'senha123',
         ]);
         $response->assertRedirect(route('dashboard'));
@@ -41,7 +38,7 @@ class AuthTest extends TestCase
     public function test_login_with_invalid_credentials_returns_error(): void
     {
         $response = $this->post(route('login'), [
-            'email' => 'admin@demo.zionmed.com',
+            'email' => 'qa-owner@zionmed.test',
             'password' => 'wrong',
         ]);
         $response->assertSessionHasErrors('email');

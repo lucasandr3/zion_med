@@ -12,48 +12,31 @@ class ClinicSeeder extends Seeder
 {
     public function run(): void
     {
+        // Tenants novos vêm do cadastro (Comece). Aqui só o mínimo para QA: um tenant + uma clínica.
         $tenant = Tenant::firstOrCreate(
-            ['slug' => 'clinica-demo-zion'],
-            ['name' => 'Clínica Demo Zion'],
+            ['slug' => 'clinica-qa-zion'],
+            ['name' => 'Tenant QA Zion'],
         );
-
-        $clinics = [
-            [
-                'name' => 'Clínica Demo Zion - Matriz',
-                'slug' => 'clinica-demo-zion-matriz',
-                'notification_email' => 'recepcao@demo.zionmed.com',
-                'address' => 'Rua Central, 45 – Bela Vista',
-            ],
-            [
-                'name' => 'Clínica Demo Zion - Filial Centro',
-                'slug' => 'clinica-demo-zion-centro',
-                'notification_email' => 'centro@demo.zionmed.com',
-                'address' => 'Av. Paulista, 1000 – Centro',
-            ],
-            [
-                'name' => 'Clínica Demo Zion - Filial Sul',
-                'slug' => 'clinica-demo-zion-sul',
-                'notification_email' => 'sul@demo.zionmed.com',
-                'address' => 'Rua das Flores, 220 – Vila Sul',
-            ],
-        ];
 
         $trialDays = (int) config('asaas.trial_days', 14);
 
-        foreach ($clinics as $index => $data) {
-            $clinic = Clinic::create(array_merge($data, ['tenant_id' => $tenant->id]));
+        $clinic = Clinic::firstOrCreate(
+            ['slug' => 'clinica-qa-zion'],
+            [
+                'tenant_id' => $tenant->id,
+                'name' => 'Clínica QA Zion',
+                'notification_email' => 'qa@zionmed.test',
+                'address' => 'Ambiente de testes manuais (QA)',
+            ],
+        );
 
-            if ($index === 0) {
-                $clinic->update([
-                    'trial_ends_at' => now()->addDays($trialDays),
-                    'subscription_status' => 'trial',
-                    'billing_status' => 'ok',
-                ]);
-            }
-        }
+        $clinic->update([
+            'trial_ends_at' => now()->addDays($trialDays),
+            'subscription_status' => 'trial',
+            'billing_status' => 'ok',
+        ]);
 
-        // Apenas o dono da plataforma (sem usuários de clínica; templates são criados pelo FormTemplateSeeder).
-        // Usuário PlatformAdmin: dono da plataforma, não está vinculado a tenant/clinic.
+        // Somente o dono da plataforma (sem usuário de clínica no seed; QA cria via cadastro ou testes).
         User::withoutGlobalScopes()->firstOrCreate(
             ['email' => 'admin@zionmed.com'],
             [

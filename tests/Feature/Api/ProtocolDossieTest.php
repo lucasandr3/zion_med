@@ -22,7 +22,7 @@ class ProtocolDossieTest extends TestCase
 
     private function tenantUser(): User
     {
-        return User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        return $this->qaClinicOwnerUser();
     }
 
     public function test_dossie_requires_auth(): void
@@ -44,7 +44,7 @@ class ProtocolDossieTest extends TestCase
             'protocol_number' => 'P-DOSSIE-001',
             'submitter_name' => 'Test',
             'submitter_email' => 'test@example.com',
-            'status' => 'submitted',
+            'status' => 'pending',
         ]);
 
         $response = $this->get("/api/v1/protocols/{$submission->id}/dossie");

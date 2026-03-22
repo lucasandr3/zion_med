@@ -18,6 +18,11 @@ use Illuminate\Http\Request;
 
 class LinkBioController extends Controller
 {
+    /**
+     * Layouts do Link Bio (mesmos IDs do front Angular).
+     */
+    private const LINK_BIO_LAYOUT_MODELS = [1, 2, 3, 4, 5, 6, 7];
+
     public function __construct(private ThemeService $themeService) {}
 
     /**
@@ -64,6 +69,9 @@ class LinkBioController extends Controller
                     'public_theme' => $clinic->public_theme,
                     'cover_color' => $clinic->cover_color,
                     'cover_mode' => $clinic->cover_mode ?? 'banner',
+                    'link_bio_model' => (int) ($clinic->link_bio_model ?? 1),
+                    'link_bio_extra' => $clinic->link_bio_extra,
+                    'address' => $clinic->address,
                     'cover_image_url' => $clinic->cover_image_url,
                     'short_description' => $clinic->short_description,
                     'specialties' => $clinic->specialties,
@@ -269,6 +277,8 @@ class LinkBioController extends Controller
             'public_theme' => ['nullable', 'string', \Illuminate\Validation\Rule::in(array_merge([''], $validThemes))],
             'cover_color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'cover_mode' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['banner', 'solid', 'none'])],
+            'link_bio_model' => ['nullable', 'integer', \Illuminate\Validation\Rule::in(self::LINK_BIO_LAYOUT_MODELS)],
+            'link_bio_extra' => ['nullable', 'array'],
             'short_description' => ['nullable', 'string', 'max:200'],
             'specialties' => ['nullable', 'string', 'max:500'],
             'founded_year' => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')],

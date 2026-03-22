@@ -22,7 +22,7 @@ class DocumentSendControllerTest extends TestCase
 
     private function tenantUser(): User
     {
-        return User::withoutGlobalScopes()->where('email', 'admin@demo.zionmed.com')->first();
+        return $this->qaClinicOwnerUser();
     }
 
     public function test_document_sends_index_requires_auth(): void
@@ -133,7 +133,7 @@ class DocumentSendControllerTest extends TestCase
             'protocol_number' => 'P-001',
             'submitter_name' => 'Test',
             'submitter_email' => 'signed@test.com',
-            'status' => 'submitted',
+            'status' => 'pending',
         ]);
 
         $send = DocumentSend::create([
