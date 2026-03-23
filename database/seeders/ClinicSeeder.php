@@ -36,7 +36,18 @@ class ClinicSeeder extends Seeder
             'billing_status' => 'ok',
         ]);
 
-        // Somente o dono da plataforma (sem usuário de clínica no seed; QA cria via cadastro ou testes).
+        // Dono da clínica QA (login manual + mesmos testes que usam qaClinicOwnerUser()).
+        User::withoutGlobalScopes()->firstOrCreate(
+            ['email' => 'qa-owner@zionmed.test'],
+            [
+                'organization_id' => $clinic->id,
+                'name' => 'QA Clínica',
+                'password' => 'senha123',
+                'role' => Role::Owner,
+                'active' => true,
+            ]
+        );
+
         User::withoutGlobalScopes()->firstOrCreate(
             ['email' => 'admin@zionmed.com'],
             [

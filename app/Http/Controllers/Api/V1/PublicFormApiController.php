@@ -9,11 +9,15 @@ use App\Rules\Cpf;
 use App\Services\SubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class PublicFormApiController extends Controller
 {
+    /** Tamanho máximo por arquivo (KB), alinhado à regra `max:` de campos `file`. */
+    private const PUBLIC_FILE_MAX_KB = 5120;
+
     public function __construct(private SubmissionService $submissionService) {}
 
     /**
@@ -21,7 +25,7 @@ class PublicFormApiController extends Controller
      */
     public function show(string $token): JsonResponse
     {
-        $key = 'public-form:' . $token;
+        $key = 'public-form:'.$token;
         if (RateLimiter::tooManyAttempts($key, 30)) {
             return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
         }
@@ -76,7 +80,7 @@ class PublicFormApiController extends Controller
      */
     public function validatePerson(Request $request, string $token): JsonResponse
     {
-        $key = 'public-form-person:' . $token;
+        $key = 'public-form-person:'.$token;
         if (RateLimiter::tooManyAttempts($key, 40)) {
             return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
         }
@@ -122,7 +126,7 @@ class PublicFormApiController extends Controller
      */
     public function submit(Request $request, string $token): JsonResponse
     {
-        $key = 'public-form:' . $token;
+        $key = 'public-form:'.$token;
         RateLimiter::hit($key, 60);
 
         $template = FormTemplate::withoutGlobalScopes()
@@ -158,15 +162,25 @@ class PublicFormApiController extends Controller
                 $rules[$field->name_key] = ['nullable'];
             }
             if ($field->type === 'file') {
-                $rules[$field->name_key] = ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,pdf', 'max:5120'];
+                $rules[$field->name_key] = ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,pdf', 'max:'.self::PUBLIC_FILE_MAX_KB];
             }
             if ($field->name_key === 'cpf' && $field->type === 'text') {
                 $rules[$field->name_key][] = new Cpf;
             }
         }
 
+        $this->hydrateFileFieldsFromJsonPayload($request, $template);
+
         $validated = $request->validate($rules);
         $data = $validated;
+
+        foreach ($template->fields as $field) {
+            if ($field->type === 'file' && $field->required && ! $request->hasFile($field->name_key)) {
+                throw ValidationException::withMessages([
+                    $field->name_key => ['O campo '.$field->label.' é obrigatório.'],
+                ]);
+            }
+        }
 
         $personId = null;
         if ($template->public_require_person_link) {
@@ -204,6 +218,118 @@ class PublicFormApiController extends Controller
                 'protocol_number' => $submission->protocol_number,
             ],
         ], 201);
+    }
+
+    /**
+     * Quando a SPA envia JSON com foto em Base64 ou data URL (em vez de multipart),
+     * converte para {@see UploadedFile} no bag de arquivos para as regras `file` funcionarem.
+     */
+    private function hydrateFileFieldsFromJsonPayload(Request $request, FormTemplate $template): void
+    {
+        $touchedFilesBag = false;
+
+        foreach ($template->fields as $field) {
+            if ($field->type !== 'file') {
+                continue;
+            }
+            $key = $field->name_key;
+            if ($request->hasFile($key)) {
+                continue;
+            }
+            $raw = $request->input($key);
+            if ($raw === null) {
+                continue;
+            }
+            if (! is_string($raw)) {
+                throw ValidationException::withMessages([
+                    $key => ['O campo '.$field->label.' deve ser um arquivo ou imagem em Base64.'],
+                ]);
+            }
+            if (trim($raw) === '') {
+                $request->request->remove($key);
+
+                continue;
+            }
+            $uploaded = $this->uploadedFileFromBase64OrDataUrl(trim($raw), $field->label, $key);
+            $request->files->add([$key => $uploaded]);
+            $request->request->remove($key);
+            $touchedFilesBag = true;
+        }
+
+        if ($touchedFilesBag) {
+            $this->flushUploadedFilesCache($request);
+        }
+    }
+
+    /** Limpa o cache interno de arquivos convertidos do Request (JSON + Base64 após o parse inicial). */
+    private function flushUploadedFilesCache(Request $request): void
+    {
+        $prop = new \ReflectionProperty(Request::class, 'convertedFiles');
+        $prop->setValue($request, null);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function uploadedFileFromBase64OrDataUrl(string $raw, string $fieldLabel, string $fieldKey): UploadedFile
+    {
+        $maxBytes = self::PUBLIC_FILE_MAX_KB * 1024;
+        $maxPayloadChars = (int) ceil($maxBytes * 4 / 3) + 512;
+
+        if (strlen($raw) > $maxPayloadChars) {
+            throw ValidationException::withMessages([
+                $fieldKey => ['O arquivo enviado em '.$fieldLabel.' é grande demais (máx. 5 MB).'],
+            ]);
+        }
+
+        if (preg_match('/^data:([\w\/.+-]+);base64,(.+)$/is', $raw, $matches)) {
+            $b64 = preg_replace('/\s+/', '', $matches[2]) ?? $matches[2];
+        } else {
+            $b64 = preg_replace('/\s+/', '', $raw) ?? $raw;
+        }
+
+        $binary = base64_decode($b64, true);
+        if ($binary === false) {
+            throw ValidationException::withMessages([
+                $fieldKey => ['O campo '.$fieldLabel.' não é um Base64 válido.'],
+            ]);
+        }
+
+        if (strlen($binary) > $maxBytes) {
+            throw ValidationException::withMessages([
+                $fieldKey => ['O arquivo enviado em '.$fieldLabel.' é grande demais (máx. 5 MB).'],
+            ]);
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'zion_pub_');
+        if ($tmp === false) {
+            throw ValidationException::withMessages([
+                $fieldKey => ['Não foi possível processar o arquivo de '.$fieldLabel.'.'],
+            ]);
+        }
+
+        file_put_contents($tmp, $binary);
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($tmp) ?: 'application/octet-stream';
+
+        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+        if (! in_array($mime, $allowed, true)) {
+            unlink($tmp);
+            throw ValidationException::withMessages([
+                $fieldKey => ['O arquivo de '.$fieldLabel.' deve ser imagem (JPEG, PNG, GIF) ou PDF.'],
+            ]);
+        }
+
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'application/pdf' => 'pdf',
+            default => 'bin',
+        };
+
+        return new UploadedFile($tmp, $fieldKey.'.'.$extension, $mime, UPLOAD_ERR_OK, true);
     }
 
     private function findPersonForTemplate(FormTemplate $template, string $code, string $birthDate): ?Person

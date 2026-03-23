@@ -50,6 +50,12 @@ npm install
 npm run build
 ```
 
+### `zion_med.test` + Docker (laravel-docker): erro 413 no envio de arquivo
+
+Se a API responde **413 Request Entity Too Large** (no navegador pode aparecer como `net::ERR_FAILED 413`), o limite costuma ser o **Nginx** (padrão **1 MB**), não o Laravel. O PHP do stack geralmente já permite uploads maiores; falta alinhar o Nginx.
+
+Edite `laravel-docker/docker/nginx/conf.d/default.conf` e defina `client_max_body_size 50M;` no bloco `server` do `zion_med.test` ou no início do arquivo (vale para todos os hosts). Reinicie o container Nginx (`docker compose restart nginx` no diretório do stack). Detalhes em `docker/laravel-docker-nginx-upload-limit.snippet.txt`.
+
 ## Acesso após o seed
 
 - **URL:** `http://localhost:8000` (ou `php artisan serve`)

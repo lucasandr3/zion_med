@@ -1,0 +1,26 @@
+# HTTP 413 (Request Entity Too Large) ao enviar anexos no formulário público
+# ---------------------------------------------------------------------------
+# O PHP do stack laravel-docker costuma aceitar uploads grandes (ex.: 50M em
+# docker/php/uploads.ini), mas o Nginx bloqueia o corpo da requisição no padrão
+# de 1m se você não configurar client_max_body_size.
+#
+# Arquivo a editar (fora deste repositório, no stack Docker):
+#   laravel-docker/docker/nginx/conf.d/default.conf
+#
+# Opção A — só zion_med.test: dentro do bloco server { ... } que contém
+#   server_name zion_med.test www.zion_med.test;
+# adicione após "charset utf-8;":
+#
+#     client_max_body_size 50M;
+#
+# Opção B — todos os hosts desse default.conf: na primeira linha do arquivo
+# (contexto http), antes do primeiro "server {":
+#
+#     client_max_body_size 50M;
+#
+# Depois, no diretório laravel-docker:
+#   docker compose restart nginx
+#
+# Produção: o nginx-production.conf deste projeto já define 20M; ajuste se
+# precisar de anexos maiores que a validação Laravel (até 5 MB por arquivo
+# hoje em PublicFormApiController).

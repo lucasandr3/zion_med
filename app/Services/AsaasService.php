@@ -5,19 +5,20 @@ namespace App\Services;
 use App\Models\Clinic;
 use App\Models\Payment;
 use App\Models\Subscription;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AsaasService
 {
     private string $baseUrl;
+
     private string $apiKey;
 
     public function __construct()
     {
         $this->baseUrl = rtrim(config('asaas.base_url'), '/');
-        $this->apiKey  = config('asaas.api_key') ?? '';
+        $this->apiKey = config('asaas.api_key') ?? '';
     }
 
     public function isConfigured(): bool
@@ -27,7 +28,7 @@ class AsaasService
 
     private function request(string $method, string $path, array $data = []): Response
     {
-        $url = $this->baseUrl . '/' . ltrim($path, '/');
+        $url = $this->baseUrl.'/'.ltrim($path, '/');
         $http = Http::withHeaders([
             'access_token' => $this->apiKey,
             'Content-Type' => 'application/json',
@@ -63,7 +64,7 @@ class AsaasService
         }
 
         if ($clinic->asaas_customer_id) {
-            $resp = $this->request('POST', '/customers/' . $clinic->asaas_customer_id, $payload);
+            $resp = $this->request('POST', '/customers/'.$clinic->asaas_customer_id, $payload);
             if ($resp->successful()) {
                 return $resp->json();
             }
@@ -73,13 +74,34 @@ class AsaasService
         $resp->throw();
         $data = $resp->json();
         $clinic->update(['asaas_customer_id' => $data['id'] ?? null]);
+
         return $data;
+    }
+
+    /**
+     * Data da primeira cobrança no Asaas: fim do trial + dias de carência (grace),
+     * ou hoje se já não estiver em trial ou se a data calculada passou.
+     */
+    public function firstChargeDueDateForClinic(Clinic $clinic): string
+    {
+        $graceDays = (int) config('asaas.grace_days', 7);
+        if ($clinic->isOnTrial()) {
+            $due = $clinic->trial_ends_at->copy()->addDays($graceDays)->startOfDay();
+            $today = now()->startOfDay();
+            if ($due->lt($today)) {
+                $due = $today;
+            }
+
+            return $due->format('Y-m-d');
+        }
+
+        return now()->format('Y-m-d');
     }
 
     /**
      * Cria assinatura no ASAAS (cycle MONTHLY, primeira cobrança em nextDueDate).
      */
-    public function createSubscription(Clinic $clinic, string $planKey, float $value, string $billingType = 'BOLETO'): array
+    public function createSubscription(Clinic $clinic, string $planKey, float $value, string $billingType = 'BOLETO', ?string $nextDueDate = null): array
     {
         $customer = $this->ensureCustomer($clinic);
         $customerId = $customer['id'] ?? $clinic->asaas_customer_id;
@@ -88,7 +110,7 @@ class AsaasService
         }
 
         $productName = config('asaas.product_name', 'ZionMed');
-        $nextDue = now()->format('Y-m-d');
+        $nextDue = $nextDueDate ?? now()->format('Y-m-d');
 
         $payload = [
             'customer' => $customerId,
@@ -101,6 +123,7 @@ class AsaasService
 
         $resp = $this->request('POST', '/subscriptions', $payload);
         $resp->throw();
+
         return $resp->json();
     }
 
@@ -109,9 +132,10 @@ class AsaasService
      */
     public function getSubscriptionPayments(string $asaasSubscriptionId): array
     {
-        $resp = $this->request('GET', '/subscriptions/' . $asaasSubscriptionId . '/payments');
+        $resp = $this->request('GET', '/subscriptions/'.$asaasSubscriptionId.'/payments');
         $resp->throw();
         $data = $resp->json();
+
         return $data['data'] ?? [];
     }
 
@@ -120,8 +144,9 @@ class AsaasService
      */
     public function getSubscription(string $asaasSubscriptionId): array
     {
-        $resp = $this->request('GET', '/subscriptions/' . $asaasSubscriptionId);
+        $resp = $this->request('GET', '/subscriptions/'.$asaasSubscriptionId);
         $resp->throw();
+
         return $resp->json();
     }
 
@@ -130,8 +155,9 @@ class AsaasService
      */
     public function cancelSubscription(string $asaasSubscriptionId): array
     {
-        $resp = $this->request('DELETE', '/subscriptions/' . $asaasSubscriptionId);
+        $resp = $this->request('DELETE', '/subscriptions/'.$asaasSubscriptionId);
         $resp->throw();
+
         return $resp->json();
     }
 
@@ -151,6 +177,7 @@ class AsaasService
                     'subscription_id' => $subscription->asaas_subscription_id,
                     'error' => $e->getMessage(),
                 ]);
+
                 continue;
             }
             foreach ($payments as $item) {

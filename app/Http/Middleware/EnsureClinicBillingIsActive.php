@@ -37,8 +37,9 @@ class EnsureClinicBillingIsActive
 
         if ($this->canAccess($organization, $request)) {
             if ($organization->subscription_status === 'past_due' && $organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
-                $request->session()->flash('billing_warning', 'Pagamento pendente. Regularize até ' . $organization->grace_ends_at->format('d/m/Y') . ' para evitar a suspensão do acesso.');
+                $request->session()->flash('billing_warning', 'Pagamento pendente. Regularize até '.$organization->grace_ends_at->format('d/m/Y').' para evitar a suspensão do acesso.');
             }
+
             return $next($request);
         }
 
@@ -51,7 +52,7 @@ class EnsureClinicBillingIsActive
     {
         $path = trim($request->path(), '/');
         foreach (self::ALLOWED_PREFIXES as $prefix) {
-            if ($path === $prefix || str_starts_with($path, $prefix . '/')) {
+            if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
                 return true;
             }
             if (str_ends_with($prefix, '/') && str_starts_with($path, $prefix)) {
@@ -70,6 +71,7 @@ class EnsureClinicBillingIsActive
         if ($request->routeIs('clinica.configuracoes.*')) {
             return true;
         }
+
         return false;
     }
 
@@ -79,6 +81,7 @@ class EnsureClinicBillingIsActive
         if (! $orgId) {
             return null;
         }
+
         return Organization::find($orgId);
     }
 
@@ -87,13 +90,23 @@ class EnsureClinicBillingIsActive
         if ($organization->subscription_status !== 'trial' || ! $organization->trial_ends_at || now()->lte($organization->trial_ends_at)) {
             return;
         }
-        $hasActiveSubscription = $organization->subscriptions()->where('status', 'active')->exists();
+        $hasActiveSubscription = $organization->subscriptions()
+            ->whereIn('status', ['active', 'ACTIVE'])
+            ->exists();
         if (! $hasActiveSubscription) {
             $organization->update([
                 'subscription_status' => 'inactive',
-                'billing_status'     => 'blocked',
+                'billing_status' => 'blocked',
             ]);
+
+            return;
         }
+
+        // Assinatura criada durante o trial: após trial_ends_at o status ainda era "trial" e o acesso caía em falso.
+        $organization->update([
+            'subscription_status' => 'active',
+            'billing_status' => 'ok',
+        ]);
     }
 
     private function canAccess(Organization $organization, Request $request): bool
@@ -112,6 +125,7 @@ class EnsureClinicBillingIsActive
                 $organization->update(['billing_status' => 'blocked']);
             }
         }
+
         return false;
     }
 }

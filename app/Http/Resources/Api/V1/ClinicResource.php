@@ -23,6 +23,7 @@ class ClinicResource extends JsonResource
             'plan_key' => $this->plan_key,
             'subscription_status' => $this->subscription_status,
             'billing_status' => $this->billing_status,
+            'trial_ends_at' => $this->trial_ends_at?->toIso8601String(),
             'notification_email' => $this->notification_email,
             'contact_email' => $this->contact_email,
             'phone' => $this->phone,

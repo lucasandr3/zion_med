@@ -12,6 +12,7 @@ use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -69,6 +70,8 @@ class BillingController extends Controller
                     'plan_key' => $clinic->plan_key,
                     'subscription_status' => $clinic->subscription_status,
                     'billing_status' => $clinic->billing_status,
+                    'trial_ends_at' => $clinic->trial_ends_at?->toIso8601String(),
+                    'is_on_trial' => $clinic->isOnTrial(),
                 ],
                 'plans' => $plans,
                 'subscriptions' => $subscriptions,
@@ -116,16 +119,21 @@ class BillingController extends Controller
             return response()->json(['message' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido em Configurações > Dados Gerais > Dados para Faturamento antes de assinar.'], 422);
         }
 
+        $wasOnTrial = $clinic->isOnTrial();
+        $firstDue = $this->asaasService->firstChargeDueDateForClinic($clinic);
+
         try {
             $payload = $this->asaasService->createSubscription(
                 $clinic,
                 $planKey,
                 (float) $plan['value'],
-                'BOLETO'
+                'BOLETO',
+                $firstDue
             );
         } catch (\Throwable $e) {
             Log::warning('Asaas createSubscription failed', ['clinic_id' => $clinic->id, 'error' => $e->getMessage()]);
             $errorMessage = $this->extractAsaasErrorMessage($e);
+
             return response()->json(['message' => $errorMessage], 422);
         }
 
@@ -134,36 +142,46 @@ class BillingController extends Controller
             return response()->json(['message' => 'O gateway de pagamento não retornou o ID da assinatura. Tente novamente ou entre em contato com o suporte.'], 502);
         }
 
+        $nextDue = $payload['nextDueDate'] ?? $firstDue;
+
         $subscription = Subscription::create([
             'organization_id' => $clinic->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'status' => 'active',
-            'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+            'next_due_date' => $nextDue,
         ]);
 
         $this->syncSubscriptionPaymentsFromAsaas($clinic, $subscription, $asaasId);
 
-        $clinic->update([
+        $clinicUpdates = [
             'plan_key' => $planKey,
-            'subscription_status' => 'active',
             'billing_status' => 'ok',
             'grace_ends_at' => null,
-        ]);
+        ];
+        if (! $wasOnTrial) {
+            $clinicUpdates['subscription_status'] = 'active';
+        }
+        $clinic->update($clinicUpdates);
 
         $this->whatsAppNotificationService->notifySubscriptionCreated($clinic->fresh(), [
             'plan_key' => $planKey,
             'plan_name' => $plan['name'] ?? $planKey,
             'asaas_subscription_id' => $asaasId,
-            'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+            'next_due_date' => $nextDue,
         ]);
+
+        $dueFormatted = Carbon::parse($nextDue)->format('d/m/Y');
+        $successMessage = $wasOnTrial
+            ? 'Assinatura registrada. Você permanece em período de trial. A primeira cobrança vencerá em '.$dueFormatted.'.'
+            : 'Assinatura ativa. Sua primeira cobrança foi gerada e em breve você receberá o boleto por e-mail.';
 
         return response()->json([
             'data' => [
-                'message' => 'Assinatura ativa. Sua primeira cobrança foi gerada e em breve você receberá o boleto por e-mail.',
+                'message' => $successMessage,
                 'subscription_id' => $subscription->id,
                 'plan_key' => $planKey,
-                'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+                'next_due_date' => $nextDue,
             ],
         ], 201);
     }
@@ -194,6 +212,7 @@ class BillingController extends Controller
                     'subscription_id' => $subscription->id,
                     'error' => $e->getMessage(),
                 ]);
+
                 return response()->json([
                     'message' => 'Não foi possível cancelar no gateway. Tente novamente ou entre em contato com o suporte.',
                 ], 502);
@@ -268,15 +287,20 @@ class BillingController extends Controller
             return response()->json(['message' => 'Informe CPF ou CNPJ em Configurações > Dados para Faturamento.'], 422);
         }
 
+        $wasOnTrial = $clinic->isOnTrial();
+        $firstDue = $this->asaasService->firstChargeDueDateForClinic($clinic);
+
         try {
             $payload = $this->asaasService->createSubscription(
                 $clinic,
                 $planKey,
                 (float) $plan['value'],
-                'BOLETO'
+                'BOLETO',
+                $firstDue
             );
         } catch (\Throwable $e) {
             Log::warning('Asaas createSubscription (changePlan) failed', ['clinic_id' => $clinic->id, 'error' => $e->getMessage()]);
+
             return response()->json(['message' => $this->extractAsaasErrorMessage($e)], 422);
         }
 
@@ -285,29 +309,39 @@ class BillingController extends Controller
             return response()->json(['message' => 'Gateway não retornou ID da assinatura.'], 502);
         }
 
+        $nextDue = $payload['nextDueDate'] ?? $firstDue;
+
         $subscription = Subscription::create([
             'organization_id' => $clinic->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'status' => 'active',
-            'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+            'next_due_date' => $nextDue,
         ]);
 
         $this->syncSubscriptionPaymentsFromAsaas($clinic, $subscription, $asaasId);
 
-        $clinic->update([
+        $clinicUpdates = [
             'plan_key' => $planKey,
-            'subscription_status' => 'active',
             'billing_status' => 'ok',
             'grace_ends_at' => null,
-        ]);
+        ];
+        if (! $wasOnTrial) {
+            $clinicUpdates['subscription_status'] = 'active';
+        }
+        $clinic->update($clinicUpdates);
+
+        $dueFormatted = Carbon::parse($nextDue)->format('d/m/Y');
+        $changeMessage = $wasOnTrial
+            ? 'Plano alterado. Você permanece em trial. A primeira cobrança vencerá em '.$dueFormatted.'.'
+            : 'Plano alterado. Nova cobrança será gerada em breve.';
 
         return response()->json([
             'data' => [
-                'message' => 'Plano alterado. Nova cobrança será gerada em breve.',
+                'message' => $changeMessage,
                 'subscription_id' => $subscription->id,
                 'plan_key' => $planKey,
-                'next_due_date' => $payload['nextDueDate'] ?? now()->format('Y-m-d'),
+                'next_due_date' => $nextDue,
             ],
         ], 200);
     }
@@ -318,6 +352,7 @@ class BillingController extends Controller
         if (! $clinicId) {
             return null;
         }
+
         return Clinic::find($clinicId);
     }
 
@@ -327,6 +362,7 @@ class BillingController extends Controller
             $payments = $this->asaasService->getSubscriptionPayments($asaasSubscriptionId);
         } catch (\Throwable $e) {
             Log::warning('Asaas getSubscriptionPayments failed', ['subscription_id' => $asaasSubscriptionId, 'error' => $e->getMessage()]);
+
             return;
         }
 

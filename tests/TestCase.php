@@ -10,7 +10,7 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Dono da clínica de QA (o seeder não cria usuário de tenant; os testes usam este usuário fixo).
+     * Dono da clínica de QA (também criado pelo ClinicSeeder como qa-owner@zionmed.test).
      */
     protected function qaClinicOwnerUser(): User
     {
