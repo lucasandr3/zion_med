@@ -176,7 +176,7 @@ class PersonController extends Controller
 
     public function destroy(Request $request, Person $pessoa): JsonResponse
     {
-        $this->authorize('manage-templates');
+        $this->authorize('people-deactivate');
         $pessoa->update(['status' => 'inactive']);
 
         return response()->json([

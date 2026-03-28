@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\Role;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserStoreRequest;
 use App\Http\Requests\UserUpdateRequest;
 use App\Http\Resources\Api\V1\UserResource;
+use App\Models\OrganizationRole;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,18 +32,26 @@ class UserController extends Controller
     }
 
     /**
-     * Lista roles disponíveis para create/edit (exclui SuperAdmin e PlatformAdmin).
+     * Lista papéis atribuíveis da organização atual (organization_roles).
      */
     public function roles(): JsonResponse
     {
         $this->authorize('manage-users');
-        $roles = array_values(array_filter(Role::cases(), fn (Role $r) => $r !== Role::SuperAdmin && $r !== Role::PlatformAdmin));
+        $orgId = session('current_clinic_id');
+        if ($orgId === null || $orgId === '') {
+            return response()->json(['data' => []]);
+        }
+        $roles = OrganizationRole::query()
+            ->where('organization_id', (int) $orgId)
+            ->where('is_assignable', true)
+            ->orderBy('label')
+            ->get(['slug', 'label']);
 
         return response()->json([
-            'data' => array_map(fn (Role $r) => [
-                'value' => $r->value,
-                'label' => $r->label(),
-            ], $roles),
+            'data' => $roles->map(fn (OrganizationRole $r) => [
+                'value' => $r->slug,
+                'label' => $r->label,
+            ])->values()->all(),
         ]);
     }
 
@@ -55,7 +63,6 @@ class UserController extends Controller
         $data = $request->validated();
         $organizationId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
         $data['organization_id'] = $organizationId;
-        $data['role'] = Role::from($data['role']);
         $data['active'] = true;
         $data['can_switch_clinic'] = $request->user()->can('grant-clinic-switch')
             ? $request->boolean('can_switch_clinic')
@@ -91,7 +98,6 @@ class UserController extends Controller
         } else {
             unset($data['password']);
         }
-        $data['role'] = Role::from($data['role']);
         $data['active'] = $request->boolean('active', true);
         if ($request->user()->can('grant-clinic-switch', $usuario)) {
             $data['can_switch_clinic'] = $request->boolean('can_switch_clinic');

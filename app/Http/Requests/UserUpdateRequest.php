@@ -26,13 +26,21 @@ class UserUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique('users')->where('organization_id', $clinicId)->ignore($user->id),
             ],
-            'role' => ['required', 'string', 'in:owner,manager,staff'],
+            'role' => [
+                'required',
+                'string',
+                'max:64',
+                Rule::exists('organization_roles', 'slug')->where(function ($query) use ($clinicId) {
+                    return $query->where('organization_id', $clinicId)->where('is_assignable', true);
+                }),
+            ],
             'active' => ['boolean'],
             'can_switch_clinic' => ['sometimes', 'boolean'],
         ];
         if ($this->filled('password')) {
             $rules['password'] = ['nullable', 'string', 'confirmed', Password::defaults()];
         }
+
         return $rules;
     }
 

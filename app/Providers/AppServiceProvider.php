@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\Role;
 use App\Models\Clinic;
+use App\Support\Permission;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\User;
@@ -97,20 +98,29 @@ class AppServiceProvider extends ServiceProvider
                 );
             });
 
+        Gate::define('view-dashboard', function (User $user) {
+            return $user->hasPermission(Permission::DASHBOARD_ACCESS);
+        });
+        Gate::define('view-notifications', function (User $user) {
+            return $user->hasPermission(Permission::NOTIFICATIONS_ACCESS);
+        });
+        Gate::define('manage-billing', function (User $user) {
+            return $user->hasPermission(Permission::BILLING_MANAGE);
+        });
         Gate::define('manage-clinic', function (User $user) {
-            return $user->role->canManageClinic();
+            return $user->hasPermission(Permission::ORGANIZATION_MANAGE);
         });
         Gate::define('manage-users', function (User $user) {
-            return $user->role->canManageUsers();
+            return $user->hasPermission(Permission::USERS_MANAGE);
         });
         Gate::define('manage-templates', function (User $user) {
-            return $user->role->canManageTemplates();
+            return $user->hasPermission(Permission::TEMPLATES_MANAGE);
         });
         Gate::define('approve-submissions', function (User $user) {
-            return $user->role->canApproveSubmissions();
+            return $user->hasPermission(Permission::SUBMISSIONS_APPROVE);
         });
         Gate::define('view-submissions', function (User $user) {
-            return $user->role->canViewSubmissions();
+            return $user->hasPermission(Permission::SUBMISSIONS_VIEW);
         });
         Gate::define('viewApiDocs', function (?User $user) {
             return $user !== null;
@@ -120,15 +130,16 @@ class AppServiceProvider extends ServiceProvider
             if ($user === null) {
                 return false;
             }
-            return in_array($user->role, [Role::SuperAdmin, Role::PlatformAdmin], true);
+
+            return in_array($user->roleEnum(), [Role::SuperAdmin, Role::PlatformAdmin], true);
         });
 
         /** Quem pode conceder "acessar todas as clínicas" a outro usuário (SuperAdmin ou Owner na mesma clínica). */
         Gate::define('grant-clinic-switch', function (User $user, ?User $target = null) {
-            if ($user->role === Role::SuperAdmin) {
+            if ($user->roleEnum() === Role::SuperAdmin) {
                 return true;
             }
-            if ($user->role !== Role::Owner) {
+            if (! $user->isOwner()) {
                 return false;
             }
             if ($target === null) {
@@ -141,19 +152,20 @@ class AppServiceProvider extends ServiceProvider
             if ($user->canSwitchClinic()) {
                 return (string) $clinic->id === (string) session('current_clinic_id');
             }
-            return $user->role === Role::Owner && $user->clinic_id === $clinic->id;
+
+            return $user->isOwner() && $user->clinic_id === $clinic->id;
         });
         Gate::define('update-user', function (User $user, User $target) {
             if ($user->canSwitchClinic()) {
                 return (string) $target->clinic_id === (string) session('current_clinic_id');
             }
-            if ($user->role !== Role::Owner) {
+            if (! $user->isOwner()) {
                 return false;
             }
             return $user->clinic_id === $target->clinic_id;
         });
         Gate::define('view-template', function (User $user, FormTemplate $template) {
-            if (! $user->role->canViewSubmissions()) {
+            if (! $user->hasPermission(Permission::SUBMISSIONS_VIEW)) {
                 return false;
             }
             if ($user->canSwitchClinic()) {
@@ -162,7 +174,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->clinic_id === $template->clinic_id;
         });
         Gate::define('update-template', function (User $user, FormTemplate $template) {
-            if (! $user->role->canManageTemplates()) {
+            if (! $user->hasPermission(Permission::TEMPLATES_MANAGE)) {
                 return false;
             }
             if ($user->canSwitchClinic()) {
@@ -171,7 +183,7 @@ class AppServiceProvider extends ServiceProvider
             return $user->clinic_id === $template->clinic_id;
         });
         Gate::define('view-submission', function (User $user, FormSubmission $submission) {
-            if (! $user->role->canViewSubmissions()) {
+            if (! $user->hasPermission(Permission::SUBMISSIONS_VIEW)) {
                 return false;
             }
             if ($user->canSwitchClinic()) {
@@ -180,13 +192,16 @@ class AppServiceProvider extends ServiceProvider
             return $user->clinic_id === $submission->clinic_id;
         });
         Gate::define('approve-submission', function (User $user, FormSubmission $submission) {
-            if (! $user->role->canApproveSubmissions()) {
+            if (! $user->hasPermission(Permission::SUBMISSIONS_APPROVE)) {
                 return false;
             }
             if ($user->canSwitchClinic()) {
                 return (string) $submission->clinic_id === (string) session('current_clinic_id');
             }
             return $user->clinic_id === $submission->clinic_id;
+        });
+        Gate::define('people-deactivate', function (User $user) {
+            return $user->hasPermission(Permission::PEOPLE_DEACTIVATE);
         });
     }
 }

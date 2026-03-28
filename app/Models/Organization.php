@@ -11,6 +11,13 @@ class Organization extends Model
 {
     protected $table = 'organizations';
 
+    protected static function booted(): void
+    {
+        static::created(function (Organization $organization): void {
+            OrganizationRole::seedDefaultsForOrganization((int) $organization->id);
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'name',
@@ -177,6 +184,11 @@ class Organization extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class, 'organization_id');
+    }
+
+    public function organizationRoles(): HasMany
+    {
+        return $this->hasMany(OrganizationRole::class, 'organization_id');
     }
 
     public function formTemplates(): HasMany

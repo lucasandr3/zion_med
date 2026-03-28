@@ -18,7 +18,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Artisan::command('platform:notify-billing', function () {
-    $admins = User::where('role', Role::PlatformAdmin)->get();
+    $admins = User::where('role', Role::PlatformAdmin->value)->get();
     if ($admins->isEmpty()) {
         return;
     }

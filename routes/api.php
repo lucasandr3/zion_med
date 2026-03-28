@@ -10,7 +10,10 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\IntegrationsController;
 use App\Http\Controllers\Api\V1\LinkBioController;
 use App\Http\Controllers\Api\V1\LinksPublicosController;
+use App\Http\Controllers\Api\V1\MeAppearanceController;
 use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\OrganizationRoleController;
+use App\Http\Controllers\Api\V1\PermissionCatalogController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
@@ -64,6 +67,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
     Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
+    Route::patch('/me/appearance', [MeAppearanceController::class, 'update'])->name('api.v1.me.appearance');
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('api.v1.notificacoes.index');
     Route::patch('/notificacoes/{id}/lida', [NotificationController::class, 'markAsRead'])->name('api.v1.notificacoes.read');
     Route::post('/notificacoes/marcar-todas', [NotificationController::class, 'markAllAsRead'])->name('api.v1.notificacoes.read.all');
@@ -91,6 +95,13 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
 Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
+    Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');
+    Route::get('/organization-roles', [OrganizationRoleController::class, 'index'])->name('api.v1.organization-roles.index');
+    Route::post('/organization-roles', [OrganizationRoleController::class, 'store'])->name('api.v1.organization-roles.store');
+    Route::get('/organization-roles/{slug}', [OrganizationRoleController::class, 'show'])->name('api.v1.organization-roles.show');
+    Route::put('/organization-roles/{slug}', [OrganizationRoleController::class, 'update'])->name('api.v1.organization-roles.update');
+    Route::delete('/organization-roles/{slug}', [OrganizationRoleController::class, 'destroy'])->name('api.v1.organization-roles.destroy');
+
     Route::get('/usuarios/roles', [UserController::class, 'roles'])->name('api.v1.usuarios.roles');
     Route::apiResource('usuarios', UserController::class)->parameters(['usuarios' => 'usuario'])->names('api.v1.usuarios');
 

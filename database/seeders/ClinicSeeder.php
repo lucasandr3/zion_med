@@ -43,7 +43,7 @@ class ClinicSeeder extends Seeder
                 'organization_id' => $clinic->id,
                 'name' => 'QA Clínica',
                 'password' => 'senha123',
-                'role' => Role::Owner,
+                'role' => Role::Owner->value,
                 'active' => true,
             ]
         );
@@ -54,7 +54,7 @@ class ClinicSeeder extends Seeder
                 'organization_id' => null,
                 'name' => 'Admin Plataforma',
                 'password' => bcrypt('senha123'),
-                'role' => Role::PlatformAdmin,
+                'role' => Role::PlatformAdmin->value,
                 'active' => true,
             ]
         );

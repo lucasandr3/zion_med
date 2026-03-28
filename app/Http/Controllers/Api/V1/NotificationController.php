@@ -14,6 +14,8 @@ class NotificationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('view-notifications');
+
         $user = $request->user();
         $filter = $request->get('filtro', 'todas');
 
@@ -46,6 +48,8 @@ class NotificationController extends Controller
      */
     public function markAsRead(Request $request, string $id): JsonResponse
     {
+        $this->authorize('view-notifications');
+
         $notification = $request->user()->notifications()->findOrFail($id);
         $notification->markAsRead();
 
@@ -59,6 +63,8 @@ class NotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
+        $this->authorize('view-notifications');
+
         $request->user()->unreadNotifications->markAsRead();
 
         return response()->json([
@@ -71,6 +77,8 @@ class NotificationController extends Controller
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
+        $this->authorize('view-notifications');
+
         $request->user()->notifications()->findOrFail($id)->delete();
 
         return response()->json([
@@ -83,6 +91,8 @@ class NotificationController extends Controller
      */
     public function destroyAll(Request $request): JsonResponse
     {
+        $this->authorize('view-notifications');
+
         $request->user()->notifications()->delete();
 
         return response()->json([

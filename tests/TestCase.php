@@ -22,7 +22,7 @@ abstract class TestCase extends BaseTestCase
                 'organization_id' => $clinic->id,
                 'name' => 'QA Clínica',
                 'password' => 'senha123',
-                'role' => Role::Owner,
+                'role' => Role::Owner->value,
                 'active' => true,
             ]
         );

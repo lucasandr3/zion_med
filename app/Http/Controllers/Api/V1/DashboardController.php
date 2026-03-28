@@ -19,6 +19,8 @@ class DashboardController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
+        $this->authorize('view-dashboard');
+
         $orgId = session('current_clinic_id');
         if (! $orgId) {
             return response()->json([

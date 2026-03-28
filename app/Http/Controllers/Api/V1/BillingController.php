@@ -28,6 +28,8 @@ class BillingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('manage-billing');
+
         $clinic = $this->currentClinic($request);
         if (! $clinic) {
             return response()->json([
@@ -86,6 +88,8 @@ class BillingController extends Controller
      */
     public function checkout(Request $request): JsonResponse
     {
+        $this->authorize('manage-billing');
+
         $allowedPlanKeys = Plan::activeKeys();
         if (empty($allowedPlanKeys)) {
             $allowedPlanKeys = array_keys(config('asaas.plans', []));
@@ -191,6 +195,8 @@ class BillingController extends Controller
      */
     public function cancelSubscription(Request $request, Subscription $subscription): JsonResponse
     {
+        $this->authorize('manage-billing');
+
         $clinic = $this->currentClinic($request);
         if (! $clinic) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
@@ -238,6 +244,8 @@ class BillingController extends Controller
      */
     public function changePlan(Request $request): JsonResponse
     {
+        $this->authorize('manage-billing');
+
         $allowedPlanKeys = Plan::activeKeys();
         if (empty($allowedPlanKeys)) {
             $allowedPlanKeys = array_keys(config('asaas.plans', []));

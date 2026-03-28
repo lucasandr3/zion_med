@@ -16,6 +16,7 @@ class UserStoreRequest extends FormRequest
     public function rules(): array
     {
         $clinicId = $this->user()?->clinic_id ?? session('current_clinic_id');
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -26,7 +27,14 @@ class UserStoreRequest extends FormRequest
                 Rule::unique('users')->where('organization_id', $clinicId),
             ],
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
-            'role' => ['required', 'string', 'in:owner,manager,staff'],
+            'role' => [
+                'required',
+                'string',
+                'max:64',
+                Rule::exists('organization_roles', 'slug')->where(function ($query) use ($clinicId) {
+                    return $query->where('organization_id', $clinicId)->where('is_assignable', true);
+                }),
+            ],
             'can_switch_clinic' => ['sometimes', 'boolean'],
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Support\Permission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,6 +24,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'active',
         'can_switch_clinic',
+        'ui_theme',
+        'ui_dark_mode',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -45,9 +48,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'role' => Role::class,
             'active' => 'boolean',
             'can_switch_clinic' => 'boolean',
+            'ui_dark_mode' => 'boolean',
         ];
     }
 
@@ -82,39 +85,130 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AuditLog::class);
     }
 
+    public function roleEnum(): ?Role
+    {
+        return Role::tryFrom((string) ($this->attributes['role'] ?? ''));
+    }
+
+    /** Contexto da organização atual (sessão API) ou organização do usuário. */
+    public function currentOrganizationId(): ?int
+    {
+        $sid = session('current_clinic_id');
+
+        return $sid !== null && $sid !== '' ? (int) $sid : ($this->organization_id !== null ? (int) $this->organization_id : null);
+    }
+
+    /**
+     * Permissões efetivas no contexto atual (header/sessão de organização).
+     *
+     * @return list<string>
+     */
+    public function effectivePermissions(): array
+    {
+        $enum = $this->roleEnum();
+        if ($enum === Role::PlatformAdmin) {
+            return Permission::keys();
+        }
+        if ($enum === Role::SuperAdmin) {
+            return Permission::keys();
+        }
+
+        $orgId = $this->currentOrganizationId();
+        if (! $orgId) {
+            return $this->permissionsFallbackFromEnum();
+        }
+
+        $row = OrganizationRole::query()
+            ->where('organization_id', $orgId)
+            ->where('slug', (string) ($this->attributes['role'] ?? ''))
+            ->first();
+
+        if ($row && is_array($row->permissions)) {
+            return array_values(array_unique(array_intersect($row->permissions, Permission::keys())));
+        }
+
+        return $this->permissionsFallbackFromEnum();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function permissionsFallbackFromEnum(): array
+    {
+        $enum = $this->roleEnum();
+        if (! $enum) {
+            return [];
+        }
+
+        return match ($enum) {
+            Role::Owner => Permission::ownerDefaults(),
+            Role::Manager => Permission::managerDefaults(),
+            Role::Staff => Permission::staffDefaults(),
+            default => [],
+        };
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if (! in_array($permission, Permission::keys(), true)) {
+            return false;
+        }
+
+        return in_array($permission, $this->effectivePermissions(), true);
+    }
+
+    public function resolveRoleLabel(): string
+    {
+        $slug = (string) ($this->attributes['role'] ?? '');
+        $orgId = $this->currentOrganizationId();
+        if ($orgId) {
+            $label = OrganizationRole::query()
+                ->where('organization_id', $orgId)
+                ->where('slug', $slug)
+                ->value('label');
+            if ($label) {
+                return $label;
+            }
+        }
+        $enum = Role::tryFrom($slug);
+
+        return $enum ? $enum->label() : $slug;
+    }
+
     public function isPlatformAdmin(): bool
     {
-        return $this->role === Role::PlatformAdmin;
+        return $this->roleEnum() === Role::PlatformAdmin;
     }
 
     public function isTenantUser(): bool
     {
-        return in_array($this->role, [
-            Role::SuperAdmin,
-            Role::Owner,
-            Role::Manager,
-            Role::Staff,
-        ], true);
+        if ($this->isPlatformAdmin()) {
+            return false;
+        }
+
+        return $this->roleEnum() !== null || $this->organization_id !== null;
     }
 
     public function isOwner(): bool
     {
-        return $this->role === Role::Owner;
+        return (string) ($this->attributes['role'] ?? '') === Role::Owner->value;
     }
 
     public function isManager(): bool
     {
-        return $this->role === Role::Manager;
+        return (string) ($this->attributes['role'] ?? '') === Role::Manager->value;
     }
 
     public function isStaff(): bool
     {
-        return $this->role === Role::Staff;
+        return (string) ($this->attributes['role'] ?? '') === Role::Staff->value;
     }
 
-    /** Pode acessar e trocar entre todas as clínicas (por cargo SuperAdmin ou permissão delegada). */
+    /** Pode acessar e trocar entre todas as empresas (SuperAdmin/Owner ou permissão delegada). */
     public function canSwitchClinic(): bool
     {
-        return $this->role->canSwitchClinic() || ($this->can_switch_clinic ?? false);
+        $enum = $this->roleEnum();
+
+        return ($enum !== null && $enum->canSwitchClinic()) || (bool) ($this->can_switch_clinic ?? false);
     }
 }

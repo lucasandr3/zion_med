@@ -32,7 +32,7 @@ class ClinicScopingTest extends TestCase
             'name' => 'User 2',
             'email' => 'user2@outra.com',
             'password' => bcrypt('senha'),
-            'role' => Role::Owner,
+            'role' => Role::Owner->value,
             'active' => true,
         ]);
         $template2 = FormTemplate::withoutGlobalScopes()->create([

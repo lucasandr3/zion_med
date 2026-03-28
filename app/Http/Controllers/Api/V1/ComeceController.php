@@ -93,7 +93,7 @@ class ComeceController extends Controller
                 'name' => $validated['responsible_name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
-                'role' => Role::Owner,
+                'role' => Role::Owner->value,
                 'active' => true,
             ]);
 
