@@ -22,7 +22,7 @@ class LinkBioController extends Controller
     /**
      * Layouts do Link Bio (mesmos IDs do front Angular).
      */
-    private const LINK_BIO_LAYOUT_MODELS = [1, 2, 3, 4, 5, 6, 7];
+    private const LINK_BIO_LAYOUT_MODELS = [1, 2, 3, 4, 5, 6, 7, 8];
 
     public function __construct(private ThemeService $themeService) {}
 
