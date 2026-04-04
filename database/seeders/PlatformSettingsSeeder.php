@@ -43,6 +43,10 @@ class PlatformSettingsSeeder extends Seeder
                 'name' => $plan['name'] ?? $key,
                 'value' => $plan['value'] ?? 0,
                 'description' => $plan['description'] ?? null,
+                'max_users' => isset($plan['max_users']) ? (int) $plan['max_users'] : null,
+                'max_organizations_per_tenant' => isset($plan['max_organizations_per_tenant'])
+                    ? (int) $plan['max_organizations_per_tenant']
+                    : null,
                 'sort_order' => $sortOrder++,
                 'is_active' => true,
             ]);

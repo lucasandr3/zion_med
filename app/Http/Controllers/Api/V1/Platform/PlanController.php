@@ -20,6 +20,8 @@ class PlanController extends Controller
                 'name' => $p->name,
                 'value' => (float) $p->value,
                 'description' => $p->description,
+                'max_users' => $p->max_users,
+                'max_organizations_per_tenant' => $p->max_organizations_per_tenant,
                 'sort_order' => $p->sort_order,
                 'is_active' => $p->is_active,
                 'created_at' => $p->created_at?->toIso8601String(),

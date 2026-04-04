@@ -12,6 +12,8 @@ class Plan extends Model
         'name',
         'value',
         'description',
+        'max_users',
+        'max_organizations_per_tenant',
         'sort_order',
         'is_active',
     ];
@@ -19,6 +21,8 @@ class Plan extends Model
     protected $casts = [
         'value' => 'decimal:2',
         'is_active' => 'boolean',
+        'max_users' => 'integer',
+        'max_organizations_per_tenant' => 'integer',
     ];
 
     protected static function booted(): void
@@ -43,11 +47,21 @@ class Plan extends Model
                 ->orderBy('key')
                 ->get()
                 ->keyBy('key')
-                ->map(fn (Plan $p) => [
-                    'name' => $p->name,
-                    'value' => (float) $p->value,
-                    'description' => $p->description,
-                ])
+                ->map(function (Plan $p) {
+                    $row = [
+                        'name' => $p->name,
+                        'value' => (float) $p->value,
+                        'description' => $p->description,
+                    ];
+                    if ($p->max_users !== null) {
+                        $row['max_users'] = (int) $p->max_users;
+                    }
+                    if ($p->max_organizations_per_tenant !== null) {
+                        $row['max_organizations_per_tenant'] = (int) $p->max_organizations_per_tenant;
+                    }
+
+                    return $row;
+                })
                 ->toArray();
         });
     }

@@ -21,6 +21,7 @@ class OrganizationResource extends JsonResource
             'theme' => $this->theme,
             'dark_mode' => $this->dark_mode ?? false,
             'plan_key' => $this->plan_key,
+            'plan_limits' => $this->planLimitsForApi(),
             'subscription_status' => $this->subscription_status,
             'billing_status' => $this->billing_status,
             'trial_ends_at' => $this->trial_ends_at?->toIso8601String(),

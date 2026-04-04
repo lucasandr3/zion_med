@@ -23,11 +23,19 @@ return [
     'multi_empresa_plan' => env('ASAAS_MULTI_EMPRESA_PLAN', 'enterprise'),
 
     'plans' => [
-        // Teste com preço único e plano principal simplificado para a landing e o fluxo de cadastro.
+        'solo' => [
+            'name' => env('ASAAS_PLAN_SOLO_NAME', 'Gestgo Profissional'),
+            'value' => (float) env('ASAAS_PLAN_SOLO_VALUE', 97),
+            'description' => 'Para autônomos: fichas digitais, consentimentos, assinatura eletrônica, protocolo, PDF, link da bio e templates — até 2 usuários.',
+            'max_users' => (int) env('ASAAS_PLAN_SOLO_MAX_USERS', 2),
+            'max_organizations_per_tenant' => 1,
+        ],
         'executive' => [
-            'name' => 'Gestgo Clínica',
-            'value' => 247.00,
-            'description' => 'Plano único com fichas e consentimentos digitais, assinatura, protocolo automático, PDF e templates prontos.',
+            'name' => env('ASAAS_PLAN_EXECUTIVE_NAME', 'Gestgo Business'),
+            'value' => (float) env('ASAAS_PLAN_EXECUTIVE_VALUE', 247),
+            'description' => 'Para clínicas e equipes: mesmo núcleo do Profissional, com usuários ilimitados no plano.',
+            'max_users' => null,
+            'max_organizations_per_tenant' => 1,
         ],
     ],
 

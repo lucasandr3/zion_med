@@ -35,6 +35,7 @@ class BillingController extends Controller
             return response()->json([
                 'data' => [
                     'organization' => null,
+                    'plan_limits' => null,
                     'billing_ui' => [
                         'show_managed_subscription_card' => false,
                         'show_pending_first_payment' => false,
@@ -84,6 +85,7 @@ class BillingController extends Controller
                     'billing_status' => $organization->billing_status,
                     'trial_ends_at' => $organization->trial_ends_at?->toIso8601String(),
                     'is_on_trial' => $organization->isTrialWindowOpen() && ! $organization->hasConfirmedBillingPayment(),
+                    'plan_limits' => $organization->planLimitsForApi(),
                 ],
                 'billing_ui' => $organization->billingUiState(),
                 'plans' => $plans,
@@ -127,6 +129,12 @@ class BillingController extends Controller
         $plan = $plans[$planKey] ?? null;
         if (! $plan) {
             return response()->json(['message' => 'Plano selecionado não existe.'], 422);
+        }
+
+        if (! $organization->meetsLimitsForPlanConfig($plan)) {
+            return response()->json([
+                'message' => 'Seu uso atual excede os limites do plano selecionado (usuários ou empresas no grupo). Remova usuários extras, ajuste o grupo ou escolha um plano superior.',
+            ], 422);
         }
 
         $doc = preg_replace('/\D/', '', $organization->billing_document ?? '');
@@ -294,6 +302,12 @@ class BillingController extends Controller
         $plan = $plans[$planKey] ?? null;
         if (! $plan) {
             return response()->json(['message' => 'Plano não encontrado.'], 422);
+        }
+
+        if (! $organization->meetsLimitsForPlanConfig($plan)) {
+            return response()->json([
+                'message' => 'Seu uso atual excede os limites do plano selecionado (usuários ou empresas no grupo). Remova usuários extras, ajuste o grupo ou escolha um plano superior.',
+            ], 422);
         }
 
         $this->cancelActiveGatewaySubscriptions($organization);

@@ -436,6 +436,110 @@ class Organization extends Model
     }
 
     /**
+     * Definição do plano atual (nome, valor, limites) a partir de config('asaas.plans') já mesclado com o banco.
+     *
+     * @return array<string, mixed>
+     */
+    public function planDefinition(): array
+    {
+        $key = $this->plan_key;
+        $plans = config('asaas.plans', []);
+        if ($key !== null && $key !== '' && isset($plans[$key]) && is_array($plans[$key])) {
+            return $plans[$key];
+        }
+
+        return [];
+    }
+
+    public function planMaxUsers(): ?int
+    {
+        $v = $this->planDefinition()['max_users'] ?? null;
+
+        return $v === null ? null : (int) $v;
+    }
+
+    public function planMaxOrganizationsPerTenant(): ?int
+    {
+        $v = $this->planDefinition()['max_organizations_per_tenant'] ?? null;
+
+        return $v === null ? null : (int) $v;
+    }
+
+    public function organizationsInTenantCount(): int
+    {
+        if (! $this->tenant_id) {
+            return 1;
+        }
+
+        return (int) self::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->count();
+    }
+
+    public function canAddAnotherUser(): bool
+    {
+        $max = $this->planMaxUsers();
+        if ($max === null) {
+            return true;
+        }
+
+        return $this->users()->count() < $max;
+    }
+
+    public function canAddOrganizationInTenant(): bool
+    {
+        $max = $this->planMaxOrganizationsPerTenant();
+        if ($max === null) {
+            return true;
+        }
+
+        return $this->organizationsInTenantCount() < $max;
+    }
+
+    /**
+     * @param  array<string, mixed>  $planConfig
+     */
+    public function meetsLimitsForPlanConfig(array $planConfig): bool
+    {
+        $maxUsers = $planConfig['max_users'] ?? null;
+        if ($maxUsers !== null && $this->users()->count() > (int) $maxUsers) {
+            return false;
+        }
+        $maxOrgs = $planConfig['max_organizations_per_tenant'] ?? null;
+        if ($maxOrgs !== null && $this->organizationsInTenantCount() > (int) $maxOrgs) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array{
+     *     plan_key: string|null,
+     *     max_users: int|null,
+     *     max_organizations_per_tenant: int|null,
+     *     users_count: int,
+     *     organizations_in_tenant: int,
+     *     can_add_user: bool,
+     *     can_add_organization_in_tenant: bool
+     * }
+     */
+    public function planLimitsForApi(): array
+    {
+        $def = $this->planDefinition();
+        $maxUsers = $def['max_users'] ?? null;
+        $maxOrgs = $def['max_organizations_per_tenant'] ?? null;
+
+        return [
+            'plan_key' => $this->plan_key,
+            'max_users' => $maxUsers !== null ? (int) $maxUsers : null,
+            'max_organizations_per_tenant' => $maxOrgs !== null ? (int) $maxOrgs : null,
+            'users_count' => $this->users()->count(),
+            'organizations_in_tenant' => $this->organizationsInTenantCount(),
+            'can_add_user' => $this->canAddAnotherUser(),
+            'can_add_organization_in_tenant' => $this->canAddOrganizationInTenant(),
+        ];
+    }
+
+    /**
      * Alinha status local com o fim do trial: sem pagamento confirmado → inativo/bloqueado (mesmo com assinatura Asaas pendente).
      */
     public function syncExpiredTrialStateIfNeeded(): void

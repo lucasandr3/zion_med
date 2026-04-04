@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\UserStoreRequest;
 use App\Http\Requests\UserUpdateRequest;
 use App\Http\Resources\Api\V1\UserResource;
+use App\Models\Organization;
 use App\Models\OrganizationRole;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,12 @@ class UserController extends Controller
     {
         $data = $request->validated();
         $organizationId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $organization = $organizationId ? Organization::query()->find((int) $organizationId) : null;
+        if ($organization && ! $organization->canAddAnotherUser()) {
+            return response()->json([
+                'message' => 'O plano atual atingiu o limite de usuários. Faça upgrade do plano ou desative outro usuário antes de adicionar um novo.',
+            ], 422);
+        }
         $data['organization_id'] = $organizationId;
         $data['active'] = true;
         $data['can_switch_clinic'] = $request->user()->can('grant-clinic-switch')
