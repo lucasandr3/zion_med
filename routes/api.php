@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\PublicFormApiController;
 use App\Http\Controllers\Api\V1\PublicFormOtpController;
 use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\WhatsappEvolutionController;
 use App\Http\Controllers\Api\V1\Platform\AuditLogController as PlatformAuditLogController;
 use App\Http\Controllers\Api\V1\Platform\BillingOverviewController as PlatformBillingOverviewController;
 use App\Http\Controllers\Api\V1\Platform\DashboardController as PlatformDashboardController;
@@ -160,6 +161,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::put('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'updateWebhook'])->name('api.v1.clinica.integracoes.webhooks.update');
     Route::delete('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'destroyWebhook'])->name('api.v1.clinica.integracoes.webhooks.destroy');
     Route::post('/clinica/integracoes/webhook-deliveries/{delivery}/retry', [IntegrationsController::class, 'retryWebhookDelivery'])->name('api.v1.clinica.integracoes.webhook-deliveries.retry');
+
+    Route::get('/clinica/whatsapp/evolution', [WhatsappEvolutionController::class, 'show'])->name('api.v1.clinica.whatsapp.evolution.show');
+    Route::post('/clinica/whatsapp/evolution/instance', [WhatsappEvolutionController::class, 'store'])->name('api.v1.clinica.whatsapp.evolution.instance.store');
+    Route::post('/clinica/whatsapp/evolution/connect', [WhatsappEvolutionController::class, 'connect'])->name('api.v1.clinica.whatsapp.evolution.connect');
+    Route::get('/clinica/whatsapp/evolution/qr', [WhatsappEvolutionController::class, 'qr'])->name('api.v1.clinica.whatsapp.evolution.qr');
+    Route::post('/clinica/whatsapp/evolution/pair', [WhatsappEvolutionController::class, 'pair'])->name('api.v1.clinica.whatsapp.evolution.pair');
+    Route::post('/clinica/whatsapp/evolution/disconnect', [WhatsappEvolutionController::class, 'disconnect'])->name('api.v1.clinica.whatsapp.evolution.disconnect');
+    Route::delete('/clinica/whatsapp/evolution/instance', [WhatsappEvolutionController::class, 'destroy'])->name('api.v1.clinica.whatsapp.evolution.instance.destroy');
+    Route::post('/clinica/whatsapp/evolution/test', [WhatsappEvolutionController::class, 'testMessage'])->name('api.v1.clinica.whatsapp.evolution.test');
 
     Route::get('/billing', [BillingController::class, 'index'])->name('api.v1.billing.index');
     Route::post('/billing/checkout', [BillingController::class, 'checkout'])->name('api.v1.billing.checkout');

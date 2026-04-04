@@ -55,6 +55,9 @@ class Organization extends Model
         'whatsapp_notify_faturas_boleto',
         'whatsapp_notify_avisos',
         'signing_security_level',
+        'evolution_go_instance_name',
+        'evolution_go_remote_id',
+        'evolution_go_instance_token',
     ];
 
     protected $casts = [
@@ -67,6 +70,7 @@ class Organization extends Model
         'link_bio_extra' => 'array',
         'trial_ends_at'   => 'datetime',
         'grace_ends_at'   => 'datetime',
+        'evolution_go_instance_token' => 'encrypted',
     ];
 
     public function isOpenNow(): ?bool
