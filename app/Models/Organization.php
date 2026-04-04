@@ -242,9 +242,184 @@ class Organization extends Model
         return $this->hasMany(Payment::class, 'organization_id');
     }
 
+    /**
+     * Último dia do trial conta inteiro (até 23:59:59 do dia de trial_ends_at).
+     */
+    public function isTrialWindowOpen(): bool
+    {
+        if (! $this->trial_ends_at) {
+            return false;
+        }
+
+        return now()->lte($this->trial_ends_at->copy()->endOfDay());
+    }
+
+    public function hasConfirmedBillingPayment(): bool
+    {
+        return $this->payments()
+            ->whereIn('status', ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'])
+            ->exists();
+    }
+
+    /**
+     * Registro local de assinatura no Asaas ainda marcado como ativo (não cancelado).
+     */
+    public function hasActiveGatewaySubscription(): bool
+    {
+        return $this->subscriptions()
+            ->whereNotNull('asaas_subscription_id')
+            ->whereIn('status', ['active', 'ACTIVE'])
+            ->exists();
+    }
+
+    /**
+     * Trial já encerrado, existe assinatura no gateway, mas nenhum pagamento confirmado (acesso bloqueado até pagar ou refazer fluxo).
+     */
+    public function isAwaitingFirstBillingPayment(): bool
+    {
+        if ($this->hasConfirmedBillingPayment()) {
+            return false;
+        }
+        if (! $this->hasActiveGatewaySubscription()) {
+            return false;
+        }
+        if ($this->isTrialWindowOpen()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * UI: cartão “assinatura ativa” com próxima cobrança / cancelar — não usar no estado “só boleto pendente pós-trial”.
+     */
+    public function billingUiShowsManagedActiveSubscription(): bool
+    {
+        if ($this->isAwaitingFirstBillingPayment()) {
+            return false;
+        }
+
+        return $this->hasActiveGatewaySubscription();
+    }
+
+    /**
+     * UI: exibir planos e ação de assinar (inclui refazer checkout após trial com assinatura Asaas ainda pendente).
+     */
+    public function billingUiShowsPlanSelection(): bool
+    {
+        if ($this->billingUiShowsManagedActiveSubscription()) {
+            return false;
+        }
+
+        return ! $this->hasActiveGatewaySubscription() || $this->isAwaitingFirstBillingPayment();
+    }
+
+    /**
+     * Estado para a aba Assinatura no SPA (evita misturar "inativo" da org com assinatura Asaas ainda pendente).
+     *
+     * @return array{
+     *     show_managed_subscription_card: bool,
+     *     show_pending_first_payment: bool,
+     *     show_plan_selection: bool,
+     *     pending_first_payment_message: string|null
+     * }
+     */
+    public function billingUiState(): array
+    {
+        $pending = $this->isAwaitingFirstBillingPayment();
+
+        return [
+            'show_managed_subscription_card' => $this->billingUiShowsManagedActiveSubscription(),
+            'show_pending_first_payment' => $pending,
+            'show_plan_selection' => $this->billingUiShowsPlanSelection(),
+            'pending_first_payment_message' => $pending
+                ? 'Seu trial encerrou e a assinatura ainda não teve pagamento confirmado. Pague o boleto abaixo ou assine novamente para gerar uma nova cobrança.'
+                : null,
+        ];
+    }
+
+    /**
+     * Dias corridos até o último dia do trial (0 = encerra hoje). Só faz sentido com trial ainda aberto.
+     */
+    public function trialCalendarDaysRemaining(): int
+    {
+        if (! $this->trial_ends_at) {
+            return 0;
+        }
+        $today = now()->copy()->startOfDay();
+        $lastTrialDay = $this->trial_ends_at->copy()->startOfDay();
+
+        return max(0, (int) $today->diffInDays($lastTrialDay, false));
+    }
+
+    /**
+     * Aviso para o front (trial acabando, sem pagamento confirmado ainda).
+     *
+     * @return array{visible: true, days_remaining: int, trial_ends_at: string, message: string}|null
+     */
+    public function trialEndingNoticeMeta(): ?array
+    {
+        if (! $this->trial_ends_at || ! $this->isTrialWindowOpen()) {
+            return null;
+        }
+        if ($this->hasConfirmedBillingPayment()) {
+            return null;
+        }
+        $threshold = (int) config('asaas.trial_warning_days', 3);
+        $daysLeft = $this->trialCalendarDaysRemaining();
+        if ($daysLeft > $threshold) {
+            return null;
+        }
+
+        $message = $daysLeft === 0
+            ? 'Seu período de trial encerra hoje. Acesse Assinatura para evitar a suspensão do acesso.'
+            : sprintf(
+                'Seu trial encerra em %d %s. Acesse Assinatura para evitar a suspensão do acesso.',
+                $daysLeft,
+                $daysLeft === 1 ? 'dia' : 'dias'
+            );
+
+        return [
+            'visible' => true,
+            'days_remaining' => $daysLeft,
+            'trial_ends_at' => $this->trial_ends_at->toIso8601String(),
+            'message' => $message,
+        ];
+    }
+
     public function isOnTrial(): bool
     {
-        return $this->subscription_status === 'trial' && $this->trial_ends_at && now()->lte($this->trial_ends_at);
+        return $this->subscription_status === 'trial'
+            && $this->trial_ends_at !== null
+            && $this->isTrialWindowOpen();
+    }
+
+    /**
+     * Pode usar o app (dashboard, protocolos, etc.): trial válido, ou pagamento confirmado após o trial, ou assinatura ativa sem trial configurado.
+     */
+    public function canAccessTenantAppFeatures(): bool
+    {
+        if ($this->subscription_status === 'past_due') {
+            if ($this->grace_ends_at && now()->lte($this->grace_ends_at)) {
+                return true;
+            }
+            if ($this->grace_ends_at && now()->gt($this->grace_ends_at) && $this->billing_status !== 'blocked') {
+                $this->forceFill(['billing_status' => 'blocked'])->save();
+            }
+
+            return false;
+        }
+
+        if ($this->trial_ends_at !== null) {
+            if ($this->isTrialWindowOpen()) {
+                return true;
+            }
+
+            return $this->hasConfirmedBillingPayment();
+        }
+
+        return $this->subscription_status === 'active'
+            && in_array((string) $this->billing_status, ['ok', 'attention'], true);
     }
 
     public function isPastDueInGrace(): bool
@@ -258,5 +433,35 @@ class Organization extends Model
     public function isBillingBlocked(): bool
     {
         return $this->billing_status === 'blocked';
+    }
+
+    /**
+     * Alinha status local com o fim do trial: sem pagamento confirmado → inativo/bloqueado (mesmo com assinatura Asaas pendente).
+     */
+    public function syncExpiredTrialStateIfNeeded(): void
+    {
+        if (! $this->trial_ends_at) {
+            return;
+        }
+
+        if ($this->isTrialWindowOpen()) {
+            return;
+        }
+
+        if ($this->hasConfirmedBillingPayment()) {
+            if (in_array($this->subscription_status, ['trial', 'inactive'], true)) {
+                $this->forceFill([
+                    'subscription_status' => 'active',
+                    'billing_status' => 'ok',
+                ])->save();
+            }
+
+            return;
+        }
+
+        $this->forceFill([
+            'subscription_status' => 'inactive',
+            'billing_status' => 'blocked',
+        ])->save();
     }
 }

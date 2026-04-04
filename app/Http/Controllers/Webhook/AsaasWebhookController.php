@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\Subscription;
 use Illuminate\Http\JsonResponse;
@@ -46,8 +46,8 @@ class AsaasWebhookController extends Controller
         }
 
         $customerId = $paymentData['customer'] ?? null;
-        $clinic = $customerId ? Clinic::where('asaas_customer_id', $customerId)->first() : null;
-        if (! $clinic) {
+        $organization = $customerId ? Organization::where('asaas_customer_id', $customerId)->first() : null;
+        if (! $organization) {
             return;
         }
 
@@ -57,7 +57,7 @@ class AsaasWebhookController extends Controller
             $subscriptionId = $paymentData['subscription'] ?? null;
             $sub = $subscriptionId ? Subscription::where('asaas_subscription_id', $subscriptionId)->first() : null;
             $payment = Payment::create([
-                'organization_id' => $clinic->id,
+                'organization_id' => $organization->id,
                 'subscription_id' => $sub?->id,
                 'asaas_payment_id' => $asaasPaymentId,
                 'status' => $paymentData['status'] ?? 'PENDING',
@@ -78,7 +78,7 @@ class AsaasWebhookController extends Controller
         $status = strtoupper($paymentData['status'] ?? '');
 
         if (in_array($status, ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'], true)) {
-            $clinic->update([
+            $organization->update([
                 'subscription_status' => 'active',
                 'billing_status' => 'ok',
                 'grace_ends_at' => null,
@@ -86,12 +86,12 @@ class AsaasWebhookController extends Controller
         }
 
         if ($status === 'OVERDUE') {
-            $clinic->update([
+            $organization->update([
                 'subscription_status' => 'past_due',
                 'billing_status' => 'attention',
             ]);
-            if (! $clinic->grace_ends_at) {
-                $clinic->update([
+            if (! $organization->grace_ends_at) {
+                $organization->update([
                     'grace_ends_at' => now()->addDays(config('asaas.grace_days', 7)),
                 ]);
             }
@@ -113,26 +113,29 @@ class AsaasWebhookController extends Controller
                 'current_period_end' => $subData['currentPeriodEnd'] ?? null,
                 'next_due_date' => $subData['nextDueDate'] ?? null,
             ]);
+            if (strtoupper((string) ($subData['status'] ?? '')) === 'CANCELED') {
+                $subscription->deleteUnpaidLocalPayments();
+            }
         }
 
         $customerId = $subData['customer'] ?? null;
-        $clinic = $customerId ? Clinic::where('asaas_customer_id', $customerId)->first() : null;
-        if (! $clinic) {
+        $organization = $customerId ? Organization::where('asaas_customer_id', $customerId)->first() : null;
+        if (! $organization) {
             return;
         }
 
         $status = strtoupper($subData['status'] ?? '');
         if ($status === 'ACTIVE') {
-            $clinic->update([
+            $organization->update([
                 'subscription_status' => 'active',
                 'billing_status' => 'ok',
                 'grace_ends_at' => null,
             ]);
         }
         if ($status === 'CANCELED' || $status === 'INACTIVE') {
-            $hasOtherActive = $clinic->subscriptions()->where('id', '!=', $subscription?->id ?? 0)->where('status', 'active')->exists();
+            $hasOtherActive = $organization->subscriptions()->where('id', '!=', $subscription?->id ?? 0)->where('status', 'active')->exists();
             if (! $hasOtherActive) {
-                $clinic->update(['subscription_status' => 'inactive', 'billing_status' => 'blocked']);
+                $organization->update(['subscription_status' => 'inactive', 'billing_status' => 'blocked']);
             }
         }
     }

@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             PlatformSettingsSeeder::class,
-            ClinicSeeder::class,
+            OrganizationSeeder::class,
             FormTemplateSeeder::class,
         ]);
     }

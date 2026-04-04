@@ -11,7 +11,7 @@ class PlatformSettingsSeeder extends Seeder
     public function run(): void
     {
         $defaults = [
-            'product_name' => config('asaas.product_name', 'ZionMed'),
+            'product_name' => config('asaas.product_name', 'Gestgo'),
             'trial_days' => (string) (config('asaas.trial_days') ?? 14),
             'grace_days' => (string) (config('asaas.grace_days') ?? 7),
             'block_mode' => config('asaas.block_mode', 'soft'),

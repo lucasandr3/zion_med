@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\MailBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,7 +27,8 @@ class SendTransactionalEmailJob implements ShouldQueue
 
     public function handle(): void
     {
-        Mail::send($this->view, $this->data, function ($message) {
+        $data = MailBrand::with($this->data);
+        Mail::send($this->view, $data, function ($message) {
             $message->to($this->to)->subject($this->subject);
         });
     }

@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'platform' => \App\Http\Middleware\EnsurePlatformAdmin::class,
             'tenant' => \App\Http\Middleware\EnsureTenantUser::class,
+            'tenant.billing' => \App\Http\Middleware\EnsureTenantBillingActive::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         ]);
     })

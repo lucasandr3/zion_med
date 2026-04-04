@@ -35,7 +35,7 @@ class WebhookService
         $headers = [
             'Content-Type' => 'application/json',
             'X-Webhook-Event' => $event,
-            'User-Agent' => 'ZionMed-Webhooks/1.0',
+            'User-Agent' => 'Gestgo-Webhooks/1.0',
         ];
 
         if (Str::length($webhook->secret ?? '') > 0) {

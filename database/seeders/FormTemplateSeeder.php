@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\FormField;
 use App\Models\FormTemplate;
 use App\Models\User;
@@ -12,30 +13,37 @@ class FormTemplateSeeder extends Seeder
 {
     public function run(): void
     {
-        $clinics = Clinic::all();
-        if ($clinics->isEmpty()) {
+        $organizations = Organization::all();
+        if ($organizations->isEmpty()) {
             return;
         }
 
-        foreach ($clinics as $clinic) {
+        foreach ($organizations as $organization) {
             $alreadyHasTemplates = FormTemplate::withoutGlobalScopes()
-                ->where('organization_id', $clinic->id)
+                ->where('organization_id', $organization->id)
                 ->whereNotNull('category')
                 ->exists();
             if ($alreadyHasTemplates) {
                 continue;
             }
 
-            $owner = User::withoutGlobalScopes()->where('organization_id', $clinic->id)->first();
-            self::seedTemplatesForClinic($clinic, $owner);
+            $owner = User::withoutGlobalScopes()->where('organization_id', $organization->id)->first();
+            self::seedTemplatesForOrganization($organization, $owner);
         }
     }
 
     /**
-     * Cria os templates padrão (FormTemplateDefinitions) para uma clínica.
-     * Usado no cadastro de novo tenant e pelo run() do seeder.
+     * @deprecated Use seedTemplatesForOrganization().
      */
     public static function seedTemplatesForClinic(Clinic $clinic, ?User $owner = null): void
+    {
+        self::seedTemplatesForOrganization($clinic, $owner);
+    }
+
+    /**
+     * Cria os templates padrão (FormTemplateDefinitions) para uma organização.
+     */
+    public static function seedTemplatesForOrganization(Organization $organization, ?User $owner = null): void
     {
         $templates = FormTemplateDefinitions::all();
 
@@ -45,7 +53,7 @@ class FormTemplateSeeder extends Seeder
             unset($t['fields'], $t['category']);
 
             $template = FormTemplate::withoutGlobalScopes()->create([
-                'organization_id' => $clinic->id,
+                'organization_id' => $organization->id,
                 'name' => $t['name'],
                 'description' => $t['description'],
                 'category' => $category,

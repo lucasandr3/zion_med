@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -38,6 +39,17 @@ class Payment extends Model
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
+    }
+
+    /**
+     * Cobranças exibidas no app: ignora vínculos com assinatura cancelada/inativa (evita duplicata após novo checkout).
+     */
+    public function scopeVisibleOnTenantBilling(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q): void {
+            $q->whereNull('subscription_id')
+                ->orWhereHas('subscription', fn (Builder $sq) => $sq->forTenantBillingListing());
+        });
     }
 
     public function isPaid(): bool

@@ -16,7 +16,7 @@ class ProtocolDossieTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
     }
 

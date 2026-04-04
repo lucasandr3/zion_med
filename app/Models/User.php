@@ -93,7 +93,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /** Contexto da organização atual (sessão API) ou organização do usuário. */
     public function currentOrganizationId(): ?int
     {
-        $sid = session('current_clinic_id');
+        $sid = session('current_organization_id') ?? session('current_clinic_id');
 
         return $sid !== null && $sid !== '' ? (int) $sid : ($this->organization_id !== null ? (int) $this->organization_id : null);
     }

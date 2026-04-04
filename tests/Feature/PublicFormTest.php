@@ -12,7 +12,7 @@ class PublicFormTest extends TestCase
 
     public function test_public_form_page_loads_with_valid_token(): void
     {
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
         $template = FormTemplate::withoutGlobalScopes()->first();
         $token = str_repeat('a', 32);
@@ -24,7 +24,7 @@ class PublicFormTest extends TestCase
 
     public function test_public_form_submission_creates_submission(): void
     {
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
         $template = FormTemplate::withoutGlobalScopes()->first();
         $token = str_repeat('b', 32);

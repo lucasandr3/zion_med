@@ -17,7 +17,7 @@ class ExportCsvTest extends TestCase
 
     public function test_export_csv_returns_csv_for_authenticated_user(): void
     {
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $user = $this->qaClinicOwnerUser();
         $this->actingAs($user);
         session(['current_clinic_id' => $user->clinic_id]);

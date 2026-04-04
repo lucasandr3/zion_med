@@ -14,7 +14,7 @@ class ThemeService
     public function getAvailableThemes(): array
     {
         return [
-            'zion-blue'     => ['label' => 'Zion Blue',     'primary' => '#1e40af'],
+            'zion-blue'     => ['label' => 'Azul Gestgo',   'primary' => '#1e40af'],
             'ocean-blue'    => ['label' => 'Ocean Blue',    'primary' => '#2563eb'],
             'indigo-night'  => ['label' => 'Indigo Night',  'primary' => '#4f46e5'],
             'emerald-fresh' => ['label' => 'Emerald Fresh', 'primary' => '#10b981'],

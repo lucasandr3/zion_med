@@ -7,7 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}" />
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}" />
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}" />
-    <meta name="apple-mobile-web-app-title" content="ZionMed" />
+    <meta name="apple-mobile-web-app-title" content="{{ config('asaas.product_name') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #333; }
@@ -99,7 +99,7 @@
     @endif
 
     <div class="footer">
-        Documento gerado em {{ now()->format('d/m/Y H:i') }} — Emitido por {{ $clinic->name }} — Zion Med
+        Documento gerado em {{ now()->format('d/m/Y H:i') }} — Emitido por {{ $clinic->name }} — {{ config('asaas.product_name') }}
     </div>
 </body>
 </html>

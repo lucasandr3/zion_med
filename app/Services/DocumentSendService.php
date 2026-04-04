@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DocumentSend;
 use App\Models\FormTemplate;
+use App\Support\MailBrand;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
@@ -45,20 +46,23 @@ class DocumentSendService
             'public_token' => $template->public_token,
         ]);
 
-        $clinicName = $template->organization?->name ?? 'Clínica';
+        $organizationName = $template->organization?->name ?? 'Organização';
         $templateName = $template->name;
 
-        Mail::send([], [], function ($message) use ($recipientEmail, $url, $clinicName, $templateName) {
-            $message->to($recipientEmail)
-                ->subject("{$clinicName} - Documento para assinatura: {$templateName}")
-                ->html(
-                    "<p>Olá,</p>" .
-                    "<p>{$clinicName} enviou o documento <strong>{$templateName}</strong> para sua assinatura.</p>" .
-                    "<p><a href=\"{$url}\" style=\"display:inline-block;padding:12px 24px;background:#1e40af;color:#fff;text-decoration:none;border-radius:8px;\">Acessar e assinar</a></p>" .
-                    "<p>Ou copie o link: {$url}</p>" .
-                    "<p>— Zion Med</p>"
-                );
-        });
+        Mail::send(
+            'emails.document-sign-invite',
+            MailBrand::with([
+                'emailTitle' => 'Documento para assinatura',
+                'organizationName' => $organizationName,
+                'templateName' => $templateName,
+                'signUrl' => $url,
+                'recipientName' => $recipientName,
+            ]),
+            function ($message) use ($recipientEmail, $organizationName, $templateName) {
+                $message->to($recipientEmail)
+                    ->subject("{$organizationName} — documento para assinatura: {$templateName}");
+            }
+        );
 
         return $send;
     }
@@ -122,22 +126,26 @@ class DocumentSendService
             return false;
         }
         $url = $this->publicLinkService->getPublicUrl($template);
-        $clinicName = $template->organization?->name ?? 'Clínica';
+        $organizationName = $template->organization?->name ?? 'Organização';
         $templateName = $template->name;
         $email = $documentSend->recipient_email;
         if (! $email) {
             return false;
         }
-        Mail::send([], [], function ($message) use ($email, $url, $clinicName, $templateName) {
-            $message->to($email)
-                ->subject("Lembrete: {$clinicName} - Documento pendente de assinatura: {$templateName}")
-                ->html(
-                    "<p>Olá,</p>" .
-                    "<p>Lembrete: o documento <strong>{$templateName}</strong> de {$clinicName} ainda está aguardando sua assinatura.</p>" .
-                    "<p><a href=\"{$url}\" style=\"display:inline-block;padding:12px 24px;background:#1e40af;color:#fff;text-decoration:none;border-radius:8px;\">Acessar e assinar</a></p>" .
-                    "<p>— Zion Med</p>"
-                );
-        });
+        Mail::send(
+            'emails.document-sign-reminder',
+            MailBrand::with([
+                'emailTitle' => 'Lembrete — documento pendente',
+                'organizationName' => $organizationName,
+                'templateName' => $templateName,
+                'signUrl' => $url,
+                'recipientName' => $documentSend->recipient_name,
+            ]),
+            function ($message) use ($email, $organizationName, $templateName) {
+                $message->to($email)
+                    ->subject("Lembrete: {$organizationName} — documento pendente: {$templateName}");
+            }
+        );
         $documentSend->update(['reminded_at' => now()]);
         return true;
     }

@@ -11,7 +11,7 @@ class BillingOverviewController extends Controller
 {
     public function subscriptions(): JsonResponse
     {
-        $subscriptions = Subscription::with(['clinic:id,name,tenant_id,plan_key,subscription_status,billing_status'])
+        $subscriptions = Subscription::with(['organization:id,name,tenant_id,plan_key,subscription_status,billing_status'])
             ->orderByDesc('created_at')
             ->limit(100)
             ->get();
@@ -26,13 +26,13 @@ class BillingOverviewController extends Controller
                 'current_period_end' => $s->current_period_end?->toIso8601String(),
                 'next_due_date' => $s->next_due_date?->toIso8601String(),
                 'created_at' => $s->created_at?->toIso8601String(),
-                'clinic' => $s->clinic ? [
-                    'id' => $s->clinic->id,
-                    'name' => $s->clinic->name,
-                    'tenant_id' => $s->clinic->tenant_id,
-                    'plan_key' => $s->clinic->plan_key,
-                    'subscription_status' => $s->clinic->subscription_status,
-                    'billing_status' => $s->clinic->billing_status,
+                'organization' => $s->organization ? [
+                    'id' => $s->organization->id,
+                    'name' => $s->organization->name,
+                    'tenant_id' => $s->organization->tenant_id,
+                    'plan_key' => $s->organization->plan_key,
+                    'subscription_status' => $s->organization->subscription_status,
+                    'billing_status' => $s->organization->billing_status,
                 ] : null,
             ]),
         ]);
@@ -40,7 +40,7 @@ class BillingOverviewController extends Controller
 
     public function payments(): JsonResponse
     {
-        $payments = Payment::with(['clinic:id,name,tenant_id', 'subscription:id,plan_key,status'])
+        $payments = Payment::with(['organization:id,name,tenant_id', 'subscription:id,plan_key,status'])
             ->orderByDesc('due_date')
             ->limit(100)
             ->get();
@@ -57,10 +57,10 @@ class BillingOverviewController extends Controller
                 'value' => $p->value,
                 'bank_slip_url' => $p->bank_slip_url,
                 'created_at' => $p->created_at?->toIso8601String(),
-                'clinic' => $p->clinic ? [
-                    'id' => $p->clinic->id,
-                    'name' => $p->clinic->name,
-                    'tenant_id' => $p->clinic->tenant_id,
+                'organization' => $p->organization ? [
+                    'id' => $p->organization->id,
+                    'name' => $p->organization->name,
+                    'tenant_id' => $p->organization->tenant_id,
                 ] : null,
                 'subscription' => $p->subscription ? [
                     'id' => $p->subscription->id,

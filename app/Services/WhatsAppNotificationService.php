@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Clinic;
+use App\Models\Organization;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -24,31 +24,38 @@ class WhatsAppNotificationService
     }
 
     /**
-     * Verifica se a clínica quer receber notificação WhatsApp para o tipo informado.
+     * Verifica se a organização quer receber notificação WhatsApp para o tipo informado.
      */
-    public function clinicWantsNotification(Clinic $clinic, string $eventType): bool
+    public function organizationWantsNotification(Organization $organization, string $eventType): bool
     {
-        if (! $clinic->whatsapp_notifications_enabled ?? false) {
+        if (! ($organization->whatsapp_notifications_enabled ?? false)) {
             return false;
         }
         return match ($eventType) {
-            self::EVENT_COBRANCA => (bool) ($clinic->whatsapp_notify_cobranca ?? true),
-            self::EVENT_FATURAS_BOLETO => (bool) ($clinic->whatsapp_notify_faturas_boleto ?? true),
-            self::EVENT_AVISOS => (bool) ($clinic->whatsapp_notify_avisos ?? true),
+            self::EVENT_COBRANCA => (bool) ($organization->whatsapp_notify_cobranca ?? true),
+            self::EVENT_FATURAS_BOLETO => (bool) ($organization->whatsapp_notify_faturas_boleto ?? true),
+            self::EVENT_AVISOS => (bool) ($organization->whatsapp_notify_avisos ?? true),
             default => false,
         };
     }
 
     /**
-     * Envia notificação de assinatura criada (confirmação) para o n8n.
-     * Só envia se a clínica tiver WhatsApp habilitado e opção "Faturas/Boleto" ativa.
+     * @deprecated Use organizationWantsNotification().
      */
-    public function notifySubscriptionCreated(Clinic $clinic, array $subscriptionData): void
+    public function clinicWantsNotification(Organization $organization, string $eventType): bool
+    {
+        return $this->organizationWantsNotification($organization, $eventType);
+    }
+
+    /**
+     * Envia notificação de assinatura criada (confirmação) para o n8n.
+     */
+    public function notifySubscriptionCreated(Organization $organization, array $subscriptionData): void
     {
         if (! $this->isConfigured()) {
             return;
         }
-        if (! $this->clinicWantsNotification($clinic, self::EVENT_FATURAS_BOLETO)) {
+        if (! $this->organizationWantsNotification($organization, self::EVENT_FATURAS_BOLETO)) {
             return;
         }
 
@@ -56,16 +63,18 @@ class WhatsAppNotificationService
         $payload = [
             'event' => self::EVENT_SUBSCRIPTION_CREATED,
             'type' => self::EVENT_FATURAS_BOLETO,
-            'clinic_id' => $clinic->id,
-            'clinic_name' => $clinic->name,
+            'organization_id' => $organization->id,
+            'clinic_id' => $organization->id,
+            'organization_name' => $organization->name,
+            'clinic_name' => $organization->name,
             'plan_key' => $subscriptionData['plan_key'] ?? null,
             'plan_name' => $planName,
             'subscription_asaas_id' => $subscriptionData['asaas_subscription_id'] ?? null,
             'next_due_date' => $subscriptionData['next_due_date'] ?? null,
-            'phone' => $this->normalizePhone($clinic->phone),
+            'phone' => $this->normalizePhone($organization->phone),
             'message' => sprintf(
                 'Assinatura confirmada: %s – Plano %s. O boleto será enviado por e-mail.',
-                $clinic->name,
+                $organization->name,
                 $planName
             ),
             'sent_at' => now()->toIso8601String(),

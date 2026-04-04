@@ -4,7 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\FormField;
 use App\Models\FormTemplate;
-use Database\Seeders\ClinicSeeder;
+use Database\Seeders\OrganizationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -19,7 +19,7 @@ class PublicFormApiSubmitTest extends TestCase
     {
         Storage::fake('minio_attachments');
 
-        $this->seed(ClinicSeeder::class);
+        $this->seed(OrganizationSeeder::class);
         $clinic = \App\Models\Clinic::query()->firstOrFail();
 
         $template = FormTemplate::withoutGlobalScopes()->create([
@@ -62,7 +62,7 @@ class PublicFormApiSubmitTest extends TestCase
     {
         Storage::fake('minio_attachments');
 
-        $this->seed(ClinicSeeder::class);
+        $this->seed(OrganizationSeeder::class);
         $clinic = \App\Models\Clinic::query()->firstOrFail();
 
         $template = FormTemplate::withoutGlobalScopes()->create([

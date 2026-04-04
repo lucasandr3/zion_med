@@ -19,6 +19,7 @@ use App\Notifications\NovoComentario;
 use App\Notifications\NovoProtocoloRecebido;
 use App\Notifications\ProtocoloAprovado;
 use App\Notifications\ProtocoloReprovado;
+use App\Support\MailBrand;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -267,11 +268,19 @@ class SubmissionService
             return;
         }
         try {
-            Mail::raw(
-                "Novo protocolo recebido.\nProtocolo: {$submission->protocol_number}\nFormulário: {$submission->template->name}\nAcesse o sistema para visualizar.",
-                function ($message) use ($email, $submission) {
+            $brand = (string) (config('mail.branding.product_name') ?: config('asaas.product_name') ?: config('app.name'));
+            Mail::send(
+                'emails.protocol-new',
+                MailBrand::with([
+                    'emailTitle' => 'Novo protocolo',
+                    'protocolNumber' => $submission->protocol_number,
+                    'templateName' => $submission->template->name,
+                    'submitterName' => $submission->submitter_name,
+                    'dashboardUrl' => route('protocolos.show', ['submissao' => $submission->id], true),
+                ]),
+                function ($message) use ($email, $submission, $brand) {
                     $message->to($email)
-                        ->subject('Zion Med - Novo protocolo: ' . $submission->protocol_number);
+                        ->subject("{$brand} — novo protocolo: {$submission->protocol_number}");
                 }
             );
         } catch (\Throwable) {

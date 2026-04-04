@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -30,11 +30,17 @@ class BillingController extends Controller
     {
         $this->authorize('manage-billing');
 
-        $clinic = $this->currentClinic($request);
-        if (! $clinic) {
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
             return response()->json([
                 'data' => [
-                    'clinic' => null,
+                    'organization' => null,
+                    'billing_ui' => [
+                        'show_managed_subscription_card' => false,
+                        'show_pending_first_payment' => false,
+                        'show_plan_selection' => false,
+                        'pending_first_payment_message' => null,
+                    ],
                     'plans' => [],
                     'subscriptions' => [],
                     'payments' => [],
@@ -43,12 +49,16 @@ class BillingController extends Controller
             ]);
         }
 
+        $organization->syncExpiredTrialStateIfNeeded();
+        $organization->refresh();
+
         if ($this->asaasService->isConfigured()) {
-            $this->asaasService->syncClinicPaymentsFromAsaas($clinic);
+            $this->asaasService->syncOrganizationPaymentsFromAsaas($organization);
+            $organization->refresh();
         }
 
         $plans = config('asaas.plans', []);
-        $subscriptions = $clinic->subscriptions()->latest()->get()->map(fn (Subscription $s) => [
+        $subscriptions = $organization->subscriptions()->forTenantBillingListing()->latest()->get()->map(fn (Subscription $s) => [
             'id' => $s->id,
             'asaas_subscription_id' => $s->asaas_subscription_id,
             'plan_key' => $s->plan_key,
@@ -56,7 +66,7 @@ class BillingController extends Controller
             'next_due_date' => $s->next_due_date,
             'created_at' => $s->created_at?->toIso8601String(),
         ]);
-        $payments = $clinic->payments()->latest()->limit(10)->get()->map(fn (Payment $p) => [
+        $payments = $organization->payments()->visibleOnTenantBilling()->latest()->limit(10)->get()->map(fn (Payment $p) => [
             'id' => $p->id,
             'status' => $p->status,
             'due_date' => $p->due_date,
@@ -67,14 +77,15 @@ class BillingController extends Controller
 
         return response()->json([
             'data' => [
-                'clinic' => [
-                    'id' => $clinic->id,
-                    'plan_key' => $clinic->plan_key,
-                    'subscription_status' => $clinic->subscription_status,
-                    'billing_status' => $clinic->billing_status,
-                    'trial_ends_at' => $clinic->trial_ends_at?->toIso8601String(),
-                    'is_on_trial' => $clinic->isOnTrial(),
+                'organization' => [
+                    'id' => $organization->id,
+                    'plan_key' => $organization->plan_key,
+                    'subscription_status' => $organization->subscription_status,
+                    'billing_status' => $organization->billing_status,
+                    'trial_ends_at' => $organization->trial_ends_at?->toIso8601String(),
+                    'is_on_trial' => $organization->isTrialWindowOpen() && ! $organization->hasConfirmedBillingPayment(),
                 ],
+                'billing_ui' => $organization->billingUiState(),
                 'plans' => $plans,
                 'subscriptions' => $subscriptions,
                 'payments' => $payments,
@@ -102,9 +113,9 @@ class BillingController extends Controller
             'plan_key.in' => 'Plano inválido. Escolha um dos planos disponíveis.',
         ]);
 
-        $clinic = $this->currentClinic($request);
-        if (! $clinic) {
-            return response()->json(['message' => 'Nenhuma empresa selecionada. Escolha uma empresa (clínica/escolher ou header X-Clinic-Id).'], 422);
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Nenhuma empresa selecionada. Escolha uma empresa (configurações/escolher ou header X-Organization-Id).'], 422);
         }
 
         if (! $this->asaasService->isConfigured()) {
@@ -118,24 +129,35 @@ class BillingController extends Controller
             return response()->json(['message' => 'Plano selecionado não existe.'], 422);
         }
 
-        $doc = preg_replace('/\D/', '', $clinic->billing_document ?? '');
+        $doc = preg_replace('/\D/', '', $organization->billing_document ?? '');
         if (strlen($doc) !== 11 && strlen($doc) !== 14) {
             return response()->json(['message' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido em Configurações > Dados Gerais > Dados para Faturamento antes de assinar.'], 422);
         }
 
-        $wasOnTrial = $clinic->isOnTrial();
-        $firstDue = $this->asaasService->firstChargeDueDateForClinic($clinic);
+        if ($organization->hasActiveGatewaySubscription() && ! $organization->isAwaitingFirstBillingPayment()) {
+            return response()->json([
+                'message' => 'Sua empresa já possui uma assinatura registrada no pagamento. Aguarde a cobrança ou use a lista de pagamentos. Para trocar de plano, use a opção de alteração de plano.',
+            ], 422);
+        }
+
+        if ($organization->isAwaitingFirstBillingPayment()) {
+            $this->cancelActiveGatewaySubscriptions($organization);
+            $organization->refresh();
+        }
+
+        $wasOnTrial = $organization->isOnTrial();
+        $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
 
         try {
             $payload = $this->asaasService->createSubscription(
-                $clinic,
+                $organization,
                 $planKey,
                 (float) $plan['value'],
                 'BOLETO',
                 $firstDue
             );
         } catch (\Throwable $e) {
-            Log::warning('Asaas createSubscription failed', ['clinic_id' => $clinic->id, 'error' => $e->getMessage()]);
+            Log::warning('Asaas createSubscription failed', ['organization_id' => $organization->id, 'error' => $e->getMessage()]);
             $errorMessage = $this->extractAsaasErrorMessage($e);
 
             return response()->json(['message' => $errorMessage], 422);
@@ -149,26 +171,26 @@ class BillingController extends Controller
         $nextDue = $payload['nextDueDate'] ?? $firstDue;
 
         $subscription = Subscription::create([
-            'organization_id' => $clinic->id,
+            'organization_id' => $organization->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);
 
-        $this->syncSubscriptionPaymentsFromAsaas($clinic, $subscription, $asaasId);
+        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId);
 
-        $clinicUpdates = [
+        $organizationUpdates = [
             'plan_key' => $planKey,
             'billing_status' => 'ok',
             'grace_ends_at' => null,
         ];
         if (! $wasOnTrial) {
-            $clinicUpdates['subscription_status'] = 'active';
+            $organizationUpdates['subscription_status'] = 'active';
         }
-        $clinic->update($clinicUpdates);
+        $organization->update($organizationUpdates);
 
-        $this->whatsAppNotificationService->notifySubscriptionCreated($clinic->fresh(), [
+        $this->whatsAppNotificationService->notifySubscriptionCreated($organization->fresh(), [
             'plan_key' => $planKey,
             'plan_name' => $plan['name'] ?? $planKey,
             'asaas_subscription_id' => $asaasId,
@@ -191,17 +213,17 @@ class BillingController extends Controller
     }
 
     /**
-     * Cancela a assinatura atual da clínica (no ASAAS e localmente).
+     * Cancela a assinatura atual (no ASAAS e localmente).
      */
     public function cancelSubscription(Request $request, Subscription $subscription): JsonResponse
     {
         $this->authorize('manage-billing');
 
-        $clinic = $this->currentClinic($request);
-        if (! $clinic) {
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
-        if ((string) $subscription->organization_id !== (string) $clinic->id) {
+        if ((string) $subscription->organization_id !== (string) $organization->id) {
             abort(404);
         }
         if (in_array($subscription->status, ['CANCELED', 'DELETED'], true)) {
@@ -225,9 +247,10 @@ class BillingController extends Controller
             }
         }
 
+        $subscription->deleteUnpaidLocalPayments();
         $subscription->update(['status' => 'CANCELED']);
-        if ($clinic->plan_key === $subscription->plan_key) {
-            $clinic->update([
+        if ($organization->plan_key === $subscription->plan_key) {
+            $organization->update([
                 'plan_key' => null,
                 'subscription_status' => 'canceled',
                 'billing_status' => 'canceled',
@@ -240,7 +263,7 @@ class BillingController extends Controller
     }
 
     /**
-     * Troca o plano da clínica: cancela a assinatura atual (se houver) e cria nova para o plan_key informado.
+     * Troca o plano: cancela a assinatura atual (se houver) e cria nova para o plan_key informado.
      */
     public function changePlan(Request $request): JsonResponse
     {
@@ -258,8 +281,8 @@ class BillingController extends Controller
             'plan_key.in' => 'Plano inválido.',
         ]);
 
-        $clinic = $this->currentClinic($request);
-        if (! $clinic) {
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
         if (! $this->asaasService->isConfigured()) {
@@ -273,41 +296,27 @@ class BillingController extends Controller
             return response()->json(['message' => 'Plano não encontrado.'], 422);
         }
 
-        $activeSubscription = $clinic->subscriptions()
-            ->whereIn('status', ['active', 'ACTIVE'])
-            ->whereNotNull('asaas_subscription_id')
-            ->first();
+        $this->cancelActiveGatewaySubscriptions($organization);
+        $organization->refresh();
 
-        if ($activeSubscription) {
-            try {
-                $this->asaasService->cancelSubscription($activeSubscription->asaas_subscription_id);
-            } catch (\Throwable $e) {
-                Log::warning('Asaas cancelSubscription (changePlan) failed', [
-                    'subscription_id' => $activeSubscription->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-            $activeSubscription->update(['status' => 'CANCELED']);
-        }
-
-        $doc = preg_replace('/\D/', '', $clinic->billing_document ?? '');
+        $doc = preg_replace('/\D/', '', $organization->billing_document ?? '');
         if (strlen($doc) !== 11 && strlen($doc) !== 14) {
             return response()->json(['message' => 'Informe CPF ou CNPJ em Configurações > Dados para Faturamento.'], 422);
         }
 
-        $wasOnTrial = $clinic->isOnTrial();
-        $firstDue = $this->asaasService->firstChargeDueDateForClinic($clinic);
+        $wasOnTrial = $organization->isOnTrial();
+        $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
 
         try {
             $payload = $this->asaasService->createSubscription(
-                $clinic,
+                $organization,
                 $planKey,
                 (float) $plan['value'],
                 'BOLETO',
                 $firstDue
             );
         } catch (\Throwable $e) {
-            Log::warning('Asaas createSubscription (changePlan) failed', ['clinic_id' => $clinic->id, 'error' => $e->getMessage()]);
+            Log::warning('Asaas createSubscription (changePlan) failed', ['organization_id' => $organization->id, 'error' => $e->getMessage()]);
 
             return response()->json(['message' => $this->extractAsaasErrorMessage($e)], 422);
         }
@@ -320,24 +329,24 @@ class BillingController extends Controller
         $nextDue = $payload['nextDueDate'] ?? $firstDue;
 
         $subscription = Subscription::create([
-            'organization_id' => $clinic->id,
+            'organization_id' => $organization->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);
 
-        $this->syncSubscriptionPaymentsFromAsaas($clinic, $subscription, $asaasId);
+        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId);
 
-        $clinicUpdates = [
+        $organizationUpdates = [
             'plan_key' => $planKey,
             'billing_status' => 'ok',
             'grace_ends_at' => null,
         ];
         if (! $wasOnTrial) {
-            $clinicUpdates['subscription_status'] = 'active';
+            $organizationUpdates['subscription_status'] = 'active';
         }
-        $clinic->update($clinicUpdates);
+        $organization->update($organizationUpdates);
 
         $dueFormatted = Carbon::parse($nextDue)->format('d/m/Y');
         $changeMessage = $wasOnTrial
@@ -354,17 +363,40 @@ class BillingController extends Controller
         ], 200);
     }
 
-    private function currentClinic(Request $request): ?Clinic
+    private function cancelActiveGatewaySubscriptions(Organization $organization): void
     {
-        $clinicId = session('current_clinic_id') ?? $request->user()?->clinic_id;
-        if (! $clinicId) {
+        $subs = $organization->subscriptions()
+            ->whereNotNull('asaas_subscription_id')
+            ->whereIn('status', ['active', 'ACTIVE'])
+            ->get();
+
+        foreach ($subs as $sub) {
+            try {
+                if ($this->asaasService->isConfigured() && $sub->asaas_subscription_id) {
+                    $this->asaasService->cancelSubscription($sub->asaas_subscription_id);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Asaas cancelSubscription failed', [
+                    'subscription_id' => $sub->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            $sub->deleteUnpaidLocalPayments();
+            $sub->update(['status' => 'CANCELED']);
+        }
+    }
+
+    private function currentOrganization(Request $request): ?Organization
+    {
+        $organizationId = session('current_organization_id') ?? session('current_clinic_id') ?? $request->user()?->clinic_id;
+        if (! $organizationId) {
             return null;
         }
 
-        return Clinic::find($clinicId);
+        return Organization::query()->find($organizationId);
     }
 
-    private function syncSubscriptionPaymentsFromAsaas(Clinic $clinic, Subscription $subscription, string $asaasSubscriptionId): void
+    private function syncSubscriptionPaymentsFromAsaas(Organization $organization, Subscription $subscription, string $asaasSubscriptionId): void
     {
         try {
             $payments = $this->asaasService->getSubscriptionPayments($asaasSubscriptionId);
@@ -382,7 +414,7 @@ class BillingController extends Controller
             Payment::updateOrCreate(
                 ['asaas_payment_id' => $asaasPaymentId],
                 [
-                    'organization_id' => $clinic->id,
+                    'organization_id' => $organization->id,
                     'subscription_id' => $subscription->id,
                     'status' => $item['status'] ?? 'PENDING',
                     'due_date' => isset($item['dueDate']) ? $item['dueDate'] : null,

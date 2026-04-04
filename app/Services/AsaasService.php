@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\Subscription;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -44,27 +45,27 @@ class AsaasService
     }
 
     /**
-     * Cria ou retorna customer no ASAAS. Se clinic já tem asaas_customer_id, atualiza e retorna.
+     * Cria ou retorna customer no ASAAS. Se a organização já tem asaas_customer_id, atualiza e retorna.
      */
-    public function ensureCustomer(Clinic $clinic): array
+    public function ensureCustomer(Organization $organization): array
     {
-        $doc = $this->normalizeCpfCnpj($clinic->billing_document ?? '');
+        $doc = $this->normalizeCpfCnpj($organization->billing_document ?? '');
         if ($doc === '') {
             $doc = '00000000000';
         }
         $payload = [
-            'name' => $clinic->billing_name ?: $clinic->name,
+            'name' => $organization->billing_name ?: $organization->name,
             'cpfCnpj' => $doc,
-            'email' => $clinic->billing_email ?: $clinic->notification_email ?: $clinic->contact_email ?: 'contato@clinicazionmed.local',
-            'phone' => $clinic->phone,
-            'externalReference' => (string) $clinic->id,
+            'email' => $organization->billing_email ?: $organization->notification_email ?: $organization->contact_email ?: 'contato@gestgo.local',
+            'phone' => $organization->phone,
+            'externalReference' => (string) $organization->id,
         ];
-        if ($clinic->address) {
-            $payload['address'] = $clinic->address;
+        if ($organization->address) {
+            $payload['address'] = $organization->address;
         }
 
-        if ($clinic->asaas_customer_id) {
-            $resp = $this->request('POST', '/customers/'.$clinic->asaas_customer_id, $payload);
+        if ($organization->asaas_customer_id) {
+            $resp = $this->request('POST', '/customers/'.$organization->asaas_customer_id, $payload);
             if ($resp->successful()) {
                 return $resp->json();
             }
@@ -73,7 +74,7 @@ class AsaasService
         $resp = $this->request('POST', '/customers', $payload);
         $resp->throw();
         $data = $resp->json();
-        $clinic->update(['asaas_customer_id' => $data['id'] ?? null]);
+        $organization->update(['asaas_customer_id' => $data['id'] ?? null]);
 
         return $data;
     }
@@ -82,11 +83,11 @@ class AsaasService
      * Data da primeira cobrança no Asaas: fim do trial + dias de carência (grace),
      * ou hoje se já não estiver em trial ou se a data calculada passou.
      */
-    public function firstChargeDueDateForClinic(Clinic $clinic): string
+    public function firstChargeDueDateForOrganization(Organization $organization): string
     {
         $graceDays = (int) config('asaas.grace_days', 7);
-        if ($clinic->isOnTrial()) {
-            $due = $clinic->trial_ends_at->copy()->addDays($graceDays)->startOfDay();
+        if ($organization->trial_ends_at && $organization->isTrialWindowOpen()) {
+            $due = $organization->trial_ends_at->copy()->addDays($graceDays)->startOfDay();
             $today = now()->startOfDay();
             if ($due->lt($today)) {
                 $due = $today;
@@ -101,15 +102,15 @@ class AsaasService
     /**
      * Cria assinatura no ASAAS (cycle MONTHLY, primeira cobrança em nextDueDate).
      */
-    public function createSubscription(Clinic $clinic, string $planKey, float $value, string $billingType = 'BOLETO', ?string $nextDueDate = null): array
+    public function createSubscription(Organization $organization, string $planKey, float $value, string $billingType = 'BOLETO', ?string $nextDueDate = null): array
     {
-        $customer = $this->ensureCustomer($clinic);
-        $customerId = $customer['id'] ?? $clinic->asaas_customer_id;
+        $customer = $this->ensureCustomer($organization);
+        $customerId = $customer['id'] ?? $organization->asaas_customer_id;
         if (! $customerId) {
             throw new \InvalidArgumentException('Cliente ASAAS não encontrado.');
         }
 
-        $productName = config('asaas.product_name', 'ZionMed');
+        $productName = config('asaas.product_name', 'Gestgo');
         $nextDue = $nextDueDate ?? now()->format('Y-m-d');
 
         $payload = [
@@ -165,15 +166,55 @@ class AsaasService
      * Sincroniza pagamentos da clínica com a API do Asaas (status, paymentDate, etc.).
      * Útil quando o webhook não foi recebido (ex.: ambiente local ou cobrança marcada como paga no painel Asaas).
      */
-    public function syncClinicPaymentsFromAsaas(Clinic $clinic): void
+    public function syncOrganizationPaymentsFromAsaas(Organization $organization): void
     {
-        $subscriptions = $clinic->subscriptions()->whereNotNull('asaas_subscription_id')->get();
+        $subscriptions = $organization->subscriptions()
+            ->whereNotNull('asaas_subscription_id')
+            ->whereIn('status', ['active', 'ACTIVE'])
+            ->get();
         foreach ($subscriptions as $subscription) {
+            try {
+                $subData = $this->getSubscription($subscription->asaas_subscription_id);
+            } catch (\Throwable $e) {
+                $httpStatus = $e instanceof RequestException ? $e->response?->status() : null;
+                if ($httpStatus === 404) {
+                    $subscription->deleteUnpaidLocalPayments();
+                    $subscription->update([
+                        'status' => 'canceled',
+                        'next_due_date' => null,
+                        'current_period_end' => null,
+                    ]);
+                } else {
+                    Log::warning('Asaas getSubscription failed', [
+                        'organization_id' => $organization->id,
+                        'subscription_id' => $subscription->asaas_subscription_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                continue;
+            }
+
+            $localStatus = $this->mapAsaasSubscriptionStatusToLocal((string) ($subData['status'] ?? ''));
+            $subscription->update([
+                'status' => $localStatus,
+                'next_due_date' => $subData['nextDueDate'] ?? $subscription->next_due_date,
+                'current_period_end' => $subData['currentPeriodEnd'] ?? $subscription->current_period_end,
+            ]);
+
+            if ($localStatus === 'canceled') {
+                $subscription->deleteUnpaidLocalPayments();
+            }
+
+            if ($localStatus !== 'active') {
+                continue;
+            }
+
             try {
                 $payments = $this->getSubscriptionPayments($subscription->asaas_subscription_id);
             } catch (\Throwable $e) {
                 Log::warning('Asaas sync payments failed', [
-                    'clinic_id' => $clinic->id,
+                    'organization_id' => $organization->id,
                     'subscription_id' => $subscription->asaas_subscription_id,
                     'error' => $e->getMessage(),
                 ]);
@@ -189,7 +230,7 @@ class AsaasService
                 Payment::updateOrCreate(
                     ['asaas_payment_id' => $asaasPaymentId],
                     [
-                        'organization_id' => $clinic->id,
+                        'organization_id' => $organization->id,
                         'subscription_id' => $subscription->id,
                         'status' => $status,
                         'due_date' => $item['dueDate'] ?? null,
@@ -199,28 +240,30 @@ class AsaasService
                     ]
                 );
             }
-            // Atualiza next_due_date da assinatura a partir da API
-            try {
-                $subData = $this->getSubscription($subscription->asaas_subscription_id);
-                $subscription->update([
-                    'next_due_date' => $subData['nextDueDate'] ?? $subscription->next_due_date,
-                    'current_period_end' => $subData['currentPeriodEnd'] ?? $subscription->current_period_end,
-                ]);
-            } catch (\Throwable $e) {
-                // ignora falha ao atualizar subscription
-            }
         }
-        // Se algum pagamento está pago e a clínica estava em atraso, normaliza status
-        $hasPaidPending = $clinic->payments()
+        $hasPaidPending = $organization->payments()
             ->whereIn('status', ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'])
             ->exists();
-        if ($hasPaidPending && in_array($clinic->subscription_status, ['past_due'], true)) {
-            $clinic->update([
+        if ($hasPaidPending && in_array($organization->subscription_status, ['past_due'], true)) {
+            $organization->update([
                 'subscription_status' => 'active',
                 'billing_status' => 'ok',
                 'grace_ends_at' => null,
             ]);
         }
+    }
+
+    /**
+     * Alinha com o webhook Asaas (OrganizationResource / Subscription local).
+     */
+    public function mapAsaasSubscriptionStatusToLocal(string $asaasStatus): string
+    {
+        return match (strtoupper(trim($asaasStatus))) {
+            'ACTIVE' => 'active',
+            'CANCELED' => 'canceled',
+            'INACTIVE', 'EXPIRED' => 'inactive',
+            default => strtolower($asaasStatus),
+        };
     }
 
     private function normalizeCpfCnpj(string $value): string

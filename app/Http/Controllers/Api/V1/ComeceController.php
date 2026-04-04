@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\ClinicResource;
+use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
@@ -73,11 +73,11 @@ class ComeceController extends Controller
                 'slug' => $tenantSlug,
             ]);
 
-            $clinicSlug = $this->uniqueClinicSlug(Str::slug($validated['company_name']));
-            $clinic = Clinic::create([
+            $organizationSlug = $this->uniqueOrganizationSlug(Str::slug($validated['company_name']));
+            $organization = Organization::create([
                 'tenant_id' => $tenant->id,
                 'name' => $validated['company_name'],
-                'slug' => $clinicSlug,
+                'slug' => $organizationSlug,
                 'notification_email' => $validated['email'],
                 'billing_email' => $validated['email'],
                 'billing_name' => $validated['company_name'],
@@ -89,7 +89,7 @@ class ComeceController extends Controller
             ]);
 
             $user = User::create([
-                'organization_id' => $clinic->id,
+                'organization_id' => $organization->id,
                 'name' => $validated['responsible_name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
@@ -97,7 +97,16 @@ class ComeceController extends Controller
                 'active' => true,
             ]);
 
-            FormTemplateSeeder::seedTemplatesForClinic($clinic, $user);
+            FormTemplateSeeder::seedTemplatesForOrganization($organization, $user);
+
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (\Throwable $e) {
+                Log::warning('Comece API: falha ao enviar e-mail de verificação', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             $subscriptionCreated = false;
             $firstInvoiceDueDate = null;
@@ -106,10 +115,10 @@ class ComeceController extends Controller
                 $plan = $plans[$validated['plan_key']] ?? null;
                 if ($plan) {
                     try {
-                        $clinic->refresh();
-                        $firstDue = $this->asaasService->firstChargeDueDateForClinic($clinic);
+                        $organization->refresh();
+                        $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
                         $payload = $this->asaasService->createSubscription(
-                            $clinic,
+                            $organization,
                             $validated['plan_key'],
                             (float) $plan['value'],
                             'BOLETO',
@@ -119,16 +128,17 @@ class ComeceController extends Controller
                         if ($asaasId) {
                             $firstInvoiceDueDate = $payload['nextDueDate'] ?? $firstDue;
                             Subscription::create([
-                                'organization_id' => $clinic->id,
+                                'organization_id' => $organization->id,
                                 'asaas_subscription_id' => $asaasId,
                                 'plan_key' => $validated['plan_key'],
                                 'status' => 'active',
                                 'next_due_date' => $firstInvoiceDueDate,
                             ]);
-                            $clinic->update([
+                            $organization->update([
                                 'plan_key' => $validated['plan_key'],
                                 'billing_status' => 'ok',
                                 'grace_ends_at' => null,
+                                'subscription_status' => 'active',
                             ]);
                             $subscriptionCreated = true;
                         }
@@ -145,9 +155,9 @@ class ComeceController extends Controller
             $user->tokens()->where('name', 'spa')->delete();
             $token = $user->createToken('spa')->plainTextToken;
 
-            $clinics = Clinic::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderBy('name')->withCount('users')->get();
-            if ($clinics->isEmpty()) {
-                $clinics = Clinic::where('id', $clinic->id)->withCount('users')->get();
+            $organizations = Organization::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderBy('name')->withCount('users')->get();
+            if ($organizations->isEmpty()) {
+                $organizations = Organization::query()->where('id', $organization->id)->withCount('users')->get();
             }
 
             $successMessage = $subscriptionCreated && $firstInvoiceDueDate
@@ -160,8 +170,8 @@ class ComeceController extends Controller
                     'token' => $token,
                     'token_type' => 'Bearer',
                     'user' => new UserResource($user),
-                    'current_clinic_id' => $clinic->id,
-                    'clinics' => ClinicResource::collection($clinics),
+                    'current_organization_id' => $organization->id,
+                    'organizations' => OrganizationResource::collection($organizations),
                     'message' => $successMessage,
                 ],
             ], 201);
@@ -218,11 +228,11 @@ class ComeceController extends Controller
         return $slug;
     }
 
-    private function uniqueClinicSlug(string $base): string
+    private function uniqueOrganizationSlug(string $base): string
     {
         $slug = $base;
         $n = 1;
-        while (Clinic::where('slug', $slug)->exists()) {
+        while (Organization::where('slug', $slug)->exists()) {
             $slug = $base.'-'.$n;
             $n++;
         }

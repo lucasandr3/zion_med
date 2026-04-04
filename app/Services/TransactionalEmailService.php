@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\SendTransactionalEmailJob;
+use App\Support\MailBrand;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -30,7 +31,7 @@ class TransactionalEmailService
      */
     public function sendNow(string $to, string $subject, string $view, array $data = []): void
     {
-        Mail::send($view, $data, function ($message) use ($to, $subject) {
+        Mail::send($view, MailBrand::with($data), function ($message) use ($to, $subject) {
             $message->to($to)->subject($subject);
         });
     }

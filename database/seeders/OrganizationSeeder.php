@@ -3,45 +3,43 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
-class ClinicSeeder extends Seeder
+class OrganizationSeeder extends Seeder
 {
     public function run(): void
     {
-        // Tenants novos vêm do cadastro (Comece). Aqui só o mínimo para QA: um tenant + uma clínica.
         $tenant = Tenant::firstOrCreate(
-            ['slug' => 'clinica-qa-zion'],
-            ['name' => 'Tenant QA Zion'],
+            ['slug' => 'clinica-qa-gestgo'],
+            ['name' => 'Tenant QA Gestgo'],
         );
 
         $trialDays = (int) config('asaas.trial_days', 14);
 
-        $clinic = Clinic::firstOrCreate(
-            ['slug' => 'clinica-qa-zion'],
+        $organization = Organization::firstOrCreate(
+            ['slug' => 'clinica-qa-gestgo'],
             [
                 'tenant_id' => $tenant->id,
-                'name' => 'Clínica QA Zion',
-                'notification_email' => 'qa@zionmed.test',
+                'name' => 'Organização QA Gestgo',
+                'notification_email' => 'qa@gestgo.test',
                 'address' => 'Ambiente de testes manuais (QA)',
             ],
         );
 
-        $clinic->update([
+        $organization->update([
             'trial_ends_at' => now()->addDays($trialDays),
             'subscription_status' => 'trial',
             'billing_status' => 'ok',
         ]);
 
-        // Dono da clínica QA (login manual + mesmos testes que usam qaClinicOwnerUser()).
         User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'qa-owner@zionmed.test'],
+            ['email' => 'qa-owner@gestgo.test'],
             [
-                'organization_id' => $clinic->id,
-                'name' => 'QA Clínica',
+                'organization_id' => $organization->id,
+                'name' => 'QA Organização',
                 'password' => 'senha123',
                 'role' => Role::Owner->value,
                 'active' => true,
@@ -49,7 +47,7 @@ class ClinicSeeder extends Seeder
         );
 
         User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'admin@zionmed.com'],
+            ['email' => 'admin@gestgo.com'],
             [
                 'organization_id' => null,
                 'name' => 'Admin Plataforma',

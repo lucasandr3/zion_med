@@ -17,7 +17,7 @@ class ClinicScopingTest extends TestCase
 
     public function test_submissions_are_scoped_by_clinic(): void
     {
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
 
         $clinic1 = Clinic::first();

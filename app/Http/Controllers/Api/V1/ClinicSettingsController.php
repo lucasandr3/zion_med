@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Events\AuditEvent;
 use App\Http\Requests\ClinicSettingsRequest;
-use App\Http\Resources\Api\V1\ClinicResource;
-use App\Models\Clinic;
+use App\Http\Resources\Api\V1\OrganizationResource;
+use App\Models\Organization;
 use App\Services\AsaasService;
 use App\Services\ThemeService;
 use Illuminate\Http\JsonResponse;
@@ -26,14 +26,18 @@ class ClinicSettingsController extends Controller
     {
         $this->authorize('manage-clinic');
 
-        $clinic = Clinic::findOrFail(session('current_clinic_id'));
+        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organization = Organization::query()->findOrFail($organizationId);
+
+        $organization->syncExpiredTrialStateIfNeeded();
+        $organization->refresh();
 
         if ($this->asaasService->isConfigured()) {
-            $this->asaasService->syncClinicPaymentsFromAsaas($clinic);
+            $this->asaasService->syncOrganizationPaymentsFromAsaas($organization);
         }
 
         $billingPlans = config('asaas.plans', []);
-        $billingSubscriptions = $clinic->subscriptions()->latest()->get()->map(fn ($s) => [
+        $billingSubscriptions = $organization->subscriptions()->forTenantBillingListing()->latest()->get()->map(fn ($s) => [
             'id' => $s->id,
             'asaas_subscription_id' => $s->asaas_subscription_id,
             'plan_key' => $s->plan_key,
@@ -41,7 +45,7 @@ class ClinicSettingsController extends Controller
             'next_due_date' => $s->next_due_date,
             'created_at' => $s->created_at?->toIso8601String(),
         ]);
-        $billingPayments = $clinic->payments()->latest()->limit(10)->get()->map(fn ($p) => [
+        $billingPayments = $organization->payments()->visibleOnTenantBilling()->latest()->limit(10)->get()->map(fn ($p) => [
             'id' => $p->id,
             'status' => $p->status,
             'due_date' => $p->due_date,
@@ -51,22 +55,23 @@ class ClinicSettingsController extends Controller
         ]);
 
         $multiEmpresaPlan = config('asaas.multi_empresa_plan', 'enterprise');
-        $canAddMultiEmpresa = $clinic->plan_key === $multiEmpresaPlan;
-        $tenantClinics = $canAddMultiEmpresa && $clinic->tenant_id
-            ? Clinic::withoutGlobalScopes()->where('tenant_id', $clinic->tenant_id)->orderBy('name')->withCount('users')->get()
+        $canAddMultiEmpresa = $organization->plan_key === $multiEmpresaPlan;
+        $tenantOrganizations = $canAddMultiEmpresa && $organization->tenant_id
+            ? Organization::withoutGlobalScopes()->where('tenant_id', $organization->tenant_id)->orderBy('name')->withCount('users')->get()
             : collect();
 
         return response()->json([
             'data' => [
-                'clinic' => new ClinicResource($clinic),
+                'organization' => new OrganizationResource($organization),
                 'available_themes' => $this->themeService->getAvailableThemes(),
                 'billing_plans' => $billingPlans,
+                'billing_ui' => $organization->billingUiState(),
                 'billing_subscriptions' => $billingSubscriptions,
                 'billing_payments' => $billingPayments,
                 'asaas_configured' => $this->asaasService->isConfigured(),
                 'active_config_tab' => $request->query('tab', 'dados'),
                 'can_add_multi_empresa' => $canAddMultiEmpresa,
-                'tenant_clinics' => ClinicResource::collection($tenantClinics),
+                'tenant_organizations' => OrganizationResource::collection($tenantOrganizations),
             ],
         ]);
     }
@@ -76,39 +81,40 @@ class ClinicSettingsController extends Controller
      */
     public function update(ClinicSettingsRequest $request): JsonResponse
     {
-        $clinic = Clinic::findOrFail(session('current_clinic_id'));
-        $this->authorize('update-clinic', $clinic);
+        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organization = Organization::query()->findOrFail($organizationId);
+        $this->authorize('update-clinic', $organization);
         $data = $request->validated();
 
         if ($request->boolean('dark_mode_only')) {
-            $clinic->update(['dark_mode' => $request->boolean('dark_mode')]);
-            return response()->json(['data' => new ClinicResource($clinic->fresh())]);
+            $organization->update(['dark_mode' => $request->boolean('dark_mode')]);
+            return response()->json(['data' => new OrganizationResource($organization->fresh())]);
         }
 
         if ($request->boolean('theme_only')) {
-            $clinic->update(['theme' => $request->input('theme')]);
-            return response()->json(['data' => new ClinicResource($clinic->fresh())]);
+            $organization->update(['theme' => $request->input('theme')]);
+            return response()->json(['data' => new OrganizationResource($organization->fresh())]);
         }
 
         if ($request->hasFile('logo')) {
-            if ($clinic->logo_path) {
-                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->logo_path);
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($clinic->logo_path);
+            if ($organization->logo_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($organization->logo_path);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($organization->logo_path);
             }
             $data['logo_path'] = $request->file('logo')->store(
-                'organizations/' . $clinic->id . '/logos',
+                'organizations/' . $organization->id . '/logos',
                 'minio_assets'
             );
         }
         unset($data['logo']);
 
         if ($request->hasFile('cover_image')) {
-            if ($clinic->cover_image_path) {
-                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($clinic->cover_image_path);
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($clinic->cover_image_path);
+            if ($organization->cover_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('minio_assets')->delete($organization->cover_image_path);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($organization->cover_image_path);
             }
             $data['cover_image_path'] = $request->file('cover_image')->store(
-                'organizations/' . $clinic->id . '/covers',
+                'organizations/' . $organization->id . '/covers',
                 'minio_assets'
             );
         }
@@ -137,11 +143,11 @@ class ClinicSettingsController extends Controller
         $data['whatsapp_notify_faturas_boleto'] = $request->boolean('whatsapp_notify_faturas_boleto');
         $data['whatsapp_notify_avisos'] = $request->boolean('whatsapp_notify_avisos');
 
-        $clinic->update($data);
-        \Illuminate\Support\Facades\Event::dispatch(new AuditEvent('clinic.updated', Clinic::class, $clinic->id, null, $clinic->id, $request->user()?->id));
+        $organization->update($data);
+        \Illuminate\Support\Facades\Event::dispatch(new AuditEvent('clinic.updated', Organization::class, $organization->id, null, $organization->id, $request->user()?->id));
 
         return response()->json([
-            'data' => new ClinicResource($clinic->fresh()),
+            'data' => new OrganizationResource($organization->fresh()),
         ]);
     }
 

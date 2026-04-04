@@ -87,7 +87,7 @@ class PlatformSetting extends Model
         }
 
         return [
-            'service_name' => "Gestgo",
+            'service_name' => $name,
             'status' => $status,
             'severity' => $severity,
             'message' => $message,

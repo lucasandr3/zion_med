@@ -115,4 +115,20 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Identidade visual dos e-mails (layout unificado)
+    |--------------------------------------------------------------------------
+    |
+    | MAIL_PRODUCT_NAME vazio usa ASAAS_PRODUCT_NAME ou APP_NAME.
+    |
+    */
+
+    'branding' => [
+        'product_name' => env('MAIL_PRODUCT_NAME'),
+        'logo_url' => env('MAIL_LOGO_URL'),
+        'primary_color' => env('MAIL_PRIMARY_COLOR', '#1e40af'),
+        'support_email' => env('MAIL_SUPPORT_EMAIL'),
+    ],
+
 ];

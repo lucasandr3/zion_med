@@ -32,7 +32,7 @@ class DispatchWebhookJob implements ShouldQueue
         $headers = [
             'Content-Type' => 'application/json',
             'X-Webhook-Event' => $this->event,
-            'User-Agent' => 'ZionMed-Webhooks/1.0',
+            'User-Agent' => 'Gestgo-Webhooks/1.0',
         ];
 
         if (Str::length($this->webhook->secret ?? '') > 0) {

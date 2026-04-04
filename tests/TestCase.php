@@ -10,14 +10,14 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Dono da clínica de QA (também criado pelo ClinicSeeder como qa-owner@zionmed.test).
+     * Dono da organização de QA (também criado pelo OrganizationSeeder como qa-owner@gestgo.test).
      */
     protected function qaClinicOwnerUser(): User
     {
         $clinic = Clinic::query()->firstOrFail();
 
         $user = User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'qa-owner@zionmed.test'],
+            ['email' => 'qa-owner@gestgo.test'],
             [
                 'organization_id' => $clinic->id,
                 'name' => 'QA Clínica',

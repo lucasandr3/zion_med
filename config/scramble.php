@@ -29,7 +29,7 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        'description' => 'API REST do Zion Med para integração com sistemas externos. Autenticação via token (Sanctum). Gere um token em **Clínica > Integrações**. Use o header `Authorization: Bearer SEU_TOKEN`.',
+        'description' => 'API REST do Gestgo para integração com sistemas externos. Autenticação via token (Sanctum). Gere um token em **Empresa > Integrações**. Use o header `Authorization: Bearer SEU_TOKEN`.',
     ],
 
     /*

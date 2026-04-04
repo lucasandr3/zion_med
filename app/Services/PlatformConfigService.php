@@ -25,7 +25,7 @@ class PlatformConfigService
         $dbPlans = Plan::getForConfigCached();
 
         $merged = array_merge($fileConfig, [
-            'product_name' => $settings['product_name'] ?? $fileConfig['product_name'] ?? 'ZionMed',
+            'product_name' => $settings['product_name'] ?? $fileConfig['product_name'] ?? 'Gestgo',
             'trial_days' => isset($settings['trial_days']) ? (int) $settings['trial_days'] : ($fileConfig['trial_days'] ?? 14),
             'grace_days' => isset($settings['grace_days']) ? (int) $settings['grace_days'] : ($fileConfig['grace_days'] ?? 7),
             'block_mode' => $settings['block_mode'] ?? $fileConfig['block_mode'] ?? 'soft',

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\OtpChallenge;
+use App\Support\MailBrand;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
@@ -28,11 +29,17 @@ class OtpService
             'expires_at' => $expiresAt,
         ]);
 
-        Mail::raw(
-            "Seu código de verificação Zion Med é: {$code}. Válido por " . self::EXPIRY_MINUTES . " minutos. Não compartilhe.",
-            function ($message) use ($email) {
+        $brand = (string) (config('mail.branding.product_name') ?: config('asaas.product_name') ?: config('app.name'));
+        Mail::send(
+            'emails.otp-code',
+            MailBrand::with([
+                'emailTitle' => 'Código de verificação',
+                'code' => $code,
+                'validMinutes' => self::EXPIRY_MINUTES,
+            ]),
+            function ($message) use ($email, $brand) {
                 $message->to($email)
-                    ->subject('Código de verificação - Zion Med');
+                    ->subject("Código de verificação — {$brand}");
             }
         );
 

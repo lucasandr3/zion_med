@@ -301,7 +301,7 @@ class PublicFormApiController extends Controller
             ]);
         }
 
-        $tmp = tempnam(sys_get_temp_dir(), 'zion_pub_');
+        $tmp = tempnam(sys_get_temp_dir(), 'gestgo_pub_');
         if ($tmp === false) {
             throw ValidationException::withMessages([
                 $fieldKey => ['Não foi possível processar o arquivo de '.$fieldLabel.'.'],

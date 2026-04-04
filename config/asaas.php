@@ -13,17 +13,19 @@ return [
     'webhook_secret' => env('ASAAS_WEBHOOK_SECRET'),
 
     'trial_days' => (int) env('ASAAS_TRIAL_DAYS', 14),
+    /** Dias antes do fim do trial (incluindo o último dia) para exibir aviso no app. */
+    'trial_warning_days' => (int) env('ASAAS_TRIAL_WARNING_DAYS', 3),
     'grace_days' => (int) env('ASAAS_GRACE_DAYS', 7),
     'block_mode' => env('ASAAS_BLOCK_MODE', 'soft'), // soft = bloqueia app, libera /billing; hard = bloqueia tudo exceto logout
 
-    'product_name' => env('ASAAS_PRODUCT_NAME', 'ZionMed'),
+    'product_name' => env('ASAAS_PRODUCT_NAME', 'Gestgo'),
 
     'multi_empresa_plan' => env('ASAAS_MULTI_EMPRESA_PLAN', 'enterprise'),
 
     'plans' => [
         // Teste com preço único e plano principal simplificado para a landing e o fluxo de cadastro.
         'executive' => [
-            'name' => 'ZionMed Clínica',
+            'name' => 'Gestgo Clínica',
             'value' => 247.00,
             'description' => 'Plano único com fichas e consentimentos digitais, assinatura, protocolo automático, PDF e templates prontos.',
         ],

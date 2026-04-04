@@ -93,7 +93,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
 });
 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
-Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
     Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');
     Route::get('/organization-roles', [OrganizationRoleController::class, 'index'])->name('api.v1.organization-roles.index');

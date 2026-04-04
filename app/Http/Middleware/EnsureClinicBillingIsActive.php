@@ -33,11 +33,16 @@ class EnsureClinicBillingIsActive
             return $next($request);
         }
 
-        $this->syncExpiredTrial($organization);
+        $organization->syncExpiredTrialStateIfNeeded();
+        $organization->refresh();
 
-        if ($this->canAccess($organization, $request)) {
+        if ($organization->canAccessTenantAppFeatures()) {
             if ($organization->subscription_status === 'past_due' && $organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
                 $request->session()->flash('billing_warning', 'Pagamento pendente. Regularize até '.$organization->grace_ends_at->format('d/m/Y').' para evitar a suspensão do acesso.');
+            }
+            $trialNotice = $organization->trialEndingNoticeMeta();
+            if ($trialNotice !== null) {
+                $request->session()->flash('trial_notice', $trialNotice);
             }
 
             return $next($request);
@@ -77,7 +82,7 @@ class EnsureClinicBillingIsActive
 
     private function currentOrganization(Request $request): ?Organization
     {
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = session('current_organization_id') ?? session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
         if (! $orgId) {
             return null;
         }
@@ -85,47 +90,4 @@ class EnsureClinicBillingIsActive
         return Organization::find($orgId);
     }
 
-    private function syncExpiredTrial(Organization $organization): void
-    {
-        if ($organization->subscription_status !== 'trial' || ! $organization->trial_ends_at || now()->lte($organization->trial_ends_at)) {
-            return;
-        }
-        $hasActiveSubscription = $organization->subscriptions()
-            ->whereIn('status', ['active', 'ACTIVE'])
-            ->exists();
-        if (! $hasActiveSubscription) {
-            $organization->update([
-                'subscription_status' => 'inactive',
-                'billing_status' => 'blocked',
-            ]);
-
-            return;
-        }
-
-        // Assinatura criada durante o trial: após trial_ends_at o status ainda era "trial" e o acesso caía em falso.
-        $organization->update([
-            'subscription_status' => 'active',
-            'billing_status' => 'ok',
-        ]);
-    }
-
-    private function canAccess(Organization $organization, Request $request): bool
-    {
-        if ($organization->subscription_status === 'active') {
-            return true;
-        }
-        if ($organization->subscription_status === 'trial' && $organization->trial_ends_at && now()->lte($organization->trial_ends_at)) {
-            return true;
-        }
-        if ($organization->subscription_status === 'past_due') {
-            if ($organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
-                return true;
-            }
-            if ($organization->grace_ends_at && now()->gt($organization->grace_ends_at)) {
-                $organization->update(['billing_status' => 'blocked']);
-            }
-        }
-
-        return false;
-    }
 }

@@ -17,7 +17,7 @@ class PublicFormOtpTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
         $this->seed(\Database\Seeders\FormTemplateSeeder::class);
     }
 

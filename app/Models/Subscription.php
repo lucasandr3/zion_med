@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -36,5 +37,23 @@ class Subscription extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Assinaturas exibidas no app (billing / configurações): sem canceladas no Asaas ou localmente.
+     */
+    public function scopeForTenantBillingListing(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', ['CANCELED', 'canceled', 'DELETED', 'inactive']);
+    }
+
+    /**
+     * Remove cobranças locais ainda não confirmadas (ex.: após cancelar assinatura no Asaas).
+     */
+    public function deleteUnpaidLocalPayments(): int
+    {
+        return $this->payments()
+            ->whereNotIn('status', ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'])
+            ->delete();
     }
 }

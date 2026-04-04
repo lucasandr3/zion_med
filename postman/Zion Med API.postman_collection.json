@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Zion Med API",
-    "description": "API REST do Zion Med para integração com o frontend (Angular).\n\n**Autenticação:**\n1. Use `POST /api/v1/auth/login` com email e password para obter o token.\n2. Nas requisições autenticadas, envie o header: `Authorization: Bearer {{token}}`\n3. Se o usuário puder trocar de clínica, use o header `X-Clinic-Id` com o ID da clínica desejada.",
+    "name": "Gestgo API",
+    "description": "API REST do Gestgo para integração com o frontend (Angular).\n\n**Autenticação:**\n1. Use `POST /api/v1/auth/login` com email e password para obter o token.\n2. Nas requisições autenticadas, envie o header: `Authorization: Bearer {{token}}`\n3. Se o usuário puder trocar de empresa, use o header `X-Organization-Id` ou `X-Clinic-Id` com o ID desejado.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

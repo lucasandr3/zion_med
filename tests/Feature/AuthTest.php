@@ -12,14 +12,14 @@ class AuthTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\ClinicSeeder::class);
+        $this->seed(\Database\Seeders\OrganizationSeeder::class);
     }
 
     public function test_login_page_loads(): void
     {
         $response = $this->get(route('login'));
         $response->assertStatus(200);
-        $response->assertSee('Zion Med');
+        $response->assertSee('Gestgo');
     }
 
     public function test_login_with_valid_credentials_redirects_to_dashboard(): void
@@ -28,7 +28,7 @@ class AuthTest extends TestCase
         $this->assertNotNull($user);
 
         $response = $this->post(route('login'), [
-            'email' => 'qa-owner@zionmed.test',
+            'email' => 'qa-owner@gestgo.test',
             'password' => 'senha123',
         ]);
         $response->assertRedirect(route('dashboard'));
@@ -38,7 +38,7 @@ class AuthTest extends TestCase
     public function test_login_with_invalid_credentials_returns_error(): void
     {
         $response = $this->post(route('login'), [
-            'email' => 'qa-owner@zionmed.test',
+            'email' => 'qa-owner@gestgo.test',
             'password' => 'wrong',
         ]);
         $response->assertSessionHasErrors('email');

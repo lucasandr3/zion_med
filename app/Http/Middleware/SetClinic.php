@@ -21,7 +21,10 @@ class SetClinic
 
             if ($sessionClinic === null) {
                 if ($user->clinic_id !== null) {
-                    session(['current_clinic_id' => $user->clinic_id]);
+                    session([
+                        'current_clinic_id' => $user->clinic_id,
+                        'current_organization_id' => $user->clinic_id,
+                    ]);
                 } elseif (! $request->routeIs('clinica.escolher') && ! $request->routeIs('clinica.escolher.store') && ! $request->routeIs('logout')) {
                     return redirect()->route('clinica.escolher');
                 }
@@ -30,12 +33,15 @@ class SetClinic
         }
 
         if ($user->clinic_id === null) {
-            session()->forget('current_clinic_id');
+            session()->forget(['current_clinic_id', 'current_organization_id']);
             return $next($request);
         }
 
         if (session('current_clinic_id') !== (string) $user->clinic_id) {
-            session(['current_clinic_id' => $user->clinic_id]);
+            session([
+                'current_clinic_id' => $user->clinic_id,
+                'current_organization_id' => $user->clinic_id,
+            ]);
         }
 
         return $next($request);

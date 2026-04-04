@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\ClinicResource;
+use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -20,8 +20,8 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Login: email + password. Retorna token Sanctum e dados do usuário/clínicas.
-     * Para trocar de clínica, use o header X-Clinic-Id nas próximas requisições.
+     * Login: email + password. Retorna token Sanctum e dados do usuário/organizações.
+     * Para trocar de empresa, use o header X-Organization-Id (ou X-Clinic-Id) nas próximas requisições.
      * Rate limit: 5 req/min por IP (throttle:auth).
      */
     public function login(Request $request): JsonResponse
@@ -42,10 +42,13 @@ class AuthController extends Controller
         $user->tokens()->where('name', 'spa')->delete();
         $token = $user->createToken('spa')->plainTextToken;
 
-        $clinics = $this->clinicsForUser($user);
-        $currentClinicId = $user->clinic_id;
-        if ($clinics->isNotEmpty() && $currentClinicId) {
-            session(['current_clinic_id' => $currentClinicId]);
+        $organizations = $this->organizationsForUser($user);
+        $currentOrganizationId = $user->clinic_id;
+        if ($organizations->isNotEmpty() && $currentOrganizationId) {
+            session([
+                'current_clinic_id' => $currentOrganizationId,
+                'current_organization_id' => $currentOrganizationId,
+            ]);
         }
 
         return response()->json([
@@ -53,8 +56,8 @@ class AuthController extends Controller
                 'token' => $token,
                 'token_type' => 'Bearer',
                 'user' => new UserResource($user),
-                'current_clinic_id' => $currentClinicId,
-                'clinics' => ClinicResource::collection($clinics),
+                'current_organization_id' => $currentOrganizationId,
+                'organizations' => OrganizationResource::collection($organizations),
             ],
         ]);
     }
@@ -175,15 +178,16 @@ class AuthController extends Controller
         ]);
     }
 
-    private function clinicsForUser($user): \Illuminate\Database\Eloquent\Collection
+    private function organizationsForUser($user): \Illuminate\Database\Eloquent\Collection
     {
         $tenantId = $user->clinic?->tenant_id;
         if ($tenantId === null) {
             if ($user->clinic_id) {
-                return Clinic::where('id', $user->clinic_id)->withCount('users')->get();
+                return Organization::where('id', $user->clinic_id)->withCount('users')->get();
             }
-            return Clinic::whereRaw('0 = 1')->get();
+            return Organization::whereRaw('0 = 1')->get();
         }
-        return Clinic::withoutGlobalScopes()->where('tenant_id', $tenantId)->orderBy('name')->withCount('users')->get();
+
+        return Organization::withoutGlobalScopes()->where('tenant_id', $tenantId)->orderBy('name')->withCount('users')->get();
     }
 }

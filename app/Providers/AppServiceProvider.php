@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use App\Enums\Role;
 use App\Models\Clinic;
+use App\Models\Organization;
 use App\Support\Permission;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\User;
 use App\Services\PlatformConfigService;
+use App\Support\MailBrand;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -52,17 +54,44 @@ class AppServiceProvider extends ServiceProvider
 
         // Link de redefinição de senha no e-mail: apontar para o frontend (SPA) quando FRONTEND_URL estiver definida
         $frontendUrl = config('app.frontend_url');
-        if ($frontendUrl !== null && $frontendUrl !== '') {
-            ResetPassword::createUrlUsing(function (object $notifiable, string $token) use ($frontendUrl) {
-                $base = rtrim($frontendUrl, '/');
+        $spaPasswordResetUrl = static function (object $notifiable, string $token) use ($frontendUrl): string {
+            if ($frontendUrl !== null && $frontendUrl !== '') {
+                $base = rtrim((string) $frontendUrl, '/');
                 $email = $notifiable->getEmailForPasswordReset();
 
                 return $base . '/redefinir-senha?' . http_build_query([
                     'token' => $token,
                     'email' => $email,
                 ]);
-            });
+            }
 
+            return url(route('password.reset', [
+                'token' => $token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], false));
+        };
+
+        ResetPassword::createUrlUsing($spaPasswordResetUrl);
+
+        $brandName = (string) (config('mail.branding.product_name')
+            ?: config('asaas.product_name')
+            ?: config('app.name'));
+
+        ResetPassword::toMailUsing(function (object $notifiable, string $token) use ($spaPasswordResetUrl, $brandName): MailMessage {
+            $url = $spaPasswordResetUrl($notifiable, $token);
+            $expire = (int) config('auth.passwords.' . config('auth.defaults.passwords') . '.expire', 60);
+
+            return (new MailMessage)
+                ->subject('Redefinir sua senha — ' . $brandName)
+                ->view('emails.auth.reset-password', MailBrand::with([
+                    'userName' => $notifiable->name ?? '',
+                    'actionUrl' => $url,
+                    'emailTitle' => 'Redefinir senha',
+                    'expireMinutes' => $expire,
+                ]));
+        });
+
+        if ($frontendUrl !== null && $frontendUrl !== '') {
             // Link de verificação de e-mail: assinatura gerada para a API; no e-mail enviamos o link do frontend com os mesmos query params.
             VerifyEmail::createUrlUsing(function (object $notifiable) use ($frontendUrl) {
                 $apiUrl = URL::temporarySignedRoute(
@@ -75,20 +104,18 @@ class AppServiceProvider extends ServiceProvider
                 );
                 $query = parse_url($apiUrl, PHP_URL_QUERY);
 
-                return rtrim($frontendUrl, '/') . '/verificar-email?' . $query;
+                return rtrim((string) $frontendUrl, '/') . '/verificar-email?' . $query;
             });
         }
 
-        // E-mail de verificação em português (assunto e corpo claros reduzem chance de spam).
-        VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
-            $appName = config('app.name');
+        VerifyEmail::toMailUsing(function (object $notifiable, string $url) use ($brandName): MailMessage {
             return (new MailMessage)
-                ->subject('Confirme seu e-mail - ' . $appName)
-                ->greeting('Olá!')
-                ->line('Clique no botão abaixo para confirmar seu endereço de e-mail e ativar sua conta.')
-                ->action('Confirmar e-mail', $url)
-                ->line('Se você não criou uma conta, pode ignorar esta mensagem.')
-                ->salutation('Atenciosamente,' . "\n" . $appName);
+                ->subject('Confirme seu e-mail — ' . $brandName)
+                ->view('emails.auth.verify-email', MailBrand::with([
+                    'userName' => $notifiable->name ?? '',
+                    'actionUrl' => $url,
+                    'emailTitle' => 'Confirmar e-mail',
+                ]));
         });
 
         Scramble::configure()
@@ -148,12 +175,13 @@ class AppServiceProvider extends ServiceProvider
             return (string) $user->clinic_id === (string) $target->clinic_id;
         });
 
-        Gate::define('update-clinic', function (User $user, Clinic $clinic) {
+        Gate::define('update-clinic', function (User $user, Organization $organization) {
+            $contextId = session('current_organization_id') ?? session('current_clinic_id');
             if ($user->canSwitchClinic()) {
-                return (string) $clinic->id === (string) session('current_clinic_id');
+                return (string) $organization->id === (string) $contextId;
             }
 
-            return $user->isOwner() && $user->clinic_id === $clinic->id;
+            return $user->isOwner() && $user->clinic_id === $organization->id;
         });
         Gate::define('update-user', function (User $user, User $target) {
             if ($user->canSwitchClinic()) {
