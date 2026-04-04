@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
 use App\Http\Controllers\Api\V1\TemplateController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
+use App\Http\Controllers\Api\V1\DemonstrationRequestController;
 use App\Http\Controllers\Api\V1\LandingController;
 use App\Http\Controllers\Api\V1\PublicFormApiController;
 use App\Http\Controllers\Api\V1\PublicFormOtpController;
@@ -52,6 +53,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->name('api.v1.link-bio.public-go');
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
     Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
+    Route::post('/demonstracao', [DemonstrationRequestController::class, 'store'])->name('api.v1.demonstracao.store');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');
