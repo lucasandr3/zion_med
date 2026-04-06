@@ -1,8 +1,8 @@
-# PRD --- ZionMed
+# PRD --- Gestgo
 
 ## 1. Visão Geral do Produto
 
-**Nome:** ZionMed\
+**Nome:** Gestgo\
 **Tipo:** SaaS B2B para clínicas\
 **Objetivo:** Digitalizar, padronizar e organizar processos operacionais
 de clínicas por meio de formulários inteligentes com assinatura,
@@ -27,7 +27,7 @@ deixam lacunas na organização operacional.
 
 ## 3. Solução
 
-ZionMed oferece:
+Gestgo oferece:
 
 -   Formulários digitais padronizados\
 -   Assinatura eletrônica integrada\
@@ -197,7 +197,7 @@ Templates iniciais: - Anamnese\
 
 ## 11. Posicionamento Final
 
-ZionMed não é um "form builder".
+Gestgo não é um "form builder".
 
 É:
 

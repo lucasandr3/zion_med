@@ -1,10 +1,10 @@
-# Zion Med
+# Gestgo — backend API (repositório `zion_med`)
 
-MVP para clínicas: formulários operacionais, assinatura digital, geração de PDF e fluxo de aprovação. Multi-clínica (tenancy por `clinic_id`).
+MVP para clínicas: formulários operacionais, assinatura digital, geração de PDF e fluxo de aprovação. Multi-clínica (tenancy por `clinic_id`). O **nome comercial** é **Gestgo**; o nome da pasta/repositório pode permanecer `zion_med` por histórico.
 
 ## Stack
 
-- **Laravel 12** (PHP 8.3+)
+- **Laravel 12** (PHP 8.4+, conforme `composer.json`)
 - **Blade** + **Tailwind CSS**
 - **PostgreSQL** (produção) — migrations compatíveis com MySQL/SQLite
 - **barryvdh/laravel-dompdf** para PDF
@@ -12,10 +12,14 @@ MVP para clínicas: formulários operacionais, assinatura digital, geração de 
 
 ## Requisitos
 
-- PHP 8.3+
+- PHP 8.4+ (ver `composer.json`: `"php": "^8.4"`)
 - Composer
 - Node.js/npm (para Vite/Tailwind)
 - PostgreSQL (ou MySQL/SQLite para desenvolvimento)
+
+## Frontend (Angular)
+
+O SPA é um **repositório separado**. Guia de setup, proxy e deploy: [`docs/FRONTEND_README.md`](docs/FRONTEND_README.md).
 
 ## Setup local
 
@@ -59,8 +63,9 @@ Edite `laravel-docker/docker/nginx/conf.d/default.conf` e defina `client_max_bod
 ## Acesso após o seed
 
 - **URL:** `http://localhost:8000` (ou `php artisan serve`)
-- **Login:** `admin@demo.zionmed.com` / `senha123`
-- Perfil: **Owner** (acesso a clínica, usuários, templates, protocolos)
+- **Usuários** (ver `OrganizationSeeder`):
+  - Dono da organização QA: `qa-owner@gestgo.test` / `senha123` (perfil **Owner**)
+  - Admin da plataforma: `admin@gestgo.com` / `senha123` (perfil **Platform admin**)
 
 ## Fluxo básico
 
@@ -84,7 +89,7 @@ Edite `laravel-docker/docker/nginx/conf.d/default.conf` e defina `client_max_bod
 2. Criar ao menos um usuário em `users` com `clinic_id` apontando para essa clínica e `role = 'owner'`.
 3. Fazer login com esse usuário: o sistema define a clínica na sessão e o escopo passa a ser dessa clínica.
 
-Não há subdomínio no MVP: a clínica é definida pelo usuário logado. Para futuro com subdomínio (ex.: `clinica1.zionmed.com`), pode-se no middleware ler o subdomínio e definir `session('current_clinic_id')` a partir de uma tabela `clinics.subdomain` ou equivalente.
+Não há subdomínio no MVP: a clínica é definida pelo usuário logado. Para futuro com subdomínio (ex.: `clinica1.app.gestgo.com.br`), pode-se no middleware ler o subdomínio e definir `session('current_clinic_id')` a partir de uma tabela `clinics.subdomain` ou equivalente.
 
 ## Perfis e permissões
 
@@ -113,7 +118,7 @@ ASAAS_WEBHOOK_SECRET=um-segredo-gerado
 ASAAS_TRIAL_DAYS=14
 ASAAS_GRACE_DAYS=7
 ASAAS_BLOCK_MODE=soft
-ASAAS_PRODUCT_NAME=ZionMed
+ASAAS_PRODUCT_NAME=Gestgo
 ```
 
 - **ASAAS_BASE_URL:** use `https://sandbox.asaas.com/api/v3` para Sandbox.
@@ -179,12 +184,18 @@ Execute: `php artisan test`
 
 ## Segurança
 
+- **Segredos:** nunca commite chaves reais em `.env.example` ou documentação. Se uma chave (ex.: Resend) chegou a estar versionada, **revogue e gere outra** no painel do provedor.
 - CSRF em rotas web.
 - Rotas públicas protegidas por token (32+ caracteres).
 - Rate limit no endpoint público (`/f/{token}` POST).
 - Validação de upload (tamanho e MIME).
 - Auditoria (AuditService) para ações principais.
 - Gates/Policies para autorização por perfil e clínica.
+
+## API (integração)
+
+- Coleção **Postman:** `postman/Gestgo_API.postman_collection.json` e ambiente `postman/Gestgo_API.postman_environment.json`.
+- Documentação OpenAPI (Scramble): ver `config/scramble.php` e rota publicada em desenvolvimento.
 
 ## Estrutura principal
 
@@ -194,4 +205,4 @@ Execute: `php artisan test`
 
 ---
 
-**Zion Med** — formulários para clínicas, sem integração com prontuário. Focado em venda rápida para clínicas pequenas e médias.
+**Gestgo** — formulários para clínicas, sem integração com prontuário. Focado em venda rápida para clínicas pequenas e médias.

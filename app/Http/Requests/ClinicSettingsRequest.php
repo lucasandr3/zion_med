@@ -15,7 +15,7 @@ class ClinicSettingsRequest extends FormRequest
 
     public function rules(): array
     {
-        $validThemes = array_keys(app(ThemeService::class)->getAvailableThemes());
+        $validThemes = app(ThemeService::class)->themeKeysForValidation();
 
         // Dark-mode-only AJAX request
         if ($this->boolean('dark_mode_only')) {

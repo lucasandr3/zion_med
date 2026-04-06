@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "gestgo/gestgo-api",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "API Laravel do Gestgo — formulários, protocolos e assinatura para clínicas.",
+    "keywords": ["laravel", "gestgo", "api"],
     "license": "MIT",
     "require": {
         "php": "^8.4",

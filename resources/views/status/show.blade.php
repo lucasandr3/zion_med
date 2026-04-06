@@ -80,7 +80,7 @@
         <div class="mx-auto max-w-2xl px-4 py-5 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-slate-900 p-1.5">
-                    <img src="{{ asset('assets/images/logo/zionmed_logo.png') }}" alt="{{ $service_name }}" class="w-full h-full object-contain rounded">
+                    <img src="{{ asset('assets/images/logo/gestgo_logo.png') }}" alt="{{ $service_name }}" class="w-full h-full object-contain rounded">
                 </div>
                 <div>
                     <h1 class="text-sm font-semibold text-slate-900 leading-tight">{{ $service_name }}</h1>

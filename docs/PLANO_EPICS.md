@@ -1,4 +1,4 @@
-# Plano de Desenvolvimento — Zion Med (Epics)
+# Plano de Desenvolvimento — Gestgo (Epics)
 
 Documento do plano em epics, alinhado ao `PLANO_DESENVOLVIMENTO.md` e à `SPEC_CONCORRENCIA_ASSINATURA_DIGITAL.md`.
 

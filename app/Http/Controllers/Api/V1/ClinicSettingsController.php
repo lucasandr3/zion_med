@@ -92,7 +92,9 @@ class ClinicSettingsController extends Controller
         }
 
         if ($request->boolean('theme_only')) {
-            $organization->update(['theme' => $request->input('theme')]);
+            $theme = $this->themeService->normalizeThemeValue($request->input('theme'));
+            $organization->update(['theme' => $theme]);
+
             return response()->json(['data' => new OrganizationResource($organization->fresh())]);
         }
 
@@ -136,6 +138,13 @@ class ClinicSettingsController extends Controller
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
+        }
+
+        if (array_key_exists('theme', $data)) {
+            $data['theme'] = $this->themeService->normalizeThemeValue($data['theme']);
+        }
+        if (array_key_exists('public_theme', $data)) {
+            $data['public_theme'] = $this->themeService->normalizeThemeValue($data['public_theme']);
         }
 
         $data['whatsapp_notifications_enabled'] = $request->boolean('whatsapp_notifications_enabled');

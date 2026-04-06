@@ -302,7 +302,7 @@ class LinkBioController extends Controller
         $clinicId = session('current_clinic_id');
         $clinic = Clinic::findOrFail($clinicId);
 
-        $validThemes = array_keys($this->themeService->getAvailableThemes());
+        $validThemes = $this->themeService->themeKeysForValidation();
         $data = $request->validate([
             'public_theme' => ['nullable', 'string', \Illuminate\Validation\Rule::in(array_merge([''], $validThemes))],
             'cover_color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
@@ -320,6 +320,10 @@ class LinkBioController extends Controller
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
+        }
+
+        if (array_key_exists('public_theme', $data) && $data['public_theme'] !== null) {
+            $data['public_theme'] = $this->themeService->normalizeThemeValue($data['public_theme']);
         }
 
         $clinic->update($data);

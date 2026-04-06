@@ -1,4 +1,4 @@
-# Plano de Desenvolvimento — Zion Med
+# Plano de Desenvolvimento — Gestgo
 
 Documento de acompanhamento do plano de ajustes para lançamento.  
 Variáveis de ambiente e checklist de go-live estão no final.
@@ -108,7 +108,7 @@ Configure no servidor (nunca commite valores reais):
 | `MAIL_MAILER` | Sim | `resend` para envio real |
 | `RESEND_API_KEY` | Se MAIL_MAILER=resend | Chave da API Resend |
 | `MAIL_FROM_ADDRESS` | Sim | E-mail remetente (ex: `noreply@seudominio.com`) |
-| `MAIL_FROM_NAME` | Sim | Nome do remetente (ex: `Zion Med`) |
+| `MAIL_FROM_NAME` | Sim | Nome do remetente (ex: `Gestgo`) |
 | `ASAAS_BASE_URL` | Sim | Produção: `https://api.asaas.com/v3` |
 | `ASAAS_API_KEY` | Sim | Token da API Asaas produção |
 | `ASAAS_WEBHOOK_SECRET` | Sim | Token definido no webhook Asaas |

@@ -92,7 +92,7 @@ class WhatsappEvolutionController extends Controller
             ], 422);
         }
 
-        $name = 'zion_org_'.$organization->id;
+        $name = 'gestgo_org_'.$organization->id;
         $generatedToken = (string) Str::uuid();
 
         try {
@@ -315,7 +315,7 @@ class WhatsappEvolutionController extends Controller
 
         $text = isset($validated['text']) && trim($validated['text']) !== ''
             ? trim($validated['text'])
-            : 'Mensagem de teste — Zion Med / Evolution Go.';
+            : 'Mensagem de teste — Gestgo / Evolution Go.';
 
         try {
             $token = (string) $organization->evolution_go_instance_token;

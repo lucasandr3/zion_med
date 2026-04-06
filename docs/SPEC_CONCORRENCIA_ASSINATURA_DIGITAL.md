@@ -1,7 +1,7 @@
-# SPEC - Zion Med como opção viável contra Anaclara e ElevaSign
+# SPEC - Gestgo como opção viável contra Anaclara e ElevaSign
 
 ## Objetivo
-Transformar o Zion Med de um sistema de formulários/protocolos em uma plataforma competitiva de documentação clínica digital, consentimento e assinatura eletrônica com trilha de evidências, foco inicial em clínicas pequenas e médias no Brasil.
+Transformar o Gestgo de um sistema de formulários/protocolos em uma plataforma competitiva de documentação clínica digital, consentimento e assinatura eletrônica com trilha de evidências, foco inicial em clínicas pequenas e médias no Brasil.
 
 ## Contexto
 Hoje o produto já possui:

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ThemeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,12 @@ class Organization extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (Organization $organization): void {
+            if ($organization->theme === null || $organization->theme === '') {
+                $organization->theme = ThemeService::DEFAULT_THEME;
+            }
+        });
+
         static::created(function (Organization $organization): void {
             OrganizationRole::seedDefaultsForOrganization((int) $organization->id);
         });

@@ -1,12 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Clinic;
 
 class ThemeService
 {
-    public const DEFAULT_THEME = 'zion-blue';
+    public const DEFAULT_THEME = 'gestgo-blue';
+
+    /**
+     * Chaves antigas aceitas na API/UI; persistência deve usar {@see normalizeThemeValue()}.
+     *
+     * @var array<string, string>
+     */
+    public const LEGACY_THEME_ALIASES = [
+        'zion-blue' => 'gestgo-blue',
+    ];
 
     /**
      * Returns all available themes with their metadata and color palette.
@@ -14,7 +25,7 @@ class ThemeService
     public function getAvailableThemes(): array
     {
         return [
-            'zion-blue'     => ['label' => 'Azul Gestgo',   'primary' => '#1e40af'],
+            'gestgo-blue'   => ['label' => 'Azul Gestgo',   'primary' => '#1e40af'],
             'ocean-blue'    => ['label' => 'Ocean Blue',    'primary' => '#2563eb'],
             'indigo-night'  => ['label' => 'Indigo Night',  'primary' => '#4f46e5'],
             'emerald-fresh' => ['label' => 'Emerald Fresh', 'primary' => '#10b981'],
@@ -28,9 +39,44 @@ class ThemeService
         ];
     }
 
+    /**
+     * Chaves aceitas em validação (inclui aliases legados como {@see LEGACY_THEME_ALIASES}).
+     *
+     * @return list<string>
+     */
+    public function themeKeysForValidation(): array
+    {
+        return array_merge(
+            array_keys($this->getAvailableThemes()),
+            array_keys(self::LEGACY_THEME_ALIASES),
+        );
+    }
+
+    public function resolveThemeKey(string $theme): string
+    {
+        return self::LEGACY_THEME_ALIASES[$theme] ?? $theme;
+    }
+
+    /**
+     * Converte valor persistido ou enviado pela API para a chave canônica (ex.: zion-blue → gestgo-blue).
+     */
+    public function normalizeThemeValue(?string $theme): ?string
+    {
+        if ($theme === null || $theme === '') {
+            return $theme;
+        }
+
+        $resolved = $this->resolveThemeKey($theme);
+
+        return array_key_exists($resolved, $this->getAvailableThemes())
+            ? $resolved
+            : self::DEFAULT_THEME;
+    }
+
     public function getClinicTheme(?Clinic $clinic): string
     {
         $theme = $clinic?->theme ?? self::DEFAULT_THEME;
+        $theme = $this->resolveThemeKey($theme);
 
         return array_key_exists($theme, $this->getAvailableThemes())
             ? $theme
@@ -51,6 +97,8 @@ class ThemeService
 
     public function getThemeColor(string $theme): string
     {
+        $theme = $this->resolveThemeKey($theme);
+
         return $this->getAvailableThemes()[$theme]['primary']
             ?? $this->getAvailableThemes()[self::DEFAULT_THEME]['primary'];
     }
