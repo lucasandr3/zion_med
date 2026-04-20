@@ -40,6 +40,8 @@ Artisan::command('platform:notify-billing', function () {
 
 Schedule::command('platform:notify-billing')->dailyAt('08:00');
 
+Schedule::command('organization-presence:prune')->dailyAt('03:00');
+
 $reminderDays = (int) env('DOCUMENT_REMINDER_DAYS', 2);
 Artisan::command('documents:send-reminders', function () use ($reminderDays) {
     $service = app(DocumentSendService::class);

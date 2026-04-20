@@ -7,6 +7,7 @@ use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\OrganizationPresenceService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,10 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->isTenantUser() && $currentOrganizationId) {
+            app(OrganizationPresenceService::class)->join((int) $currentOrganizationId);
+        }
+
         return response()->json([
             'data' => [
                 'token' => $token,
@@ -67,7 +72,13 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        $organizationId = $user->currentOrganizationId();
+        if ($user->isTenantUser() && $organizationId) {
+            app(OrganizationPresenceService::class)->leave((int) $organizationId);
+        }
+
+        $user->currentAccessToken()->delete();
 
         return response()->json(['data' => ['message' => 'Logout realizado com sucesso.']]);
     }

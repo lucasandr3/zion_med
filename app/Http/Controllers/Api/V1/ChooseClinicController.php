@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Models\Clinic;
 use App\Models\Organization;
+use App\Services\OrganizationPresenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -52,10 +53,23 @@ class ChooseClinicController extends Controller
 
         $organizationId = (int) ($validated['organization_id'] ?? $validated['clinic_id']);
 
+        $oldOrganizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $oldOrganizationId = $oldOrganizationId !== null && $oldOrganizationId !== '' ? (int) $oldOrganizationId : null;
+
         session([
             'current_clinic_id' => $organizationId,
             'current_organization_id' => $organizationId,
         ]);
+
+        $presence = app(OrganizationPresenceService::class);
+        if ($user->isTenantUser()) {
+            if ($oldOrganizationId && $oldOrganizationId !== $organizationId && $presence->userMayAccessOrganization($user, $oldOrganizationId)) {
+                $presence->leave($oldOrganizationId);
+            }
+            if (($oldOrganizationId === null || $oldOrganizationId !== $organizationId) && $presence->userMayAccessOrganization($user, $organizationId)) {
+                $presence->join($organizationId);
+            }
+        }
 
         return response()->json([
             'data' => [

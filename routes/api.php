@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\LinkBioController;
 use App\Http\Controllers\Api\V1\LinksPublicosController;
 use App\Http\Controllers\Api\V1\MeAppearanceController;
 use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
 use App\Http\Controllers\Api\V1\PermissionCatalogController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsControl
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
+use App\Http\Controllers\Api\V1\Platform\OrganizationPresenceController as PlatformOrganizationPresenceController;
 use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Models\DocumentSend;
 use App\Models\FormSubmission;
@@ -55,6 +57,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
     Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
     Route::post('/demonstracao', [DemonstrationRequestController::class, 'store'])->name('api.v1.demonstracao.store');
+    Route::post('/organization-presence/leave-beacon', [OrganizationPresenceController::class, 'leaveBeacon'])
+        ->middleware('throttle:120,1')
+        ->name('api.v1.organization-presence.leave-beacon');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');
@@ -92,6 +97,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('api.v1.platform.settings.index');
         Route::put('/settings', [PlatformSettingsController::class, 'update'])->name('api.v1.platform.settings.update');
         Route::get('/logs', [PlatformAuditLogController::class, 'index'])->name('api.v1.platform.logs.index');
+        Route::get('/organization-presences', PlatformOrganizationPresenceController::class)->name('api.v1.platform.organization-presences.index');
     });
 });
 
