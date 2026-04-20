@@ -26,14 +26,7 @@ return [
         'solo' => [
             'name' => env('ASAAS_PLAN_SOLO_NAME', 'Gestgo Profissional'),
             'value' => (float) env('ASAAS_PLAN_SOLO_VALUE', 97),
-            'description' => 'Para autônomos: fichas digitais, consentimentos, assinatura eletrônica, protocolo, PDF, link da bio e templates — até 2 usuários.',
-            'max_users' => (int) env('ASAAS_PLAN_SOLO_MAX_USERS', 2),
-            'max_organizations_per_tenant' => 1,
-        ],
-        'executive' => [
-            'name' => env('ASAAS_PLAN_EXECUTIVE_NAME', 'Gestgo Business'),
-            'value' => (float) env('ASAAS_PLAN_EXECUTIVE_VALUE', 247),
-            'description' => 'Para clínicas e equipes: mesmo núcleo do Profissional, com usuários ilimitados no plano.',
+            'description' => 'Plano completo: fichas digitais, consentimentos, assinatura eletrônica, protocolo, PDF, link da bio, templates e usuários ilimitados.',
             'max_users' => null,
             'max_organizations_per_tenant' => 1,
         ],
