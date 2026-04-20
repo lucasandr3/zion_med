@@ -49,4 +49,16 @@ return [
         'https://n8n-webhook.gestgo.com.br/webhook/erro-pagamento'
     ),
 
+    /*
+    |--------------------------------------------------------------------------
+    | n8n — lead formulário "Agendar demonstração" (API pública)
+    |--------------------------------------------------------------------------
+    */
+    'n8n_demonstracao' => [
+        'webhook_url' => env(
+            'N8N_DEMONSTRACAO_WEBHOOK_URL',
+            'https://n8n-webhook.zionmed.com.br/webhook/c08cd03e-0111-4583-af85-a29eb47298bc'
+        ),
+    ],
+
 ];

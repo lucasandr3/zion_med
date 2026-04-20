@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendDemonstrationRequestN8nJob;
 use App\Models\DemonstrationRequest;
 use App\Models\User;
 use App\Notifications\NovoLeadPlataforma;
@@ -23,6 +24,22 @@ class DemonstrationRequestController extends Controller
         ]);
 
         $lead = DemonstrationRequest::create($validated);
+
+        $webhookUrl = config('services.n8n_demonstracao.webhook_url');
+        if (is_string($webhookUrl) && $webhookUrl !== '') {
+            SendDemonstrationRequestN8nJob::dispatchAfterResponse(
+                $webhookUrl,
+                [
+                    'id' => $lead->id,
+                    'nome' => $validated['name'],
+                    'negocio_ou_marca' => $validated['clinic'],
+                    'email' => $validated['email'],
+                    'whatsapp' => $validated['phone'],
+                    'mensagem' => $validated['message'] ?? null,
+                    'enviado_em' => $lead->created_at?->toIso8601String(),
+                ]
+            );
+        }
 
         try {
             User::where('is_platform_admin', true)
