@@ -54,6 +54,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('/link-bio/public/{slug}/go/{linkId}', [LinkBioController::class, 'publicRedirectLink'])
         ->whereNumber('linkId')
         ->name('api.v1.link-bio.public-go');
+    Route::get('/link-bio/public/{slug}/cta/{channel}', [LinkBioController::class, 'publicRedirectCta'])
+        ->where('channel', 'whatsapp|maps|email|phone|instagram|team_whatsapp')
+        ->name('api.v1.link-bio.public-cta');
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
     Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
     Route::post('/demonstracao', [DemonstrationRequestController::class, 'store'])->name('api.v1.demonstracao.store');

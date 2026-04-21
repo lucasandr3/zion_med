@@ -9,6 +9,7 @@ use App\Models\Clinic;
 use App\Models\ClinicLink;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
+use App\Models\LinkBioCtaClick;
 use App\Models\LinkBioLinkClick;
 use App\Models\LinkBioPageView;
 use App\Services\ThemeService;
@@ -23,6 +24,9 @@ class LinkBioController extends Controller
      * Layouts do Link Bio (mesmos IDs do front Angular).
      */
     private const LINK_BIO_LAYOUT_MODELS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    /** CTAs da página pública (botões que não são links cadastrados na aba Links). */
+    private const LINK_BIO_CTA_CHANNELS = ['whatsapp', 'maps', 'email', 'phone', 'instagram', 'team_whatsapp'];
 
     public function __construct(private ThemeService $themeService) {}
 
@@ -40,7 +44,8 @@ class LinkBioController extends Controller
         }
 
         $clinicLink = ClinicLink::query()
-            ->where('id', $linkId)
+            ->withoutGlobalScopes()
+            ->whereKey($linkId)
             ->where('organization_id', $clinic->id)
             ->first();
 
@@ -51,6 +56,43 @@ class LinkBioController extends Controller
         LinkBioLinkClick::incrementForLink((int) $clinicLink->id);
 
         return redirect()->away($clinicLink->url);
+    }
+
+    /**
+     * Registra clique em CTA (WhatsApp, maps, e-mail, etc.) e redireciona para o destino real.
+     *
+     * @param  string  $channel  whatsapp|maps|email|phone|instagram|team_whatsapp
+     */
+    public function publicRedirectCta(Request $request, string $slug, string $channel): Response
+    {
+        if (! in_array($channel, self::LINK_BIO_CTA_CHANNELS, true)) {
+            abort(404);
+        }
+
+        $clinic = Clinic::withoutGlobalScopes()
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $clinic) {
+            abort(404, 'Link Bio não encontrado.');
+        }
+
+        $ref = (string) $request->query('ref', '');
+        if ($channel === 'team_whatsapp' && $ref === '') {
+            abort(404, 'Referência da equipe ausente.');
+        }
+        if ($channel !== 'team_whatsapp') {
+            $ref = '';
+        }
+
+        $target = $this->resolveLinkBioCtaTargetUrl($clinic, $channel, $ref !== '' ? $ref : null);
+        if ($target === null || $target === '') {
+            abort(404, 'Link indisponível.');
+        }
+
+        LinkBioCtaClick::incrementFor((int) $clinic->id, $channel, $ref);
+
+        return redirect()->away($target);
     }
 
     /**
@@ -151,10 +193,19 @@ class LinkBioController extends Controller
         $totalViews = (int) LinkBioPageView::where('organization_id', $clinic->id)->sum('views');
 
         $linkIds = $bioLinks->pluck('id')->toArray();
-        $totalClicks = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)->sum('clicks');
-        $totalClicksLast30 = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)
-            ->where('date', '>=', Carbon::today()->subDays(30)->toDateString())
+        $cut30 = Carbon::today()->subDays(30)->toDateString();
+
+        $bioLinkClicksTotal = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)->sum('clicks');
+        $ctaClicksTotal = (int) LinkBioCtaClick::where('organization_id', $clinic->id)->sum('clicks');
+        $totalClicks = $bioLinkClicksTotal + $ctaClicksTotal;
+
+        $bioLinkClicksLast30 = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)
+            ->where('date', '>=', $cut30)
             ->sum('clicks');
+        $ctaClicksLast30 = (int) LinkBioCtaClick::where('organization_id', $clinic->id)
+            ->where('date', '>=', $cut30)
+            ->sum('clicks');
+        $totalClicksLast30 = $bioLinkClicksLast30 + $ctaClicksLast30;
 
         $taxaClique = $totalViews > 0 ? round($totalClicks / $totalViews * 100, 1) : 0;
 
@@ -177,7 +228,9 @@ class LinkBioController extends Controller
         $clicksPerDay = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i)->toDateString();
-            $clicksPerDay[$date] = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)->where('date', $date)->sum('clicks');
+            $bioDay = empty($linkIds) ? 0 : (int) LinkBioLinkClick::whereIn('clinic_link_id', $linkIds)->where('date', $date)->sum('clicks');
+            $ctaDay = (int) LinkBioCtaClick::where('organization_id', $clinic->id)->where('date', $date)->sum('clicks');
+            $clicksPerDay[$date] = $bioDay + $ctaDay;
         }
         $viewsPerDay = [];
         foreach (array_keys($clicksPerDay) as $date) {
@@ -206,6 +259,58 @@ class LinkBioController extends Controller
             ];
         });
 
+        $clickBreakdown = [];
+        foreach ($bioLinksWithClicks as $link) {
+            $totalBio = (int) ($clickCounts[$link->id] ?? 0);
+            $last30Bio = (int) LinkBioLinkClick::where('clinic_link_id', $link->id)->where('date', '>=', $cut30)->sum('clicks');
+            if ($totalBio === 0 && $last30Bio === 0) {
+                continue;
+            }
+            $clickBreakdown[] = [
+                'kind' => 'bio_link',
+                'id' => $link->id,
+                'label' => $link->label,
+                'total_clicks' => $totalBio,
+                'total_last_30' => $last30Bio,
+            ];
+        }
+
+        $ctaGrouped = LinkBioCtaClick::where('organization_id', $clinic->id)
+            ->selectRaw('channel, ref, SUM(clicks) as total')
+            ->groupBy('channel', 'ref')
+            ->get();
+
+        foreach ($ctaGrouped as $row) {
+            $channel = (string) $row->channel;
+            $ref = (string) $row->ref;
+            $totalCtaRow = (int) $row->total;
+            $last30Cta = (int) LinkBioCtaClick::where('organization_id', $clinic->id)
+                ->where('channel', $channel)
+                ->where('ref', $ref)
+                ->where('date', '>=', $cut30)
+                ->sum('clicks');
+            if ($totalCtaRow === 0 && $last30Cta === 0) {
+                continue;
+            }
+            $clickBreakdown[] = [
+                'kind' => 'cta',
+                'channel' => $channel,
+                'ref' => $ref === '' ? null : $ref,
+                'label' => $this->linkBioCtaLabel($clinic, $channel, $ref),
+                'total_clicks' => $totalCtaRow,
+                'total_last_30' => $last30Cta,
+            ];
+        }
+
+        usort($clickBreakdown, function (array $a, array $b): int {
+            $cmp = $b['total_last_30'] <=> $a['total_last_30'];
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcmp((string) $a['label'], (string) $b['label']);
+        });
+
         return response()->json([
             'data' => [
                 'clinic' => new ClinicResource($clinic),
@@ -226,6 +331,7 @@ class LinkBioController extends Controller
                 'views_per_day' => $viewsPerDay,
                 'most_clicked_link' => $mostClickedLink ? new ClinicLinkResource($mostClickedLink) : null,
                 'peak_day_label' => $peakDayLabel,
+                'click_breakdown' => $clickBreakdown,
             ],
         ]);
     }
@@ -331,5 +437,107 @@ class LinkBioController extends Controller
         return response()->json([
             'data' => new ClinicResource($clinic->fresh()),
         ]);
+    }
+
+    private function linkBioCtaLabel(Clinic $clinic, string $channel, string $ref): string
+    {
+        if ($channel === 'team_whatsapp') {
+            $idx = (int) $ref;
+            $extra = $clinic->link_bio_extra;
+            $team = is_array($extra) ? ($extra['team'] ?? null) : null;
+            $name = is_array($team) && isset($team[$idx]['name']) ? trim((string) $team[$idx]['name']) : '';
+
+            return $name !== '' ? 'WhatsApp — ' . $name : 'WhatsApp (equipe)';
+        }
+
+        return match ($channel) {
+            'whatsapp' => 'WhatsApp',
+            'maps' => 'Como chegar / Maps',
+            'email' => 'E-mail',
+            'phone' => 'Ligação (telefone)',
+            'instagram' => 'Instagram',
+            default => $channel,
+        };
+    }
+
+    private function resolveLinkBioCtaTargetUrl(Clinic $clinic, string $channel, ?string $ref): ?string
+    {
+        return match ($channel) {
+            'whatsapp' => $this->buildWhatsappUrlFromPhone($clinic->phone),
+            'phone' => $this->buildTelUrlFromPhone($clinic->phone),
+            'maps' => $clinic->getMapsUrl(),
+            'email' => $clinic->contact_email ? 'mailto:' . trim((string) $clinic->contact_email) : null,
+            'instagram' => $this->resolveInstagramUrlForCta($clinic),
+            'team_whatsapp' => $this->resolveTeamWhatsappUrl($clinic, $ref),
+            default => null,
+        };
+    }
+
+    private function resolveInstagramUrlForCta(Clinic $clinic): ?string
+    {
+        $extra = $clinic->link_bio_extra;
+        if (is_array($extra) && ! empty($extra['instagram_url'])) {
+            $u = trim((string) $extra['instagram_url']);
+            if ($u !== '') {
+                return $u;
+            }
+        }
+
+        $link = $clinic->bioLinks()->get()->first(function ($l) {
+            return str_contains(strtolower((string) $l->url), 'instagram.com');
+        });
+
+        return $link?->url;
+    }
+
+    private function resolveTeamWhatsappUrl(Clinic $clinic, ?string $ref): ?string
+    {
+        if ($ref === null || $ref === '') {
+            return null;
+        }
+        $idx = (int) $ref;
+        $extra = $clinic->link_bio_extra;
+        $team = is_array($extra) ? ($extra['team'] ?? null) : null;
+        if (! is_array($team) || ! isset($team[$idx]['whatsapp'])) {
+            return null;
+        }
+        $raw = preg_replace('/\D/', '', (string) $team[$idx]['whatsapp']);
+        if ($raw === '') {
+            return null;
+        }
+
+        return 'https://wa.me/' . $raw;
+    }
+
+    private function buildWhatsappUrlFromPhone(?string $phone): ?string
+    {
+        if ($phone === null || trim($phone) === '') {
+            return null;
+        }
+        $raw = preg_replace('/\D/', '', $phone);
+        if ($raw === '') {
+            return null;
+        }
+        $wa = strlen($raw) >= 10 && strlen($raw) <= 11 ? '55' . $raw : $raw;
+
+        return 'https://wa.me/' . $wa;
+    }
+
+    private function buildTelUrlFromPhone(?string $phone): ?string
+    {
+        if ($phone === null || trim($phone) === '') {
+            return null;
+        }
+        $raw = trim($phone);
+        if (str_starts_with($raw, '+')) {
+            return 'tel:' . $raw;
+        }
+        $d = preg_replace('/\D/', '', $raw);
+        if ($d === '') {
+            return null;
+        }
+        $intl = strlen($d) <= 11 && ! str_starts_with($d, '55') ? '55' . $d : $d;
+
+        return 'tel:+' . $intl;
     }
 }
