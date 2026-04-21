@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\FeegowAppointment;
 use App\Models\FormTemplate;
+use App\Models\Organization;
 use App\Models\Person;
 use App\Rules\Cpf;
+use App\Services\FeegowClient;
 use App\Services\SubmissionService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -18,7 +22,10 @@ class PublicFormApiController extends Controller
     /** Tamanho máximo por arquivo (KB), alinhado à regra `max:` de campos `file`. */
     private const PUBLIC_FILE_MAX_KB = 5120;
 
-    public function __construct(private SubmissionService $submissionService) {}
+    public function __construct(
+        private SubmissionService $submissionService,
+        private FeegowClient $feegowClient
+    ) {}
 
     /**
      * Retorna o template e campos do formulário público para a SPA montar o formulário.
@@ -46,6 +53,8 @@ class PublicFormApiController extends Controller
         }
 
         $clinic = $template->clinic;
+        $organization = $this->resolveTemplateOrganization($template);
+        $feegow = $this->buildFeegowPublicMeta($organization);
 
         return response()->json([
             'data' => [
@@ -62,6 +71,7 @@ class PublicFormApiController extends Controller
                     'title' => 'Identifique-se para continuar',
                     'description' => 'Informe seu código de acesso e sua data de nascimento para vincular esta resposta à sua ficha.',
                 ],
+                'feegow' => $feegow,
                 'fields' => $template->fields->map(fn ($f) => [
                     'id' => $f->id,
                     'name_key' => $f->name_key,
@@ -117,6 +127,67 @@ class PublicFormApiController extends Controller
                 'person_id' => $person->id,
                 'code' => $person->code,
                 'name' => $person->name,
+            ],
+        ]);
+    }
+
+    /**
+     * Consulta disponibilidade de horários no Feegow para o formulário público (quando integração ativa).
+     */
+    public function feegowAvailability(Request $request, string $token): JsonResponse
+    {
+        $template = FormTemplate::withoutGlobalScopes()
+            ->where('public_token', $token)
+            ->where('public_enabled', true)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('public_token_expires_at')
+                    ->orWhere('public_token_expires_at', '>', now());
+            })
+            ->first();
+
+        if (! $template) {
+            return response()->json(['message' => 'Formulário não encontrado ou não disponível.'], 404);
+        }
+
+        $organization = $this->resolveTemplateOrganization($template);
+        if (! $organization || ! $organization->feegow_enabled || ! $organization->feegow_token) {
+            return response()->json(['message' => 'Integração Feegow não está ativa para esta empresa.'], 422);
+        }
+
+        $validated = $request->validate([
+            'tipo' => ['required', 'string', \Illuminate\Validation\Rule::in(['E', 'P'])],
+            'especialidade_id' => ['nullable', 'integer'],
+            'procedimento_id' => ['nullable', 'integer'],
+            'data_start' => ['required', 'date_format:d-m-Y'],
+            'data_end' => ['required', 'date_format:d-m-Y'],
+            'unidade_id' => ['nullable', 'integer'],
+            'profissional_id' => ['nullable', 'integer'],
+            'convenio_id' => ['nullable', 'integer'],
+            'age_from' => ['nullable', 'integer'],
+            'age_to' => ['nullable', 'integer'],
+        ]);
+
+        if ($validated['tipo'] === 'E' && empty($validated['especialidade_id'])) {
+            return response()->json(['message' => 'Informe especialidade_id quando tipo=E.'], 422);
+        }
+        if ($validated['tipo'] === 'P' && empty($validated['procedimento_id'])) {
+            return response()->json(['message' => 'Informe procedimento_id quando tipo=P.'], 422);
+        }
+
+        $tokenValue = trim((string) $organization->feegow_token);
+        $baseUrl = trim((string) ($organization->feegow_base_url ?: config('feegow.base_url')));
+
+        try {
+            $raw = $this->feegowClient->availableSchedule($tokenValue, $validated, $baseUrl);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
+
+        return response()->json([
+            'data' => [
+                'schedule' => $raw['content'] ?? [],
+                'raw' => $raw,
             ],
         ]);
     }
@@ -212,10 +283,18 @@ class PublicFormApiController extends Controller
 
         $submission = $this->submissionService->createFromPublicForm($template, $data, $files, $signatures, $request, $personId);
 
+        $organization = $this->resolveTemplateOrganization($template);
+        $feegowResult = $this->tryCreateFeegowAppointmentFromPublicForm(
+            $organization,
+            $personId ? Person::withoutGlobalScopes()->find($personId) : null,
+            $data
+        );
+
         return response()->json([
             'data' => [
                 'message' => 'Formulário enviado com sucesso.',
                 'protocol_number' => $submission->protocol_number,
+                'feegow' => $feegowResult,
             ],
         ], 201);
     }
@@ -344,5 +423,265 @@ class PublicFormApiController extends Controller
             ->whereDate('birth_date', $birth)
             ->where('status', 'active')
             ->first();
+    }
+
+    private function resolveTemplateOrganization(FormTemplate $template): ?Organization
+    {
+        $orgId = $template->organization_id ?? $template->clinic_id ?? null;
+        if (! $orgId) {
+            return null;
+        }
+
+        return Organization::query()->find($orgId);
+    }
+
+    /**
+     * @return array{
+     *   enabled: bool,
+     *   requires_fields?: list<string>,
+     *   specialties?: array<int, mixed>,
+     *   insurances?: array<int, mixed>,
+     *   units?: array<int, mixed>,
+     *   locals?: array<int, mixed>,
+     *   channels?: array<int, mixed>,
+     *   warning?: string
+     * }
+     */
+    private function buildFeegowPublicMeta(?Organization $organization): array
+    {
+        if (! $organization || ! $organization->feegow_enabled || ! $organization->feegow_token) {
+            return ['enabled' => false];
+        }
+
+        $token = trim((string) $organization->feegow_token);
+        $baseUrl = trim((string) ($organization->feegow_base_url ?: config('feegow.base_url')));
+        if ($token === '' || $baseUrl === '') {
+            return ['enabled' => false];
+        }
+
+        $meta = [
+            'enabled' => true,
+            'requires_fields' => [
+                'feegow_paciente_id',
+                'feegow_profissional_id',
+                'feegow_procedimento_id',
+                'feegow_local_id',
+                'feegow_especialidade_id',
+                'feegow_data',
+                'feegow_horario',
+            ],
+        ];
+
+        try {
+            $specialties = $this->feegowClient->listSpecialties($token, null, $baseUrl);
+            $insurances = $this->feegowClient->listInsurances($token, null, $baseUrl);
+            $units = $this->feegowClient->listUnits($token, $baseUrl);
+            $locals = $this->feegowClient->listLocals($token, $baseUrl);
+            $channels = $this->feegowClient->listAppointmentChannels($token, $baseUrl);
+
+            $meta['specialties'] = is_array($specialties['content'] ?? null) ? $specialties['content'] : [];
+            $meta['insurances'] = is_array($insurances['content'] ?? null) ? $insurances['content'] : [];
+            $meta['units'] = is_array($units['content'] ?? null) ? $units['content'] : [];
+            $meta['locals'] = is_array($locals['content'] ?? null) ? $locals['content'] : [];
+            $meta['channels'] = is_array($channels['content'] ?? null) ? $channels['content'] : [];
+        } catch (\Throwable $e) {
+            $meta['warning'] = 'Catálogos Feegow indisponíveis no momento.';
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{enabled: bool, attempted: bool, created: bool, feegow_appointment_id?: int|null, message?: string}
+     */
+    private function tryCreateFeegowAppointmentFromPublicForm(?Organization $organization, ?Person $person, array $data): array
+    {
+        if (! $organization || ! $organization->feegow_enabled || ! $organization->feegow_token) {
+            return ['enabled' => false, 'attempted' => false, 'created' => false];
+        }
+
+        $payload = $this->buildFeegowAppointmentPayload($data);
+        if (! $payload) {
+            return [
+                'enabled' => true,
+                'attempted' => false,
+                'created' => false,
+                'message' => 'Campos Feegow não informados; envio local concluído sem criar agendamento externo.',
+            ];
+        }
+
+        $token = trim((string) $organization->feegow_token);
+        $baseUrl = trim((string) ($organization->feegow_base_url ?: config('feegow.base_url')));
+
+        try {
+            $response = $this->feegowClient->createAppointment($token, $payload, $baseUrl);
+            $feegowAppointmentId = $response['content']['agendamento_id'] ?? null;
+
+            if (is_numeric($feegowAppointmentId)) {
+                FeegowAppointment::create([
+                    'organization_id' => $organization->id,
+                    'person_id' => $person?->id,
+                    'feegow_appointment_id' => (int) $feegowAppointmentId,
+                    'status' => 'created',
+                    'request_payload' => $payload,
+                    'response_payload' => $response,
+                    'external_reference' => is_string($data['feegow_external_reference'] ?? null)
+                        ? mb_substr((string) $data['feegow_external_reference'], 0, 120)
+                        : null,
+                ]);
+
+                return [
+                    'enabled' => true,
+                    'attempted' => true,
+                    'created' => true,
+                    'feegow_appointment_id' => (int) $feegowAppointmentId,
+                ];
+            }
+
+            return [
+                'enabled' => true,
+                'attempted' => true,
+                'created' => false,
+                'message' => 'Feegow não retornou agendamento_id.',
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'enabled' => true,
+                'attempted' => true,
+                'created' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    private function buildFeegowAppointmentPayload(array $data): ?array
+    {
+        $pacienteId = $this->toInt($data['feegow_paciente_id'] ?? null);
+        $profissionalId = $this->toInt($data['feegow_profissional_id'] ?? null);
+        $procedimentoId = $this->toInt($data['feegow_procedimento_id'] ?? null);
+        $especialidadeId = $this->toInt($data['feegow_especialidade_id'] ?? null);
+        $localId = $this->toInt($data['feegow_local_id'] ?? null);
+        $dataAgendamento = $this->normalizeFeegowDate($data['feegow_data'] ?? null);
+        $horario = $this->normalizeFeegowTime($data['feegow_horario'] ?? null);
+
+        if (! $pacienteId || ! $profissionalId || ! $procedimentoId || ! $especialidadeId || ! $localId || ! $dataAgendamento || ! $horario) {
+            return null;
+        }
+
+        $payload = [
+            'local_id' => $localId,
+            'paciente_id' => $pacienteId,
+            'profissional_id' => $profissionalId,
+            'especialidade_id' => $especialidadeId,
+            'procedimento_id' => $procedimentoId,
+            'data' => $dataAgendamento,
+            'horario' => $horario,
+        ];
+
+        $optionalMap = [
+            'valor' => 'feegow_valor',
+            'plano' => 'feegow_plano',
+            'convenio_id' => 'feegow_convenio_id',
+            'convenio_plano_id' => 'feegow_convenio_plano_id',
+            'canal_id' => 'feegow_canal_id',
+            'tabela_id' => 'feegow_tabela_id',
+            'notas' => 'feegow_notas',
+            'celular' => 'feegow_celular',
+            'telefone' => 'feegow_telefone',
+            'email' => 'feegow_email',
+            'retorno' => 'feegow_retorno',
+            'sys_user' => 'feegow_sys_user',
+        ];
+
+        foreach ($optionalMap as $target => $source) {
+            if (! array_key_exists($source, $data) || $data[$source] === null || $data[$source] === '') {
+                continue;
+            }
+
+            if (in_array($target, ['valor'], true)) {
+                $payload[$target] = (float) $data[$source];
+                continue;
+            }
+            if (in_array($target, ['plano', 'convenio_id', 'convenio_plano_id', 'canal_id', 'tabela_id', 'sys_user'], true)) {
+                $iv = $this->toInt($data[$source]);
+                if ($iv !== null) {
+                    $payload[$target] = $iv;
+                }
+                continue;
+            }
+            if ($target === 'retorno') {
+                $payload[$target] = filter_var($data[$source], FILTER_VALIDATE_BOOL);
+                continue;
+            }
+
+            $payload[$target] = (string) $data[$source];
+        }
+
+        return $payload;
+    }
+
+    private function toInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && ctype_digit($value)) {
+            return (int) $value;
+        }
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return null;
+    }
+
+    private function normalizeFeegowDate(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $raw = trim($value);
+        foreach (['d-m-Y', 'Y-m-d', 'd/m/Y'] as $fmt) {
+            try {
+                $d = Carbon::createFromFormat($fmt, $raw);
+                if ($d !== false) {
+                    return $d->format('d-m-Y');
+                }
+            } catch (\Throwable) {
+                // tenta próximo formato
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeFeegowTime(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $raw = trim($value);
+        foreach (['H:i:s', 'H:i'] as $fmt) {
+            try {
+                $t = Carbon::createFromFormat($fmt, $raw);
+                if ($t !== false) {
+                    return $t->format('H:i:s');
+                }
+            } catch (\Throwable) {
+                // tenta próximo formato
+            }
+        }
+
+        return null;
     }
 }

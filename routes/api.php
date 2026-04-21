@@ -61,6 +61,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->middleware('throttle:120,1')
         ->name('api.v1.organization-presence.leave-beacon');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
+    Route::get('/formulario-publico/{token}/feegow/disponibilidade', [PublicFormApiController::class, 'feegowAvailability'])->name('api.v1.formulario-publico.feegow.disponibilidade');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');
     Route::post('/formulario-publico/{token}/otp/send', [PublicFormOtpController::class, 'send'])->name('api.v1.formulario-publico.otp.send');
@@ -167,6 +168,13 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::put('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'updateWebhook'])->name('api.v1.clinica.integracoes.webhooks.update');
     Route::delete('/clinica/integracoes/webhooks/{webhook}', [IntegrationsController::class, 'destroyWebhook'])->name('api.v1.clinica.integracoes.webhooks.destroy');
     Route::post('/clinica/integracoes/webhook-deliveries/{delivery}/retry', [IntegrationsController::class, 'retryWebhookDelivery'])->name('api.v1.clinica.integracoes.webhook-deliveries.retry');
+    Route::get('/clinica/integracoes/sistemas', [IntegrationsController::class, 'systemsIndex'])->name('api.v1.clinica.integracoes.sistemas.index');
+    Route::get('/clinica/integracoes/sistemas/feegow', [IntegrationsController::class, 'feegowShow'])->name('api.v1.clinica.integracoes.sistemas.feegow.show');
+    Route::put('/clinica/integracoes/sistemas/feegow', [IntegrationsController::class, 'feegowUpdate'])->name('api.v1.clinica.integracoes.sistemas.feegow.update');
+    Route::post('/clinica/integracoes/sistemas/feegow/test', [IntegrationsController::class, 'feegowTest'])->name('api.v1.clinica.integracoes.sistemas.feegow.test');
+    Route::get('/clinica/integracoes/sistemas/feegow/catalogos', [IntegrationsController::class, 'feegowCatalogs'])->name('api.v1.clinica.integracoes.sistemas.feegow.catalogos');
+    Route::get('/clinica/integracoes/sistemas/feegow/disponibilidade', [IntegrationsController::class, 'feegowAvailableSchedule'])->name('api.v1.clinica.integracoes.sistemas.feegow.disponibilidade');
+    Route::post('/clinica/integracoes/sistemas/feegow/agendamentos', [IntegrationsController::class, 'feegowCreateAppointment'])->name('api.v1.clinica.integracoes.sistemas.feegow.agendamentos.store');
 
     Route::get('/clinica/whatsapp/evolution', [WhatsappEvolutionController::class, 'show'])->name('api.v1.clinica.whatsapp.evolution.show');
     Route::post('/clinica/whatsapp/evolution/instance', [WhatsappEvolutionController::class, 'store'])->name('api.v1.clinica.whatsapp.evolution.instance.store');

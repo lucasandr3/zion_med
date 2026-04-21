@@ -11,6 +11,7 @@ use App\Services\AsaasService;
 use App\Services\ThemeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class ClinicSettingsController extends Controller
 {
@@ -28,6 +29,7 @@ class ClinicSettingsController extends Controller
 
         $organizationId = session('current_organization_id') ?? session('current_clinic_id');
         $organization = Organization::query()->findOrFail($organizationId);
+        $organization->load('addressData');
 
         $organization->syncExpiredTrialStateIfNeeded();
         $organization->refresh();
@@ -83,6 +85,7 @@ class ClinicSettingsController extends Controller
     {
         $organizationId = session('current_organization_id') ?? session('current_clinic_id');
         $organization = Organization::query()->findOrFail($organizationId);
+        $organization->load('addressData');
         $this->authorize('update-clinic', $organization);
         $data = $request->validated();
 
@@ -134,6 +137,12 @@ class ClinicSettingsController extends Controller
             $data['business_hours'] = ! empty($cleaned) ? $cleaned : null;
         }
 
+        $addressDataInput = null;
+        if (array_key_exists('address_data', $data)) {
+            $addressDataInput = is_array($data['address_data']) ? $data['address_data'] : [];
+            unset($data['address_data']);
+        }
+
         foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color', 'cover_mode'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
@@ -153,11 +162,86 @@ class ClinicSettingsController extends Controller
         $data['whatsapp_notify_avisos'] = $request->boolean('whatsapp_notify_avisos');
 
         $organization->update($data);
+
+        if ($addressDataInput !== null) {
+            $cleanAddressData = $this->normalizeAddressData($addressDataInput);
+            $hasAddressData = collect($cleanAddressData)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
+            if ($hasAddressData) {
+                $organization->addressData()->updateOrCreate(
+                    ['organization_id' => $organization->id],
+                    $cleanAddressData
+                );
+                if (! array_key_exists('address', $data) || ! filled((string) Arr::get($data, 'address'))) {
+                    $organization->forceFill([
+                        'address' => $this->composeLegacyAddress($cleanAddressData),
+                    ])->save();
+                }
+            } else {
+                $organization->addressData()->delete();
+            }
+        }
+
         \Illuminate\Support\Facades\Event::dispatch(new AuditEvent('clinic.updated', Organization::class, $organization->id, null, $organization->id, $request->user()?->id));
 
         return response()->json([
-            'data' => new OrganizationResource($organization->fresh()),
+            'data' => new OrganizationResource($organization->fresh()->load('addressData')),
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $addressData
+     * @return array<string, string|null>
+     */
+    private function normalizeAddressData(array $addressData): array
+    {
+        $cep = preg_replace('/\D+/', '', (string) ($addressData['cep'] ?? '')) ?: null;
+
+        return [
+            'cep' => $cep,
+            'logradouro' => $this->normalizeNullableString($addressData['logradouro'] ?? null),
+            'numero' => $this->normalizeNullableString($addressData['numero'] ?? null),
+            'complemento' => $this->normalizeNullableString($addressData['complemento'] ?? null),
+            'bairro' => $this->normalizeNullableString($addressData['bairro'] ?? null),
+            'cidade' => $this->normalizeNullableString($addressData['cidade'] ?? null),
+            'uf' => $this->normalizeNullableString($addressData['uf'] ?? null, true),
+        ];
+    }
+
+    private function normalizeNullableString(mixed $value, bool $uppercase = false): ?string
+    {
+        $text = trim((string) ($value ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        return $uppercase ? mb_strtoupper($text) : $text;
+    }
+
+    /**
+     * @param array<string, string|null> $addressData
+     */
+    private function composeLegacyAddress(array $addressData): ?string
+    {
+        $logradouroNumero = collect([
+            $addressData['logradouro'] ?? null,
+            $addressData['numero'] ?? null,
+        ])->filter()->implode(', ');
+        $local = collect([
+            $addressData['bairro'] ?? null,
+            $addressData['cidade'] ?? null,
+            $addressData['uf'] ?? null,
+        ])->filter()->implode(' - ');
+        $base = collect([
+            $logradouroNumero !== '' ? $logradouroNumero : null,
+            $addressData['complemento'] ?? null,
+            $local !== '' ? $local : null,
+        ])->filter()->implode(' - ');
+        $final = collect([
+            $base !== '' ? $base : null,
+            $addressData['cep'] ?? null,
+        ])->filter()->implode(' - ');
+
+        return $final !== '' ? $final : null;
     }
 
 }

@@ -6,6 +6,7 @@ use App\Services\ThemeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class Organization extends Model
@@ -65,6 +66,12 @@ class Organization extends Model
         'evolution_go_instance_name',
         'evolution_go_remote_id',
         'evolution_go_instance_token',
+        'feegow_enabled',
+        'feegow_base_url',
+        'feegow_token',
+        'feegow_last_check_at',
+        'feegow_last_status',
+        'feegow_last_error',
     ];
 
     protected $casts = [
@@ -73,11 +80,14 @@ class Organization extends Model
         'whatsapp_notify_cobranca' => 'boolean',
         'whatsapp_notify_faturas_boleto' => 'boolean',
         'whatsapp_notify_avisos' => 'boolean',
+        'feegow_enabled' => 'boolean',
         'business_hours' => 'array',
         'link_bio_extra' => 'array',
         'trial_ends_at'   => 'datetime',
         'grace_ends_at'   => 'datetime',
         'evolution_go_instance_token' => 'encrypted',
+        'feegow_token' => 'encrypted',
+        'feegow_last_check_at' => 'datetime',
     ];
 
     public function isOpenNow(): ?bool
@@ -195,6 +205,11 @@ class Organization extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class, 'organization_id');
+    }
+
+    public function addressData(): HasOne
+    {
+        return $this->hasOne(OrganizationAddress::class, 'organization_id');
     }
 
     public function organizationRoles(): HasMany
