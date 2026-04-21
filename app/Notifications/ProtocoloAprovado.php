@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\FormSubmission;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -32,7 +33,7 @@ class ProtocoloAprovado extends Notification
             'protocol_number' => $this->submission->protocol_number,
             'template_name'   => $this->submission->template?->name,
             'approved_by'     => $this->approvedBy->name,
-            'url'             => route('protocolos.show', $this->submission),
+            'url'             => FrontendUrl::protocoloDetalhe($this->submission),
         ];
     }
 }

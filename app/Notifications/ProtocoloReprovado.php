@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\FormSubmission;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -34,7 +35,7 @@ class ProtocoloReprovado extends Notification
             'template_name'   => $this->submission->template?->name,
             'rejected_by'     => $this->rejectedBy->name,
             'comment'         => $this->submission->review_comment,
-            'url'             => route('protocolos.show', $this->submission),
+            'url'             => FrontendUrl::protocoloDetalhe($this->submission),
         ];
     }
 }

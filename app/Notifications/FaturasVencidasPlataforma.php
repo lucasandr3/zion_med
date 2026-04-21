@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -28,7 +29,7 @@ class FaturasVencidasPlataforma extends Notification
             'title' => 'Faturas vencidas',
             'body'  => $msg,
             'count' => $this->count,
-            'url'   => route('platform.payments.index'),
+            'url'   => FrontendUrl::plataformaFaturas(),
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\FormSubmission;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -28,7 +29,7 @@ class NovoProtocoloRecebido extends Notification
             'protocol_number'  => $this->submission->protocol_number,
             'template_name'    => $this->submission->template?->name,
             'submitter_name'   => $this->submission->submitter_name,
-            'url'              => route('protocolos.show', ['submissao' => $this->submission->id]),
+            'url'              => FrontendUrl::protocoloDetalhe($this->submission),
         ];
     }
 }

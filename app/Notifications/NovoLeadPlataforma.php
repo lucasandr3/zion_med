@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\DemonstrationRequest;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -25,7 +26,7 @@ class NovoLeadPlataforma extends Notification
             'title'   => 'Novo lead na landing',
             'body'    => "{$this->lead->name} ({$this->lead->clinic}) solicitou demonstração.",
             'lead_id' => $this->lead->id,
-            'url'     => route('platform.leads.index'),
+            'url'     => FrontendUrl::plataformaLeads(),
         ];
     }
 }
