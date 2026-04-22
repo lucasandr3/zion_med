@@ -52,6 +52,7 @@ class OrganizationResource extends JsonResource
             'meta_description' => $this->meta_description,
             'maps_url' => $this->maps_url,
             'public_theme' => $this->public_theme,
+            'accent_hex' => $this->accent_hex,
             'cover_color' => $this->cover_color,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

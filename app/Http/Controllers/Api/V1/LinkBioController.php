@@ -127,9 +127,10 @@ class LinkBioController extends Controller
                 'public_url' => $base . '/f/' . $t->public_token,
             ]);
 
-        $accentHex = $clinic->public_theme
-            ? $this->themeService->getThemeColor($clinic->public_theme)
-            : null;
+        $accentHex = $this->themeService->getPublicAccentHex(
+            $clinic->public_theme,
+            $clinic->accent_hex,
+        );
 
         return response()->json([
             'data' => [
@@ -408,9 +409,10 @@ class LinkBioController extends Controller
         $clinicId = session('current_clinic_id');
         $clinic = Clinic::findOrFail($clinicId);
 
-        $validThemes = $this->themeService->themeKeysForValidation();
+        $validThemes = $this->themeService->publicThemeKeysForValidation();
         $data = $request->validate([
             'public_theme' => ['nullable', 'string', \Illuminate\Validation\Rule::in(array_merge([''], $validThemes))],
+            'accent_hex' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'cover_color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'cover_mode' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['banner', 'solid', 'none'])],
             'link_bio_model' => ['nullable', 'integer', \Illuminate\Validation\Rule::in(self::LINK_BIO_LAYOUT_MODELS)],
@@ -422,14 +424,27 @@ class LinkBioController extends Controller
             'maps_url' => ['nullable', 'url', 'max:500'],
         ]);
 
-        foreach (['public_theme', 'cover_color', 'cover_mode', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
+        foreach (['public_theme', 'accent_hex', 'cover_color', 'cover_mode', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
         }
 
         if (array_key_exists('public_theme', $data) && $data['public_theme'] !== null) {
-            $data['public_theme'] = $this->themeService->normalizeThemeValue($data['public_theme']);
+            $data['public_theme'] = $this->themeService->normalizePublicThemeValue($data['public_theme']);
+        }
+
+        // accent_hex só faz sentido quando o tema é `custom`; para qualquer outro tema (incluindo
+        // `onyx-black` ou presets), limpamos para que a cor do link público seja derivada do preset.
+        if (array_key_exists('public_theme', $data)) {
+            if ($data['public_theme'] !== 'custom') {
+                $data['accent_hex'] = null;
+            } elseif (! array_key_exists('accent_hex', $data) || $data['accent_hex'] === null) {
+                // custom sem cor → mantém o que já estava salvo (não sobrescreve com null).
+                unset($data['accent_hex']);
+            } else {
+                $data['accent_hex'] = strtolower($data['accent_hex']);
+            }
         }
 
         $clinic->update($data);

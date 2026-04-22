@@ -44,6 +44,7 @@ class Organization extends Model
         'link_bio_model',
         'link_bio_extra',
         'public_theme',
+        'accent_hex',
         'cover_color',
         'maps_url',
         'business_hours',
