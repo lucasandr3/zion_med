@@ -85,7 +85,7 @@ class ProtocolController extends Controller
     public function show(FormSubmission $protocol): JsonResponse
     {
         $this->authorize('view-submission', $protocol);
-        $protocol->load(['template.fields', 'values', 'template', 'person']);
+        $protocol->load(['template.fields', 'values', 'template', 'person', 'events.user', 'attachments', 'signatures']);
 
         return response()->json([
             'data' => new ProtocolDetailResource($protocol),
