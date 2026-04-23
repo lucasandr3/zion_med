@@ -31,6 +31,7 @@ class Organization extends Model
         'name',
         'slug',
         'logo_path',
+        'professional_photo_path',
         'notification_email',
         'address',
         'phone',
@@ -188,6 +189,19 @@ class Organization extends Model
             return Storage::disk('minio_assets')->temporaryUrl($this->cover_image_path, now()->addMinutes(15));
         }
         return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->cover_image_path, '/');
+    }
+
+    /** Foto do profissional no Link Bio (avatar grande), separada da logo da clínica. */
+    public function getProfessionalPhotoUrlAttribute(): ?string
+    {
+        if (! $this->professional_photo_path) {
+            return null;
+        }
+        if (Storage::disk('minio_assets')->exists($this->professional_photo_path)) {
+            return Storage::disk('minio_assets')->temporaryUrl($this->professional_photo_path, now()->addMinutes(15));
+        }
+
+        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->professional_photo_path, '/');
     }
 
     public function getSpecialtiesList(): array

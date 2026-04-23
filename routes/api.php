@@ -158,6 +158,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::delete('/link-bio/links/{link}', [LinkBioController::class, 'destroy'])->name('api.v1.link-bio.links.destroy');
     Route::post('/link-bio/links/reorder', [LinkBioController::class, 'reorder'])->name('api.v1.link-bio.links.reorder');
     Route::put('/link-bio/aparencia', [LinkBioController::class, 'updateAparencia'])->name('api.v1.link-bio.aparencia.update');
+    Route::post('/link-bio/professional-photo', [LinkBioController::class, 'uploadProfessionalPhoto'])->name('api.v1.link-bio.professional-photo.store');
 
     Route::get('/clinica/escolher', [ChooseClinicController::class, 'index'])->name('api.v1.clinica.escolher.index');
     Route::post('/clinica/escolher', [ChooseClinicController::class, 'store'])->name('api.v1.clinica.escolher.store');

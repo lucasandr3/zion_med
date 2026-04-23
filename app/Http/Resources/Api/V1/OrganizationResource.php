@@ -14,6 +14,8 @@ class OrganizationResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'logo_url' => $this->logo_path ? $this->logo_url : null,
+            'company_logo_url' => null,
+            'professional_photo_url' => $this->professional_photo_path ? $this->professional_photo_url : null,
             'cover_image_url' => $this->cover_image_path ? $this->cover_image_url : null,
             'cover_mode' => $this->cover_mode ?? 'banner',
             'link_bio_model' => (int) ($this->link_bio_model ?? 1),

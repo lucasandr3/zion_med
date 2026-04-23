@@ -16,6 +16,7 @@ use App\Services\ThemeService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class LinkBioController extends Controller
@@ -139,6 +140,8 @@ class LinkBioController extends Controller
                     'name' => $clinic->name,
                     'slug' => $clinic->slug,
                     'logo_url' => $clinic->logo_url,
+                    'company_logo_url' => null,
+                    'professional_photo_url' => $clinic->professional_photo_url,
                     'public_theme' => $clinic->public_theme,
                     'cover_color' => $clinic->cover_color,
                     'cover_mode' => $clinic->cover_mode ?? 'banner',
@@ -448,6 +451,40 @@ class LinkBioController extends Controller
         }
 
         $clinic->update($data);
+
+        return response()->json([
+            'data' => new ClinicResource($clinic->fresh()),
+        ]);
+    }
+
+    /**
+     * Upload da foto do profissional para o Link Bio (avatar grande nos layouts temáticos).
+     */
+    public function uploadProfessionalPhoto(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $clinicId = session('current_clinic_id');
+        $clinic = Clinic::findOrFail($clinicId);
+
+        $request->validate(
+            [
+                'professional_photo' => ['required', 'image', 'max:2048'],
+            ],
+            [
+                'professional_photo.required' => 'Selecione uma imagem para enviar.',
+                'professional_photo.image' => 'O arquivo precisa ser uma imagem (JPG, PNG, WebP, etc.).',
+                'professional_photo.max' => 'A foto é muito grande. O tamanho máximo permitido é 2 MB (2048 KB). Reduza a imagem e tente novamente.',
+            ]
+        );
+
+        $file = $request->file('professional_photo');
+        if ($clinic->professional_photo_path) {
+            Storage::disk('minio_assets')->delete($clinic->professional_photo_path);
+            Storage::disk('public')->delete($clinic->professional_photo_path);
+        }
+
+        $path = $file->store('organizations/' . $clinic->id . '/link-bio', 'minio_assets');
+        $clinic->update(['professional_photo_path' => $path]);
 
         return response()->json([
             'data' => new ClinicResource($clinic->fresh()),
