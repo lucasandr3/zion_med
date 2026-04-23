@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Scopes\ClinicScope;
+use App\Support\PersonPiiHasher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,22 @@ class Person extends Model
     protected static function booted(): void
     {
         static::addGlobalScope(new ClinicScope);
+
+        static::saving(function (Person $person): void {
+            $cpfPlain = $person->cpf;
+            if (is_string($cpfPlain) && $cpfPlain !== '') {
+                $digits = preg_replace('/\D+/', '', $cpfPlain) ?? '';
+                $person->cpf_hash = strlen($digits) === 11 ? PersonPiiHasher::cpf($digits) : null;
+            } else {
+                $person->cpf_hash = null;
+            }
+            $emailPlain = $person->email;
+            if (is_string($emailPlain) && trim($emailPlain) !== '') {
+                $person->email_hash = PersonPiiHasher::email($emailPlain);
+            } else {
+                $person->email_hash = null;
+            }
+        });
     }
 
     protected $fillable = [
@@ -40,6 +57,9 @@ class Person extends Model
     {
         return [
             'birth_date' => 'date',
+            'cpf' => 'encrypted',
+            'email' => 'encrypted',
+            'phone' => 'encrypted',
         ];
     }
 

@@ -123,6 +123,10 @@ class AppServiceProvider extends ServiceProvider
                 $openApi->secure(
                     SecurityScheme::http('bearer', 'JWT')->as('bearerAuth')->setDescription('Token de API (Sanctum). Header: Authorization: Bearer {token}')
                 );
+                $append = (string) config('scramble.webhooks_documentation_appendix', '');
+                if ($append !== '' && isset($openApi->info)) {
+                    $openApi->info->description = trim($openApi->info->description."\n\n".$append);
+                }
             });
 
         Gate::define('view-dashboard', function (User $user) {

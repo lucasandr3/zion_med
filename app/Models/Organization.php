@@ -65,6 +65,7 @@ class Organization extends Model
         'whatsapp_notify_faturas_boleto',
         'whatsapp_notify_avisos',
         'signing_security_level',
+        'data_retention_years',
         'evolution_go_instance_name',
         'evolution_go_remote_id',
         'evolution_go_instance_token',

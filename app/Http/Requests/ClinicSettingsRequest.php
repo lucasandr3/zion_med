@@ -70,6 +70,8 @@ class ClinicSettingsRequest extends FormRequest
             'whatsapp_notify_cobranca'       => ['nullable', 'boolean'],
             'whatsapp_notify_faturas_boleto' => ['nullable', 'boolean'],
             'whatsapp_notify_avisos'         => ['nullable', 'boolean'],
+            'signing_security_level'         => ['nullable', 'string', Rule::in(['basic', 'reinforced'])],
+            'data_retention_years'           => ['nullable', 'integer', 'min:1', 'max:50'],
         ];
     }
 

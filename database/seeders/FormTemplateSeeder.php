@@ -71,4 +71,49 @@ class FormTemplateSeeder extends Seeder
             }
         }
     }
+
+    /**
+     * Garante os templates de compliance (telemedicina, LGPD, checklist OMS) para uma organização.
+     * Não duplica se já existir template com o mesmo nome na organização.
+     */
+    public static function ensureComplianceExtrasForOrganization(Organization $organization, ?User $owner = null): int
+    {
+        $created = 0;
+
+        foreach (FormTemplateDefinitions::complianceExtras() as $t) {
+            $exists = FormTemplate::withoutGlobalScopes()
+                ->where('organization_id', $organization->id)
+                ->where('name', $t['name'])
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $fields = $t['fields'];
+            $category = $t['category'];
+
+            $template = FormTemplate::withoutGlobalScopes()->create([
+                'organization_id' => $organization->id,
+                'name' => $t['name'],
+                'description' => $t['description'],
+                'category' => $category,
+                'is_active' => true,
+                'public_enabled' => false,
+                'created_by' => $owner?->id,
+            ]);
+
+            foreach ($fields as $f) {
+                $opts = $f['options'] ?? null;
+                unset($f['options']);
+                $f['template_id'] = $template->id;
+                $f['options_json'] = $opts ? ['options' => $opts] : null;
+                FormField::create($f);
+            }
+
+            $created++;
+        }
+
+        return $created;
+    }
 }

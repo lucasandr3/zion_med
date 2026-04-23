@@ -48,6 +48,8 @@ class OrganizationResource extends JsonResource
             'whatsapp_notify_cobranca' => $this->whatsapp_notify_cobranca,
             'whatsapp_notify_faturas_boleto' => $this->whatsapp_notify_faturas_boleto,
             'whatsapp_notify_avisos' => $this->whatsapp_notify_avisos,
+            'signing_security_level' => $this->signing_security_level ?? 'basic',
+            'data_retention_years' => $this->data_retention_years !== null ? (int) $this->data_retention_years : null,
             'short_description' => $this->short_description,
             'specialties' => $this->specialties,
             'founded_year' => $this->founded_year,

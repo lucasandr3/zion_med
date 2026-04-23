@@ -21,6 +21,7 @@ use App\Notifications\NovoProtocoloRecebido;
 use App\Notifications\ProtocoloAprovado;
 use App\Notifications\ProtocoloReprovado;
 use App\Support\FrontendUrl;
+use App\Support\PersonPiiHasher;
 use App\Support\MailBrand;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,9 @@ class SubmissionService
         $signingChannel = $data['_signing_channel'] ?? 'web';
         $locale = $data['_locale'] ?? 'pt_BR';
         $timezone = $data['_timezone'] ?? config('app.timezone', 'America/Sao_Paulo');
-        $acceptedTextAt = isset($data['_accepted_text_at']) ? now()->parse($data['_accepted_text_at']) : now();
+        $acceptedTextAt = isset($data['_accepted_text_at'])
+            ? \Carbon\Carbon::parse((string) $data['_accepted_text_at'])
+            : now();
 
         $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request, $signingChannel, $locale, $timezone, $acceptedTextAt, $personId) {
             $orgId = $template->organization_id ?? $template->clinic_id;
@@ -520,10 +523,10 @@ class SubmissionService
 
         $match = null;
         if ($cpfNorm) {
-            $match = (clone $query)->whereRaw("REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = ?", [$cpfNorm])->first();
+            $match = (clone $query)->where('cpf_hash', PersonPiiHasher::cpf($cpfNorm))->first();
         }
         if (! $match && $email) {
-            $match = (clone $query)->whereRaw('LOWER(email) = ?', [$email])->first();
+            $match = (clone $query)->where('email_hash', PersonPiiHasher::email($email))->first();
         }
         if (! $match && $birth) {
             $match = (clone $query)

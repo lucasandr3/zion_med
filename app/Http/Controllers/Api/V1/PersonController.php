@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\PersonResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\Person;
+use App\Support\PersonPiiHasher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,13 +25,18 @@ class PersonController extends Controller
             ->latest('id');
 
         if ($request->filled('search')) {
-            $term = '%' . trim((string) $request->search) . '%';
-            $query->where(function ($w) use ($term) {
+            $raw = trim((string) $request->search);
+            $term = '%'.$raw.'%';
+            $digits = preg_replace('/\D+/', '', $raw) ?? '';
+            $query->where(function ($w) use ($term, $raw, $digits) {
                 $w->where('name', 'like', $term)
-                    ->orWhere('code', 'like', $term)
-                    ->orWhere('phone', 'like', $term)
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('cpf', 'like', $term);
+                    ->orWhere('code', 'like', $term);
+                if (strlen($digits) === 11) {
+                    $w->orWhere('cpf_hash', PersonPiiHasher::cpf($digits));
+                }
+                if (str_contains($raw, '@')) {
+                    $w->orWhere('email_hash', PersonPiiHasher::email($raw));
+                }
             });
         }
 

@@ -33,6 +33,44 @@ return [
     ],
 
     /*
+    | Texto adicional na documentação OpenAPI (Scramble) — webhooks de saída para o seu sistema.
+    */
+    'webhooks_documentation_appendix' => <<<'MD'
+### Webhooks de protocolo (saída)
+
+O Gestgo envia **HTTP POST** para a URL cadastrada em **Empresa → Integrações → Webhooks**, quando o evento está habilitado no registro do webhook.
+
+**Método e corpo:** `POST` com corpo JSON (`Content-Type: application/json`).
+
+**Cabeçalhos enviados:**
+- `X-Webhook-Event`: nome do evento (igual ao campo `event` no JSON).
+- `User-Agent`: `Gestgo-Webhooks/1.0`
+- `X-Webhook-Signature`: presente quando o webhook tem **segredo** configurado. Formato `sha256=` + HMAC-SHA256 do **corpo bruto** (string JSON exatamente como enviada), usando o segredo como chave. Valide no receptor recomputando o HMAC sobre o raw body.
+
+**Eventos disponíveis:**
+| Evento | Quando dispara |
+|--------|----------------|
+| `submission.created` | Novo protocolo criado (formulário público ou interno). |
+| `submission.signed` | Assinatura registrada no fluxo (quando aplicável ao template). |
+| `submission.approved` | Protocolo aprovado na revisão. |
+| `submission.rejected` | Protocolo reprovado na revisão. |
+
+**Corpo JSON (campos principais):** o payload inclui sempre a chave `event` (redundante com o header) mais os dados do protocolo, por exemplo:
+- `protocol_id` (int)
+- `protocol_number` (string)
+- `template_id` (int)
+- `template_name` (string|null)
+- `status` (string, ex.: `pending`, `approved`, `rejected`)
+- `submitter_name`, `submitter_email` (string|null)
+- `submitted_at`, `approved_at` (ISO 8601|null)
+- `organization_id`, `clinic_id` (int — compat)
+- `timestamp` (ISO 8601, momento do disparo)
+
+Configure URLs e lista de eventos na API autenticada de integrações (`GET/POST` webhooks da clínica).
+MD
+    ,
+
+    /*
      * Customize Stoplight Elements UI
      */
     'ui' => [
@@ -127,10 +165,12 @@ return [
      */
     'flatten_deep_query_parameters' => true,
 
-    'middleware' => [
-        'web',
-        RestrictedDocsAccess::class,
-    ],
+    'middleware' => env('SCRAMBLE_PUBLIC', false)
+        ? ['web']
+        : [
+            'web',
+            RestrictedDocsAccess::class,
+        ],
 
     'extensions' => [],
 ];

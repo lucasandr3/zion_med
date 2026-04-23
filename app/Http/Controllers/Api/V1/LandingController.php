@@ -32,6 +32,7 @@ class LandingController extends Controller
                 'headline' => config('landing.headline'),
                 'subheadline' => config('landing.subheadline'),
                 'niches' => config('landing.niches', ['estetica', 'odontologia']),
+                'trust_points' => config('landing.trust_points', []),
             ],
         ]);
     }

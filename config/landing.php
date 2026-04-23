@@ -18,4 +18,13 @@ return [
 
     'niches' => ['estetica', 'odontologia'],
 
+    /** Pontos de confiança (hero / trust bar) — sobrescreva via LANDING_TRUST_POINTS JSON array opcional */
+    'trust_points' => json_decode((string) env('LANDING_TRUST_POINTS', ''), true) ?: [
+        'Templates e link na bio',
+        'Assinatura com evidências (IP, UA, hashes)',
+        'OTP por e-mail e WhatsApp',
+        'Dossiê ZIP (PDF + JSON)',
+        'LGPD e rastreabilidade',
+    ],
+
 ];

@@ -79,6 +79,12 @@
                     @if($sig->evidence_hash ?? null)
                         <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (pacote evidência): {{ $sig->evidence_hash }}</p>
                     @endif
+                    @if($sig->signed_ip ?? null)
+                        <p style="font-size:8px;color:#475569;margin:4px 0 0 0"><strong>IP (captura):</strong> {{ $sig->signed_ip }}</p>
+                    @endif
+                    @if($sig->signed_user_agent ?? null)
+                        <p style="font-size:8px;color:#475569;margin:2px 0 0 0;word-break:break-all"><strong>User-Agent:</strong> {{ $sig->signed_user_agent }}</p>
+                    @endif
                     @if($submission->document_hash ?? null)
                         <p style="font-size:8px;color:#64748b;margin:0;font-family:monospace">Hash (documento): {{ $submission->document_hash }}</p>
                     @endif

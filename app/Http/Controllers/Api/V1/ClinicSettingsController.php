@@ -143,7 +143,7 @@ class ClinicSettingsController extends Controller
             unset($data['address_data']);
         }
 
-        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color', 'cover_mode'] as $key) {
+        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color', 'cover_mode', 'signing_security_level'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
@@ -160,6 +160,11 @@ class ClinicSettingsController extends Controller
         $data['whatsapp_notify_cobranca'] = $request->boolean('whatsapp_notify_cobranca');
         $data['whatsapp_notify_faturas_boleto'] = $request->boolean('whatsapp_notify_faturas_boleto');
         $data['whatsapp_notify_avisos'] = $request->boolean('whatsapp_notify_avisos');
+
+        if ($request->has('data_retention_years')) {
+            $raw = $request->input('data_retention_years');
+            $data['data_retention_years'] = $raw === null || $raw === '' ? null : (int) $raw;
+        }
 
         $organization->update($data);
 

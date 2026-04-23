@@ -28,6 +28,7 @@ class PublicFormOtpTest extends TestCase
         $template->update(['public_enabled' => true, 'public_token' => $token]);
 
         $response = $this->postJson("/api/v1/formulario-publico/{$token}/otp/send", [
+            'channel' => 'email',
             'email' => 'user@example.com',
         ]);
 
@@ -44,6 +45,7 @@ class PublicFormOtpTest extends TestCase
     public function test_otp_send_returns_404_for_invalid_token(): void
     {
         $response = $this->postJson('/api/v1/formulario-publico/invalid-token-123/otp/send', [
+            'channel' => 'email',
             'email' => 'user@example.com',
         ]);
         $response->assertStatus(404);
@@ -65,6 +67,7 @@ class PublicFormOtpTest extends TestCase
         ]);
 
         $response = $this->postJson("/api/v1/formulario-publico/{$token}/otp/verify", [
+            'channel' => 'email',
             'email' => 'verify@example.com',
             'code' => '123456',
         ]);
@@ -88,6 +91,7 @@ class PublicFormOtpTest extends TestCase
         ]);
 
         $response = $this->postJson("/api/v1/formulario-publico/{$token}/otp/verify", [
+            'channel' => 'email',
             'email' => 'bad@example.com',
             'code' => '000000',
         ]);

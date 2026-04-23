@@ -66,3 +66,5 @@ Artisan::command('documents:send-reminders', function () use ($reminderDays) {
 })->purpose('Envia e-mail de lembrete para documentos pendentes de assinatura (envios antigos)');
 
 Schedule::command('documents:send-reminders')->dailyAt('09:00');
+
+Schedule::command('people:purge-inactive')->dailyAt('04:15');

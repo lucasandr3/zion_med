@@ -18,8 +18,62 @@ class FormTemplateDefinitions
             self::ginecologia(),
             self::oftalmologia(),
             self::dermatologia(),
-            self::laboratorio()
+            self::laboratorio(),
+            self::complianceExtras(),
         );
+    }
+
+    /**
+     * Modelos adicionais: telemedicina, LGPD e checklist OMS.
+     * Idempotente por nome + organization_id (comando `templates:seed-compliance-extras`).
+     *
+     * @return array<int, array{name: string, description: string, category: string, fields: array}>
+     */
+    public static function complianceExtras(): array
+    {
+        return [
+            [
+                'name' => 'Termo de Telemedicina',
+                'description' => 'Consentimento para atendimento por telemedicina, limitações e responsabilidades.',
+                'category' => 'geral',
+                'fields' => [
+                    self::field('text', 'Nome completo', 'nome_completo', 1),
+                    self::field('text', 'CPF', 'cpf', 2),
+                    self::field('date', 'Data', 'data', 3),
+                    self::field('textarea', 'Local e condições da consulta remota', 'condicoes_consulta', 4),
+                    self::field('checkbox', 'Declaro ciência dos riscos e limitações da telemedicina', 'ciencia_tele', 5),
+                    self::field('signature', 'Assinatura', 'assinatura', 6),
+                ],
+            ],
+            [
+                'name' => 'Termo de Uso de Dados (LGPD)',
+                'description' => 'Finalidades, bases legais e direitos do titular.',
+                'category' => 'geral',
+                'fields' => [
+                    self::field('text', 'Nome do titular', 'nome_titular', 1),
+                    self::field('text', 'E-mail', 'email', 2, false),
+                    self::field('date', 'Data', 'data', 3),
+                    self::field('checkbox', 'Autorizo o tratamento dos dados para as finalidades informadas', 'consentimento_lgpd', 4),
+                    self::field('checkbox', 'Receber comunicações operacionais por e-mail/WhatsApp', 'comunicacoes', 5, false),
+                    self::field('signature', 'Assinatura', 'assinatura', 6),
+                ],
+            ],
+            [
+                'name' => 'Checklist Cirurgia Segura (OMS)',
+                'description' => 'Checklist simplificado antes do procedimento (equipe, paciente, segurança).',
+                'category' => 'clinica_medica',
+                'fields' => [
+                    self::field('text', 'Paciente', 'paciente', 1),
+                    self::field('date', 'Data do procedimento', 'data_procedimento', 2),
+                    self::field('checkbox', 'Identidade do paciente confirmada', 'id_paciente', 3),
+                    self::field('checkbox', 'Site cirúrgico e procedimento confirmados', 'site_proc', 4),
+                    self::field('checkbox', 'Riscos e anestesia revisados com a equipe', 'riscos_equipe', 5),
+                    self::field('checkbox', 'Equipamentos e esterilização verificados', 'equip_ok', 6),
+                    self::field('textarea', 'Observações', 'observacoes', 7, false),
+                    self::field('signature', 'Responsável / cirurgião', 'assinatura_responsavel', 8),
+                ],
+            ],
+        ];
     }
 
     private static function field(string $type, string $label, string $nameKey, int $order, bool $required = true, ?array $options = null): array

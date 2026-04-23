@@ -7,6 +7,7 @@ use App\Http\Resources\Api\V1\ProtocolDetailResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\FormSubmission;
 use App\Services\DossierService;
+use App\Support\PersonPiiHasher;
 use App\Services\PdfService;
 use App\Services\SubmissionService;
 use Illuminate\Http\JsonResponse;
@@ -45,16 +46,22 @@ class ProtocolController extends Controller
             $query->where('person_id', $request->person_id);
         }
         if ($request->filled('busca')) {
-            $busca = '%' . $request->busca . '%';
-            $query->where(function ($q) use ($busca) {
+            $rawBusca = trim((string) $request->busca);
+            $busca = '%'.$rawBusca.'%';
+            $digits = preg_replace('/\D+/', '', $rawBusca) ?? '';
+            $query->where(function ($q) use ($busca, $rawBusca, $digits) {
                 $q->where('protocol_number', 'like', $busca)
                     ->orWhere('submitter_name', 'like', $busca)
                     ->orWhere('submitter_email', 'like', $busca)
-                    ->orWhereHas('person', function ($pq) use ($busca) {
+                    ->orWhereHas('person', function ($pq) use ($busca, $rawBusca, $digits) {
                         $pq->where('name', 'like', $busca)
-                            ->orWhere('code', 'like', $busca)
-                            ->orWhere('phone', 'like', $busca)
-                            ->orWhere('email', 'like', $busca);
+                            ->orWhere('code', 'like', $busca);
+                        if (strlen($digits) === 11) {
+                            $pq->orWhere('cpf_hash', PersonPiiHasher::cpf($digits));
+                        }
+                        if (str_contains($rawBusca, '@')) {
+                            $pq->orWhere('email_hash', PersonPiiHasher::email($rawBusca));
+                        }
                     });
             });
         }
@@ -135,16 +142,22 @@ class ProtocolController extends Controller
             $query->where('person_id', $request->person_id);
         }
         if ($request->filled('busca')) {
-            $busca = '%' . $request->busca . '%';
-            $query->where(function ($q) use ($busca) {
+            $rawBusca = trim((string) $request->busca);
+            $busca = '%'.$rawBusca.'%';
+            $digits = preg_replace('/\D+/', '', $rawBusca) ?? '';
+            $query->where(function ($q) use ($busca, $rawBusca, $digits) {
                 $q->where('protocol_number', 'like', $busca)
                     ->orWhere('submitter_name', 'like', $busca)
                     ->orWhere('submitter_email', 'like', $busca)
-                    ->orWhereHas('person', function ($pq) use ($busca) {
+                    ->orWhereHas('person', function ($pq) use ($busca, $rawBusca, $digits) {
                         $pq->where('name', 'like', $busca)
-                            ->orWhere('code', 'like', $busca)
-                            ->orWhere('phone', 'like', $busca)
-                            ->orWhere('email', 'like', $busca);
+                            ->orWhere('code', 'like', $busca);
+                        if (strlen($digits) === 11) {
+                            $pq->orWhere('cpf_hash', PersonPiiHasher::cpf($digits));
+                        }
+                        if (str_contains($rawBusca, '@')) {
+                            $pq->orWhere('email_hash', PersonPiiHasher::email($rawBusca));
+                        }
                     });
             });
         }

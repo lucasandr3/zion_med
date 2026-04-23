@@ -8,8 +8,11 @@ use App\Models\FormTemplate;
 use App\Models\Organization;
 use App\Models\Person;
 use App\Rules\Cpf;
+use App\Services\EvolutionGoClient;
 use App\Services\FeegowClient;
+use App\Services\OtpService;
 use App\Services\SubmissionService;
+use App\Support\PersonPiiHasher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +27,9 @@ class PublicFormApiController extends Controller
 
     public function __construct(
         private SubmissionService $submissionService,
-        private FeegowClient $feegowClient
+        private FeegowClient $feegowClient,
+        private OtpService $otpService,
+        private EvolutionGoClient $evolutionGoClient,
     ) {}
 
     /**
@@ -55,6 +60,8 @@ class PublicFormApiController extends Controller
         $clinic = $template->clinic;
         $organization = $this->resolveTemplateOrganization($template);
         $feegow = $this->buildFeegowPublicMeta($organization);
+        $signingLevel = $organization?->signing_security_level ?? 'basic';
+        $waOtp = (bool) ($organization?->evolution_go_instance_token && $this->evolutionGoClient->isConfigured());
 
         return response()->json([
             'data' => [
@@ -65,11 +72,13 @@ class PublicFormApiController extends Controller
                 ],
                 'clinic_name' => $clinic?->name,
                 'logo_url' => $clinic?->logo_url,
+                'signing_security_level' => $signingLevel,
+                'otp_whatsapp_available' => $waOtp,
                 'person_link' => [
                     'enabled' => (bool) $template->public_require_person_link,
-                    'mode' => $template->public_require_person_link ? 'code_birth_date' : 'none',
+                    'mode' => $template->public_require_person_link ? 'cpf' : 'none',
                     'title' => 'Identifique-se para continuar',
-                    'description' => 'Informe seu código de acesso e sua data de nascimento para vincular esta resposta à sua ficha.',
+                    'description' => 'Informe seu CPF para autorizar o acesso a este formulário.',
                 ],
                 'feegow' => $feegow,
                 'fields' => $template->fields->map(fn ($f) => [
@@ -111,11 +120,37 @@ class PublicFormApiController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:32'],
-            'birth_date' => ['required', 'date'],
+            'cpf' => ['nullable', 'string', new Cpf],
+            'code' => ['nullable', 'string', 'max:32'],
+            'birth_date' => ['nullable', 'date'],
         ]);
 
-        $person = $this->findPersonForTemplate($template, $validated['code'], $validated['birth_date']);
+        $cpfDigits = isset($validated['cpf']) ? preg_replace('/\D+/', '', (string) $validated['cpf']) : '';
+
+        if ($cpfDigits !== '' && strlen($cpfDigits) === 11) {
+            $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
+            if (! $person) {
+                throw ValidationException::withMessages([
+                    'cpf' => ['CPF não encontrado ou não autorizado para este formulário.'],
+                ]);
+            }
+
+            return response()->json([
+                'data' => [
+                    'person_id' => $person->id,
+                    'code' => $person->code,
+                    'name' => $person->name,
+                ],
+            ]);
+        }
+
+        if (empty($validated['code']) || empty($validated['birth_date'])) {
+            throw ValidationException::withMessages([
+                'cpf' => ['Informe um CPF válido ou o código com data de nascimento.'],
+            ]);
+        }
+
+        $person = $this->findPersonForTemplate($template, (string) $validated['code'], (string) $validated['birth_date']);
         if (! $person) {
             throw ValidationException::withMessages([
                 'code' => ['Código ou data de nascimento não conferem.'],
@@ -218,13 +253,12 @@ class PublicFormApiController extends Controller
         $rules = [
             '_submitter_name' => ['nullable', 'string', 'max:255'],
             '_submitter_email' => ['nullable', 'email', 'max:255'],
+            '_person_code' => ['nullable', 'string', 'max:32'],
+            '_person_birth_date' => ['nullable', 'date'],
+            '_person_cpf' => ['nullable', 'string', 'max:20'],
         ];
         if ($template->public_require_person_link) {
-            $rules['_person_code'] = ['required', 'string', 'max:32'];
-            $rules['_person_birth_date'] = ['required', 'date'];
-        } else {
-            $rules['_person_code'] = ['nullable', 'string', 'max:32'];
-            $rules['_person_birth_date'] = ['nullable', 'date'];
+            $rules['_person_cpf'] = ['required', 'string', new Cpf];
         }
         foreach ($template->fields as $field) {
             if ($field->required && $field->type !== 'file' && $field->type !== 'signature') {
@@ -242,6 +276,14 @@ class PublicFormApiController extends Controller
 
         $this->hydrateFileFieldsFromJsonPayload($request, $template);
 
+        $signaturesPreview = $request->input('_signature', []);
+        if (! is_array($signaturesPreview)) {
+            $signaturesPreview = $signaturesPreview ? ['signature' => $signaturesPreview] : [];
+        }
+        if ($this->templateHasSignatureFields($template) && $this->signaturesPayloadNonEmpty($signaturesPreview)) {
+            $rules['_accept_terms'] = ['accepted'];
+        }
+
         $validated = $request->validate($rules);
         $data = $validated;
 
@@ -255,20 +297,48 @@ class PublicFormApiController extends Controller
 
         $personId = null;
         if ($template->public_require_person_link) {
-            $person = $this->findPersonForTemplate(
-                $template,
-                (string) $data['_person_code'],
-                (string) $data['_person_birth_date']
-            );
+            $cpfDigits = preg_replace('/\D+/', '', (string) ($data['_person_cpf'] ?? '')) ?? '';
+            $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
             if (! $person || $person->status !== 'active') {
                 throw ValidationException::withMessages([
-                    '_person_code' => ['Código ou data de nascimento não conferem.'],
+                    '_person_cpf' => ['CPF não autorizado para este formulário.'],
                 ]);
             }
             $personId = $person->id;
         }
 
-        unset($data['_person_code'], $data['_person_birth_date']);
+        $signatures = $request->input('_signature', []);
+        if (! is_array($signatures)) {
+            $signatures = $signatures ? ['signature' => $signatures] : [];
+        }
+        $organization = $this->resolveTemplateOrganization($template);
+        if ($organization && $organization->signing_security_level === 'reinforced'
+            && $this->templateHasSignatureFields($template)
+            && $this->signaturesPayloadNonEmpty($signatures)) {
+            $channel = strtolower(trim((string) $request->input('_otp_channel', 'email')));
+            if ($channel === 'whatsapp') {
+                $phone = $this->otpService->normalizeWhatsappRecipient((string) $request->input('_otp_recipient', ''));
+                if (! $phone || ! $this->otpService->isVerified($token, $phone)) {
+                    throw ValidationException::withMessages([
+                        '_otp_recipient' => ['Confirme o código enviado por WhatsApp antes de enviar o formulário.'],
+                    ]);
+                }
+            } else {
+                $email = strtolower(trim((string) ($data['_submitter_email'] ?? '')));
+                if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    throw ValidationException::withMessages([
+                        '_submitter_email' => ['Informe um e-mail válido e valide o código OTP antes de enviar.'],
+                    ]);
+                }
+                if (! $this->otpService->isVerified($token, $email)) {
+                    throw ValidationException::withMessages([
+                        '_submitter_email' => ['Confirme o código enviado ao seu e-mail antes de enviar o formulário.'],
+                    ]);
+                }
+            }
+        }
+
+        unset($data['_person_code'], $data['_person_birth_date'], $data['_person_cpf'], $data['_accept_terms'], $data['_otp_channel'], $data['_otp_recipient']);
 
         $files = [];
         foreach ($template->fields as $field) {
@@ -276,14 +346,8 @@ class PublicFormApiController extends Controller
                 $files[$field->name_key] = $request->file($field->name_key);
             }
         }
-        $signatures = $request->input('_signature', []);
-        if (! is_array($signatures)) {
-            $signatures = $signatures ? ['signature' => $signatures] : [];
-        }
-
         $submission = $this->submissionService->createFromPublicForm($template, $data, $files, $signatures, $request, $personId);
 
-        $organization = $this->resolveTemplateOrganization($template);
         $feegowResult = $this->tryCreateFeegowAppointmentFromPublicForm(
             $organization,
             $personId ? Person::withoutGlobalScopes()->find($personId) : null,
@@ -423,6 +487,46 @@ class PublicFormApiController extends Controller
             ->whereDate('birth_date', $birth)
             ->where('status', 'active')
             ->first();
+    }
+
+    private function findPersonByCpfForTemplate(FormTemplate $template, string $cpfDigits): ?Person
+    {
+        if (strlen($cpfDigits) !== 11) {
+            return null;
+        }
+        $orgId = $template->organization_id ?? $template->clinic_id;
+        $hash = PersonPiiHasher::cpf($cpfDigits);
+
+        return Person::withoutGlobalScopes()
+            ->where('organization_id', $orgId)
+            ->where('cpf_hash', $hash)
+            ->where('status', 'active')
+            ->first();
+    }
+
+    private function templateHasSignatureFields(FormTemplate $template): bool
+    {
+        foreach ($template->fields as $field) {
+            if ($field->type === 'signature') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $signatures
+     */
+    private function signaturesPayloadNonEmpty(array $signatures): bool
+    {
+        foreach ($signatures as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveTemplateOrganization(FormTemplate $template): ?Organization
