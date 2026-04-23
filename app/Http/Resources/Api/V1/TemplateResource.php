@@ -19,6 +19,10 @@ class TemplateResource extends JsonResource
             'public_require_person_link' => (bool) $this->public_require_person_link,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
+            'fields' => $this->whenLoaded(
+                'fields',
+                fn () => FormFieldResource::collection($this->fields)
+            ),
         ];
     }
 }
