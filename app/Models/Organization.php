@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Organization extends Model
 {
@@ -24,6 +25,34 @@ class Organization extends Model
         static::created(function (Organization $organization): void {
             OrganizationRole::seedDefaultsForOrganization((int) $organization->id);
         });
+    }
+
+    /**
+     * Gera um slug único a partir de um texto base, garantindo que não conflita
+     * com nenhuma outra organização nem com slugs reservados em aliases (ignora
+     * $excludeId na tabela organizations ao regerar o slug da própria org).
+     *
+     * Fallback para "empresa" quando o nome só contém caracteres especiais.
+     */
+    public static function generateUniqueSlug(string $base, ?int $excludeId = null): string
+    {
+        $slug = Str::slug($base);
+        if ($slug === '') {
+            $slug = 'empresa';
+        }
+        $candidate = $slug;
+        $n = 1;
+        while (static::query()
+            ->where('slug', $candidate)
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->exists()
+            || OrganizationSlugAlias::query()->where('slug', $candidate)->exists()
+        ) {
+            $candidate = $slug.'-'.$n;
+            $n++;
+        }
+
+        return $candidate;
     }
 
     protected $fillable = [
@@ -216,6 +245,12 @@ class Organization extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /** Slugs antigos da página pública (Link Bio) que redirecionam para o slug atual. */
+    public function slugAliases(): HasMany
+    {
+        return $this->hasMany(OrganizationSlugAlias::class, 'organization_id');
     }
 
     public function users(): HasMany

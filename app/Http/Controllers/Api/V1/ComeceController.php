@@ -73,7 +73,7 @@ class ComeceController extends Controller
                 'slug' => $tenantSlug,
             ]);
 
-            $organizationSlug = $this->uniqueOrganizationSlug(Str::slug($validated['company_name']));
+            $organizationSlug = Organization::generateUniqueSlug($validated['company_name'], null);
             $organization = Organization::create([
                 'tenant_id' => $tenant->id,
                 'name' => $validated['company_name'],
@@ -228,15 +228,4 @@ class ComeceController extends Controller
         return $slug;
     }
 
-    private function uniqueOrganizationSlug(string $base): string
-    {
-        $slug = $base;
-        $n = 1;
-        while (Organization::where('slug', $slug)->exists()) {
-            $slug = $base.'-'.$n;
-            $n++;
-        }
-
-        return $slug;
-    }
 }

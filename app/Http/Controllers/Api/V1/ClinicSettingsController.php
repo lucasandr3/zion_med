@@ -7,6 +7,7 @@ use App\Events\AuditEvent;
 use App\Http\Requests\ClinicSettingsRequest;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Models\Organization;
+use App\Models\OrganizationSlugAlias;
 use App\Services\AsaasService;
 use App\Services\ThemeService;
 use Illuminate\Http\JsonResponse;
@@ -166,7 +167,27 @@ class ClinicSettingsController extends Controller
             $data['data_retention_years'] = $raw === null || $raw === '' ? null : (int) $raw;
         }
 
+        $slugAntes = (string) $organization->slug;
+        $slugPublicoMudou = false;
+        if (array_key_exists('name', $data)) {
+            $novoNome = trim((string) $data['name']);
+            if ($novoNome !== '' && $novoNome !== (string) $organization->name) {
+                $novoSlug = Organization::generateUniqueSlug($novoNome, (int) $organization->id);
+                if ($novoSlug !== $slugAntes) {
+                    $data['slug'] = $novoSlug;
+                    $slugPublicoMudou = true;
+                }
+            }
+        }
+
         $organization->update($data);
+
+        if ($slugPublicoMudou && $slugAntes !== '') {
+            OrganizationSlugAlias::query()->updateOrCreate(
+                ['slug' => $slugAntes],
+                ['organization_id' => (int) $organization->id],
+            );
+        }
 
         if ($addressDataInput !== null) {
             $cleanAddressData = $this->normalizeAddressData($addressDataInput);

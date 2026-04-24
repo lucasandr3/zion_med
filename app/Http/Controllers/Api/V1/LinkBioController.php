@@ -9,6 +9,7 @@ use App\Models\Clinic;
 use App\Models\ClinicLink;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
+use App\Models\OrganizationSlugAlias;
 use App\Models\LinkBioCtaClick;
 use App\Models\LinkBioLinkClick;
 use App\Models\LinkBioPageView;
@@ -34,14 +35,16 @@ class LinkBioController extends Controller
     /**
      * Redireciona para a URL do link público e registra o clique (estatísticas).
      */
-    public function publicRedirectLink(string $slug, int $linkId): Response
+    public function publicRedirectLink(Request $request, string $slug, int $linkId): Response
     {
-        $clinic = Clinic::withoutGlobalScopes()
-            ->where('slug', $slug)
-            ->first();
+        $clinic = $this->resolveClinicByPublicSlug($slug);
 
         if (! $clinic) {
             abort(404, 'Link Bio não encontrado.');
+        }
+
+        if ($redirect = $this->redirectLinkBioToCanonicalSlug($request, $slug, $clinic, 'api.v1.link-bio.public-go', ['linkId' => $linkId])) {
+            return $redirect;
         }
 
         $clinicLink = ClinicLink::query()
@@ -70,12 +73,14 @@ class LinkBioController extends Controller
             abort(404);
         }
 
-        $clinic = Clinic::withoutGlobalScopes()
-            ->where('slug', $slug)
-            ->first();
+        $clinic = $this->resolveClinicByPublicSlug($slug);
 
         if (! $clinic) {
             abort(404, 'Link Bio não encontrado.');
+        }
+
+        if ($redirect = $this->redirectLinkBioToCanonicalSlug($request, $slug, $clinic, 'api.v1.link-bio.public-cta', ['channel' => $channel])) {
+            return $redirect;
         }
 
         $ref = (string) $request->query('ref', '');
@@ -99,14 +104,16 @@ class LinkBioController extends Controller
     /**
      * Dados públicos da página Link Bio por slug (sem autenticação). Usado pelo front em /l/:slug.
      */
-    public function publicBySlug(Request $request, string $slug): JsonResponse
+    public function publicBySlug(Request $request, string $slug): JsonResponse|Response
     {
-        $clinic = Clinic::withoutGlobalScopes()
-            ->where('slug', $slug)
-            ->first();
+        $clinic = $this->resolveClinicByPublicSlug($slug);
 
         if (! $clinic) {
             return response()->json(['message' => 'Link Bio não encontrado.'], 404);
+        }
+
+        if ($redirect = $this->redirectLinkBioToCanonicalSlug($request, $slug, $clinic, 'api.v1.link-bio.public')) {
+            return $redirect;
         }
 
         if ($request->query('preview') !== '1') {
@@ -591,5 +598,49 @@ class LinkBioController extends Controller
         $intl = strlen($d) <= 11 && ! str_starts_with($d, '55') ? '55' . $d : $d;
 
         return 'tel:+' . $intl;
+    }
+
+    /**
+     * Resolve a clínica pelo slug atual ou por slug histórico (alias após troca de nome).
+     */
+    private function resolveClinicByPublicSlug(string $slug): ?Clinic
+    {
+        $clinic = Clinic::withoutGlobalScopes()
+            ->where('slug', $slug)
+            ->first();
+        if ($clinic) {
+            return $clinic;
+        }
+
+        $alias = OrganizationSlugAlias::query()->where('slug', $slug)->first();
+        if (! $alias) {
+            return null;
+        }
+
+        return Clinic::withoutGlobalScopes()->find($alias->organization_id);
+    }
+
+    /**
+     * Quando o pedido usa um slug antigo, redireciona 301 para a mesma rota com o slug canônico (preserva query string).
+     *
+     * @param  array<string, mixed>  $routeParams  Parâmetros adicionais da rota (ex.: linkId, channel), além de slug.
+     */
+    private function redirectLinkBioToCanonicalSlug(
+        Request $request,
+        string $requestedSlug,
+        Clinic $clinic,
+        string $routeName,
+        array $routeParams = [],
+    ): ?Response {
+        if ($clinic->slug === $requestedSlug) {
+            return null;
+        }
+        $params = array_merge(['slug' => $clinic->slug], $routeParams);
+        $url = route($routeName, $params, true);
+        if ($qs = $request->getQueryString()) {
+            $url .= '?'.$qs;
+        }
+
+        return redirect()->to($url, 301);
     }
 }
