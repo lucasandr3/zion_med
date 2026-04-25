@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\FormTemplate;
+use Database\Seeders\Definitions\EsteticaFormTemplatePack;
 
 class FormTemplateDefinitions
 {
@@ -417,108 +418,7 @@ class FormTemplateDefinitions
 
     private static function estetica(): array
     {
-        return [
-            [
-                'name' => 'Anamnese Estética',
-                'description' => 'Anamnese estética: procedimentos prévios, alergias, gestante/lactante.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('textarea', 'Procedimentos estéticos prévios', 'procedimentos_previos', 2, false),
-                    self::field('textarea', 'Alergias', 'alergias', 3, false),
-                    self::field('select', 'Gestante ou lactante?', 'gestante_lactante', 4, true, ['Não', 'Sim']),
-                    self::field('textarea', 'Doenças / medicamentos em uso', 'doencas_medicamentos', 5, false),
-                    self::field('signature', 'Assinatura', 'assinatura', 6),
-                ],
-            ],
-            [
-                'name' => 'Termo de Consentimento – Procedimentos Estéticos',
-                'description' => 'Termo de consentimento: riscos e resultados variáveis.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('textarea', 'Procedimento', 'procedimento', 3),
-                    self::field('checkbox', 'Li e entendi os riscos e variabilidade dos resultados', 'ciencia', 4),
-                    self::field('signature', 'Assinatura', 'assinatura', 5),
-                ],
-            ],
-            [
-                'name' => 'Registro Fotográfico',
-                'description' => 'Upload de fotos antes/depois e autorização de uso de imagem.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('select', 'Momento', 'momento', 3, false, ['Antes', 'Depois', 'Acompanhamento']),
-                    self::field('checkbox', 'Autorizo uso de imagem para fins clínicos/registro', 'autorizacao_imagem', 4),
-                    self::field('textarea', 'Observações', 'observacoes', 5, false),
-                    self::field('signature', 'Assinatura', 'assinatura', 6),
-                ],
-            ],
-            [
-                'name' => 'Ficha do Procedimento',
-                'description' => 'Produto, lote, área, quantidade, profissional.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('text', 'Produto', 'produto', 3),
-                    self::field('text', 'Lote', 'lote', 4, false),
-                    self::field('text', 'Área tratada', 'area', 5, false),
-                    self::field('text', 'Quantidade', 'quantidade', 6, false),
-                    self::field('text', 'Profissional', 'profissional', 7, false),
-                    self::field('textarea', 'Observações', 'observacoes', 8, false),
-                ],
-            ],
-            [
-                'name' => 'Orientações Pós-procedimento',
-                'description' => 'Checklist de orientações entregues e ciência.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('checkbox', 'Orientações entregues e paciente ciente', 'ciencia', 3),
-                    self::field('textarea', 'Orientações específicas', 'orientacoes', 4, false),
-                    self::field('signature', 'Assinatura', 'assinatura', 5),
-                ],
-            ],
-            [
-                'name' => 'Acompanhamento 7/15/30 dias',
-                'description' => 'Acompanhamento: sintomas, satisfação, fotos.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data do acompanhamento', 'data', 2),
-                    self::field('select', 'Dias pós-procedimento', 'dias_pos', 3, false, ['7 dias', '15 dias', '30 dias']),
-                    self::field('textarea', 'Sintomas / Queixas', 'sintomas', 4, false),
-                    self::field('number', 'Satisfação (1-10)', 'satisfacao', 5, false),
-                    self::field('textarea', 'Observações', 'observacoes', 6, false),
-                ],
-            ],
-            [
-                'name' => 'Termo de Recusa / Contraindicação',
-                'description' => 'Registro quando o procedimento não é realizado.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('textarea', 'Motivo da recusa/contraindicação', 'motivo', 3),
-                    self::field('signature', 'Assinatura', 'assinatura', 4),
-                ],
-            ],
-            [
-                'name' => 'Pesquisa de Satisfação Estética',
-                'description' => 'Expectativa vs resultado percebido.',
-                'category' => 'estetica',
-                'fields' => [
-                    self::field('date', 'Data', 'data', 1),
-                    self::field('number', 'Expectativa atendida (1-10)', 'expectativa', 2, false),
-                    self::field('number', 'Resultado percebido (1-10)', 'resultado', 3, false),
-                    self::field('textarea', 'Comentários', 'comentarios', 4, false),
-                ],
-            ],
-        ];
+        return EsteticaFormTemplatePack::templates();
     }
 
     private static function fisioterapia(): array
@@ -1267,6 +1167,19 @@ class FormTemplateDefinitions
             static fn (array $t): bool => in_array(($t['category'] ?? ''), $globalTypeCategories, true) || ($t['category'] ?? '') === 'geral' || ($t['category'] ?? '') === $niche
         ));
 
-        return array_merge(self::geral(), $specialty, $compliance);
+        $geral = self::geral();
+        if ($niche === 'estetica') {
+            $skip = [
+                'Cadastro do Paciente (Básico)',
+                'Anamnese (Básica)',
+                'Termo de Consentimento (Atendimento/Procedimento)',
+            ];
+            $geral = array_values(array_filter(
+                $geral,
+                static fn (array $t): bool => ! in_array($t['name'] ?? '', $skip, true)
+            ));
+        }
+
+        return array_merge($geral, $specialty, $compliance);
     }
 }

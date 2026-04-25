@@ -42,7 +42,10 @@ class FormTemplate extends Model
     {
         return [
             'anamnese' => 'Anamnese',
+            'anamneses' => 'Anamneses',
             'acompanhamento' => 'Acompanhamento',
+            'acompanhamento_controle' => 'Acompanhamento & Controle',
+            'cadastro_documentacao' => 'Cadastro & Documentação',
             'evolucao' => 'Evolução',
             'consentimento' => 'Consentimento',
             'triagem' => 'Triagem',
@@ -75,7 +78,17 @@ class FormTemplate extends Model
     public function scopeVisibleForNiche(Builder $query, string $niche): Builder
     {
         $niche = $niche !== '' ? $niche : 'estetica';
-        $categoriasGlobaisPorTipo = ['anamnese', 'acompanhamento', 'evolucao', 'consentimento', 'triagem', 'procedimento'];
+        $categoriasGlobaisPorTipo = [
+            'anamnese',
+            'anamneses',
+            'acompanhamento',
+            'acompanhamento_controle',
+            'cadastro_documentacao',
+            'evolucao',
+            'consentimento',
+            'triagem',
+            'procedimento',
+        ];
         $categoriasConhecidas = array_keys(self::categoryLabels());
 
         return $query->where(function (Builder $w) use ($niche, $categoriasGlobaisPorTipo, $categoriasConhecidas): void {
