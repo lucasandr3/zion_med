@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders\Definitions;
 
 /**
- * Modelos padrão do nicho Estética (pastas: Cadastro & Documentação, Anamneses, Acompanhamento & Controle).
+ * Modelos padrão do nicho Estética (pastas: Cadastro e Documentação, Anamneses, Acompanhamento e Controle).
  *
  * @phpstan-type FieldDef array{type: string, label: string, name_key: string, sort_order: int, required?: bool, options?: array<int, string>}
  */
@@ -144,7 +144,7 @@ final class EsteticaFormTemplatePack
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
 
         return [
-            'name' => 'Autorização de Imagem & Proteção de Dados (LGPD)',
+            'name' => 'Autorização de Imagem e Proteção de Dados (LGPD)',
             'description' => 'Titular, consentimentos LGPD, direitos do titular e autorização de uso de imagem.',
             'category' => 'cadastro_documentacao',
             'fields' => [
@@ -218,7 +218,7 @@ final class EsteticaFormTemplatePack
         ]);
 
         return [
-            'name' => 'Orçamento & Plano de Tratamento',
+            'name' => 'Orçamento e Plano de Tratamento',
             'description' => 'Itens, valores, pagamento, plano de sessões e aceite.',
             'category' => 'cadastro_documentacao',
             'fields' => $fields,
@@ -458,7 +458,7 @@ final class EsteticaFormTemplatePack
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
 
         return [
-            'name' => 'Anamnese — Laser, Peeling & Procedimentos Lumínicos',
+            'name' => 'Anamnese — Laser, Peeling e Procedimentos Lumínicos',
             'description' => 'Tipo de procedimento, contraindicações, Fitzpatrick, histórico solar, área e parâmetros técnicos.',
             'category' => 'anamneses',
             'fields' => [
@@ -691,9 +691,9 @@ final class EsteticaFormTemplatePack
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
 
         return [
-            'name' => 'Evolução de Sessão & Acompanhamento',
+            'name' => 'Evolução de Sessão e Acompanhamento',
             'description' => 'Identificação da sessão, pré-sessão, execução, fotos, avaliação e orientações.',
-            'category' => 'Acompanhamento_controle',
+            'category' => 'acompanhamento_controle',
             'fields' => [
                 $f('text', 'Sessão nº', 'sessao_numero', false),
                 $f('date', 'Data da sessão', 'data_sessao', false),
@@ -751,7 +751,7 @@ final class EsteticaFormTemplatePack
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
 
         return [
-            'name' => 'Retorno & Avaliação Pós-Tratamento',
+            'name' => 'Retorno e Avaliação Pós-Tratamento',
             'description' => 'Identificação do retorno, reações, resultados, NPS e próximos passos.',
             'category' => 'acompanhamento_controle',
             'fields' => [

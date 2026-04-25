@@ -119,7 +119,7 @@ class FormTemplateSeeder extends Seeder
     }
 
     /**
-     * Pacote padrão do nicho Estética (pastas Cadastro & Documentação, Anamneses, Acompanhamento & Controle).
+     * Pacote padrão do nicho Estética (pastas Cadastro e Documentação, Anamneses, Acompanhamento e Controle).
      * Não inclui templates do conjunto geral() nem compliance — apenas EsteticaFormTemplatePack.
      */
     public static function seedEsteticaNichePackForOrganization(Organization $organization, ?User $owner = null): void
