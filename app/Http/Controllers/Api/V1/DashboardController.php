@@ -8,6 +8,7 @@ use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\DocumentSend;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
+use App\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -85,8 +86,11 @@ class DashboardController extends Controller
             'org:' . $orgId . ':dashboard:last_templates',
             now()->addMinutes(5),
             function () use ($orgId) {
+                $niche = (string) (Organization::query()->whereKey($orgId)->value('niche') ?: 'estetica');
+
                 return FormTemplate::withoutGlobalScopes()
                     ->where('organization_id', $orgId)
+                    ->visibleForNiche($niche)
                     ->latest()
                     ->take(5)
                     ->get();

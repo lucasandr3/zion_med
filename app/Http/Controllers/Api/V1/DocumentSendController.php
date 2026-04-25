@@ -56,6 +56,8 @@ class DocumentSendController extends Controller
 
         return response()->json([
             'data' => $sends->map(fn (DocumentSend $s) => [
+                'delivery_status' => $s->sent_at ? 'enviado' : 'nao_enviado',
+                'signature_status' => $s->form_submission_id ? 'assinado' : ($s->isCancelled() ? 'cancelado' : ($s->isExpired() ? 'expirado' : 'aguardando_assinatura')),
                 'id' => $s->id,
                 'form_template_id' => $s->form_template_id,
                 'template_name' => $s->formTemplate?->name,
@@ -142,7 +144,7 @@ class DocumentSendController extends Controller
                 $recipientName
             );
             if (! $send) {
-                return response()->json(['message' => 'WhatsApp não configurado (N8N_WHATSAPP_WEBHOOK_URL).'], 503);
+                return response()->json(['message' => 'WhatsApp não configurado para esta clínica (integração Evolution Go) ou número inválido.'], 503);
             }
             return response()->json([
                 'data' => [

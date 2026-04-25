@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\FormTemplate;
+
 class FormTemplateDefinitions
 {
     /** @return array<int, array{name: string, description: string, category: string, fields: array}> */
@@ -35,7 +37,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Termo de Telemedicina',
                 'description' => 'Consentimento para atendimento por telemedicina, limitações e responsabilidades.',
-                'category' => 'geral',
+                'category' => 'consentimento',
                 'fields' => [
                     self::field('text', 'Nome completo', 'nome_completo', 1),
                     self::field('text', 'CPF', 'cpf', 2),
@@ -48,7 +50,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Termo de Uso de Dados (LGPD)',
                 'description' => 'Finalidades, bases legais e direitos do titular.',
-                'category' => 'geral',
+                'category' => 'consentimento',
                 'fields' => [
                     self::field('text', 'Nome do titular', 'nome_titular', 1),
                     self::field('text', 'E-mail', 'email', 2, false),
@@ -90,21 +92,45 @@ class FormTemplateDefinitions
         return [
             [
                 'name' => 'Cadastro do Paciente (Básico)',
-                'description' => 'Cadastro básico do paciente.',
-                'category' => 'geral',
+                'description' => 'Ficha de cadastro do paciente com dados pessoais, contato, origem, plano e LGPD.',
+                'category' => 'anamnese',
                 'fields' => [
                     self::field('text', 'Nome completo', 'nome_completo', 1),
                     self::field('date', 'Data de nascimento', 'data_nascimento', 2),
-                    self::field('text', 'CPF', 'cpf', 3, false),
-                    self::field('text', 'Telefone', 'telefone', 4, false),
-                    self::field('textarea', 'Endereço', 'endereco', 5, false),
-                    self::field('signature', 'Assinatura', 'assinatura', 6),
+                    self::field('number', 'Idade', 'idade', 3, false),
+                    self::field('radio', 'Sexo', 'sexo', 4, false, ['Feminino', 'Masculino', 'Outro']),
+                    self::field('text', 'CPF', 'cpf', 5, false),
+                    self::field('text', 'RG', 'rg', 6, false),
+                    self::field('select', 'Estado civil', 'estado_civil', 7, false, ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União estável']),
+                    self::field('text', 'Profissão', 'profissao', 8, false),
+                    self::field('text', 'Indicado por', 'indicado_por', 9, false),
+                    self::field('text', 'Telefone / WhatsApp', 'telefone_whatsapp', 10, false),
+                    self::field('text', 'Telefone alternativo', 'telefone_alternativo', 11, false),
+                    self::field('text', 'E-mail', 'email', 12, false),
+                    self::field('text', 'Endereço completo', 'endereco_completo', 13, false),
+                    self::field('text', 'Bairro', 'bairro', 14, false),
+                    self::field('text', 'Cidade', 'cidade', 15, false),
+                    self::field('text', 'CEP', 'cep', 16, false),
+                    self::field('checkbox', 'Instagram', 'conheceu_instagram', 17, false),
+                    self::field('checkbox', 'Google', 'conheceu_google', 18, false),
+                    self::field('checkbox', 'Facebook', 'conheceu_facebook', 19, false),
+                    self::field('checkbox', 'Indicação de amigo/familiar', 'conheceu_indicacao_amigo', 20, false),
+                    self::field('checkbox', 'Indicação médica', 'conheceu_indicacao_medica', 21, false),
+                    self::field('checkbox', 'Plano de saúde', 'conheceu_plano_saude', 22, false),
+                    self::field('text', 'Outro (como nos conheceu)', 'conheceu_outro', 23, false),
+                    self::field('radio', 'Possui plano de saúde?', 'possui_plano_saude', 24, false, ['Sim', 'Não']),
+                    self::field('text', 'Operadora', 'operadora_plano', 25, false),
+                    self::field('text', 'Número da carteirinha', 'numero_carteirinha', 26, false),
+                    self::field('checkbox', 'Aceito receber comunicações e promoções por WhatsApp/e-mail', 'lgpd_comunicacoes', 27, false),
+                    self::field('checkbox', 'Aceito receber lembretes de consulta', 'lgpd_lembretes', 28, false),
+                    self::field('signature', 'Assinatura do paciente', 'assinatura_paciente', 29, false),
+                    self::field('signature', 'Responsável legal (se menor)', 'assinatura_responsavel_legal', 30, false),
                 ],
             ],
             [
                 'name' => 'Anamnese (Básica)',
                 'description' => 'Questionário de anamnese básica para primeiros atendimentos.',
-                'category' => 'geral',
+                'category' => 'anamnese',
                 'fields' => [
                     self::field('text', 'Nome completo', 'nome_completo', 1),
                     self::field('date', 'Data de nascimento', 'data_nascimento', 2),
@@ -118,7 +144,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Termo de Consentimento (Atendimento/Procedimento)',
                 'description' => 'Termo de consentimento livre e esclarecido para procedimentos.',
-                'category' => 'geral',
+                'category' => 'consentimento',
                 'fields' => [
                     self::field('text', 'Nome do paciente', 'nome_paciente', 1),
                     self::field('date', 'Data', 'data', 2),
@@ -131,7 +157,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Triagem (Sinais Vitais)',
                 'description' => 'Registro de sinais vitais na triagem.',
-                'category' => 'geral',
+                'category' => 'triagem',
                 'fields' => [
                     self::field('text', 'Nome do paciente', 'nome_paciente', 1),
                     self::field('date', 'Data', 'data', 2),
@@ -146,7 +172,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Checklist de Sala (Abertura/Fechamento)',
                 'description' => 'Checklist diário de preparação e higienização da sala.',
-                'category' => 'geral',
+                'category' => 'triagem',
                 'fields' => [
                     self::field('date', 'Data', 'data', 1),
                     self::field('text', 'Responsável', 'responsavel', 2),
@@ -161,7 +187,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Ocorrência / Incidente (registro interno)',
                 'description' => 'Registro de ocorrências e incidentes internos.',
-                'category' => 'geral',
+                'category' => 'acompanhamento',
                 'fields' => [
                     self::field('date', 'Data', 'data', 1),
                     self::field('text', 'Responsável pelo registro', 'responsavel', 2),
@@ -174,7 +200,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Solicitação Interna (Manutenção/Reposição/TI)',
                 'description' => 'Solicitação interna para manutenção, reposição ou TI.',
-                'category' => 'geral',
+                'category' => 'procedimento',
                 'fields' => [
                     self::field('date', 'Data', 'data', 1),
                     self::field('text', 'Solicitante', 'solicitante', 2),
@@ -187,7 +213,7 @@ class FormTemplateDefinitions
             [
                 'name' => 'Pesquisa de Satisfação (NPS + comentários)',
                 'description' => 'Pesquisa NPS e comentários sobre o atendimento.',
-                'category' => 'geral',
+                'category' => 'acompanhamento',
                 'fields' => [
                     self::field('date', 'Data', 'data', 1),
                     self::field('number', 'Nota NPS (0 a 10)', 'nps', 2, true),
@@ -1204,5 +1230,43 @@ class FormTemplateDefinitions
                 ],
             ],
         ];
+    }
+
+    /**
+     * Definições de templates para o nicho da organização (cadastro): geral + especialidade + extras de compliance compatíveis.
+     *
+     * @return array<int, array{name: string, description: string, category: string, fields: array}>
+     */
+    public static function forNiche(string $niche): array
+    {
+        $niche = strtolower(trim($niche));
+        $valid = array_keys(FormTemplate::categoryLabels());
+        if (! in_array($niche, $valid, true)) {
+            $niche = 'estetica';
+        }
+
+        $specialty = match ($niche) {
+            'geral' => [],
+            'clinica_medica' => self::clinicaMedica(),
+            'odontologia' => self::odontologia(),
+            'estetica' => self::estetica(),
+            'fisioterapia' => self::fisioterapia(),
+            'psicologia' => self::psicologia(),
+            'pediatria' => self::pediatria(),
+            'ginecologia' => self::ginecologia(),
+            'oftalmologia' => self::oftalmologia(),
+            'dermatologia' => self::dermatologia(),
+            'laboratorio' => self::laboratorio(),
+            default => self::estetica(),
+        };
+
+        $globalTypeCategories = ['anamnese', 'acompanhamento', 'evolucao', 'consentimento', 'triagem', 'procedimento'];
+
+        $compliance = array_values(array_filter(
+            self::complianceExtras(),
+            static fn (array $t): bool => in_array(($t['category'] ?? ''), $globalTypeCategories, true) || ($t['category'] ?? '') === 'geral' || ($t['category'] ?? '') === $niche
+        ));
+
+        return array_merge(self::geral(), $specialty, $compliance);
     }
 }

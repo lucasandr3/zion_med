@@ -13,6 +13,7 @@ class OrganizationResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
+            'niche' => $this->niche ?: 'estetica',
             'logo_url' => $this->logo_path ? $this->logo_url : null,
             'company_logo_url' => null,
             'professional_photo_url' => $this->professional_photo_path ? $this->professional_photo_url : null,

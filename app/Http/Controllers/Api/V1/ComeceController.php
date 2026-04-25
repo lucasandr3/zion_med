@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
+use App\Models\FormTemplate;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\Tenant;
@@ -54,6 +55,7 @@ class ComeceController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
+            'niche' => ['nullable', 'string', 'max:64', Rule::in(array_keys(FormTemplate::categoryLabels()))],
             'accepted_terms' => ['accepted'],
         ], [
             'company_name.required' => 'Informe o nome da empresa.',
@@ -66,6 +68,9 @@ class ComeceController extends Controller
 
         try {
             $trialDays = (int) config('asaas.trial_days', 14);
+            $niche = isset($validated['niche']) && is_string($validated['niche']) && $validated['niche'] !== ''
+                ? $validated['niche']
+                : 'estetica';
 
             $tenantSlug = $this->uniqueTenantSlug(Str::slug($validated['company_name']));
             $tenant = Tenant::create([
@@ -78,6 +83,7 @@ class ComeceController extends Controller
                 'tenant_id' => $tenant->id,
                 'name' => $validated['company_name'],
                 'slug' => $organizationSlug,
+                'niche' => $niche,
                 'notification_email' => $validated['email'],
                 'billing_email' => $validated['email'],
                 'billing_name' => $validated['company_name'],

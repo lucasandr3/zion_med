@@ -8,7 +8,7 @@ class ProtocolGeneratorService
 {
     /**
      * Gera o próximo número de protocolo para a organização no ano atual.
-     * Formato: ZMD-AAAA-NNNNNN (ex: ZMD-2026-000001)
+     * Formato: GTG-AAAA-NNNNNN (ex: GTG-2026-000001)
      */
     public function generate(int $organizationId): string
     {
@@ -41,6 +41,6 @@ class ProtocolGeneratorService
             return 1;
         });
 
-        return 'ZMD-' . $year . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        return 'GTG-' . $year . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 }

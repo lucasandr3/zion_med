@@ -59,6 +59,7 @@ class Organization extends Model
         'tenant_id',
         'name',
         'slug',
+        'niche',
         'logo_path',
         'professional_photo_path',
         'notification_email',

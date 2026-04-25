@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Scopes\ClinicScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -40,6 +41,12 @@ class FormTemplate extends Model
     public static function categoryLabels(): array
     {
         return [
+            'anamnese' => 'Anamnese',
+            'acompanhamento' => 'Acompanhamento',
+            'evolucao' => 'Evolução',
+            'consentimento' => 'Consentimento',
+            'triagem' => 'Triagem',
+            'procedimento' => 'Procedimento',
             'geral' => 'Geral (todos os tenants)',
             'clinica_medica' => 'Clínica Médica',
             'odontologia' => 'Odontologia',
@@ -57,6 +64,32 @@ class FormTemplate extends Model
     public function getCategoryLabelAttribute(): ?string
     {
         return $this->category ? (self::categoryLabels()[$this->category] ?? $this->category) : null;
+    }
+
+    /**
+     * Templates visíveis para o nicho da organização: sem categoria (personalizados), geral e especialidade.
+     *
+     * @param  Builder<FormTemplate>  $query
+     * @return Builder<FormTemplate>
+     */
+    public function scopeVisibleForNiche(Builder $query, string $niche): Builder
+    {
+        $niche = $niche !== '' ? $niche : 'estetica';
+        $categoriasGlobaisPorTipo = ['anamnese', 'acompanhamento', 'evolucao', 'consentimento', 'triagem', 'procedimento'];
+        $categoriasConhecidas = array_keys(self::categoryLabels());
+
+        return $query->where(function (Builder $w) use ($niche, $categoriasGlobaisPorTipo, $categoriasConhecidas): void {
+            $w->whereNull('category')
+                ->orWhere('category', '')
+                ->orWhere('category', 'geral')
+                ->orWhere('category', $niche)
+                ->orWhereIn('category', $categoriasGlobaisPorTipo)
+                ->orWhere(function (Builder $custom) use ($categoriasConhecidas): void {
+                    $custom->whereNotNull('category')
+                        ->where('category', '!=', '')
+                        ->whereNotIn('category', $categoriasConhecidas);
+                });
+        });
     }
 
     protected function casts(): array

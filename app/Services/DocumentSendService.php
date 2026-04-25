@@ -4,14 +4,15 @@ namespace App\Services;
 
 use App\Models\DocumentSend;
 use App\Models\FormTemplate;
+use App\Models\Organization;
 use App\Support\MailBrand;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
 class DocumentSendService
 {
     public function __construct(
-        protected PublicLinkService $publicLinkService
+        protected PublicLinkService $publicLinkService,
+        protected EvolutionGoClient $evolutionGoClient
     ) {}
 
     /**
@@ -150,9 +151,7 @@ class DocumentSendService
         return true;
     }
 
-    /**
-     * Envia o link por WhatsApp via webhook n8n (se configurado).
-     */
+    /** Envia o link por WhatsApp usando a integração Evolution Go da organização. */
     public function sendByWhatsApp(
         FormTemplate $template,
         string $recipientPhone,
@@ -161,8 +160,16 @@ class DocumentSendService
         ?string $recipientName = null
     ): ?DocumentSend
     {
-        $webhookUrl = config('services.n8n_whatsapp.webhook_url');
-        if (empty($webhookUrl) || ! filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+        if (! $this->evolutionGoClient->isConfigured()) {
+            return null;
+        }
+        $orgId = $template->organization_id ?? $template->clinic_id;
+        $organization = $orgId ? Organization::query()->find($orgId) : null;
+        if (! $organization || ! $organization->evolution_go_instance_token) {
+            return null;
+        }
+        $number = $this->normalizeWhatsappRecipient($recipientPhone);
+        if (! $number) {
             return null;
         }
         if (! $template->public_token || ! $template->public_enabled) {
@@ -183,16 +190,33 @@ class DocumentSendService
             'public_token' => $template->public_token,
         ]);
         $payload = [
-            'phone' => preg_replace('/\D/', '', $recipientPhone),
             'message' => "Documento para assinatura: {$template->name}. Acesse: {$url}",
-            'link' => $url,
-            'template_name' => $template->name,
         ];
         try {
-            Http::timeout(15)->post($webhookUrl, $payload);
+            $this->evolutionGoClient->sendText(
+                (string) $organization->evolution_go_instance_token,
+                $number,
+                (string) $payload['message']
+            );
         } catch (\Throwable $e) {
             report($e);
         }
         return $send;
+    }
+
+    private function normalizeWhatsappRecipient(string $raw): ?string
+    {
+        $digits = preg_replace('/\D+/', '', $raw) ?? '';
+        if ($digits === '') {
+            return null;
+        }
+        if (str_starts_with($digits, '55') && strlen($digits) >= 12) {
+            return $digits;
+        }
+        if (strlen($digits) >= 10 && strlen($digits) <= 11) {
+            return '55'.$digits;
+        }
+
+        return null;
     }
 }

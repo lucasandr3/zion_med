@@ -16,9 +16,12 @@ class FormTemplateRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'category' => ['nullable', 'string', 'max:80'],
+            'new_category' => ['nullable', 'string', 'max:120'],
             'is_active' => ['boolean'],
             'public_enabled' => ['boolean'],
             'public_require_person_link' => ['boolean'],
+            'public_person_link_mode' => ['nullable', 'string', 'in:code,cpf'],
         ];
     }
 
@@ -27,9 +30,12 @@ class FormTemplateRequest extends FormRequest
         return [
             'name' => 'nome',
             'description' => 'descrição',
+            'category' => 'categoria',
+            'new_category' => 'nova categoria',
             'is_active' => 'ativo',
             'public_enabled' => 'formulário público',
             'public_require_person_link' => 'exigir código e data de nascimento no formulário público',
+            'public_person_link_mode' => 'modo de identificação no formulário público',
         ];
     }
 }

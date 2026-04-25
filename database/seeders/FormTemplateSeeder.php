@@ -45,7 +45,7 @@ class FormTemplateSeeder extends Seeder
      */
     public static function seedTemplatesForOrganization(Organization $organization, ?User $owner = null): void
     {
-        $templates = FormTemplateDefinitions::all();
+        $templates = FormTemplateDefinitions::forNiche((string) ($organization->niche ?? 'estetica'));
 
         foreach ($templates as $t) {
             $fields = $t['fields'];

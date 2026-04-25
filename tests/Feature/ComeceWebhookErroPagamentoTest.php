@@ -33,6 +33,7 @@ class ComeceWebhookErroPagamentoTest extends TestCase
             'password' => 'senha12345',
             'password_confirmation' => 'senha12345',
             'plan_key' => 'solo',
+            'niche' => 'estetica',
             'accepted_terms' => true,
         ], $overrides);
     }

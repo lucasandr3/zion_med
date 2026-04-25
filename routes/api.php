@@ -119,6 +119,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::apiResource('usuarios', UserController::class)->parameters(['usuarios' => 'usuario'])->names('api.v1.usuarios');
 
     Route::get('/templates', [TemplateController::class, 'index'])->name('api.v1.templates.index');
+    Route::get('/templates/categories', [TemplateController::class, 'categories'])->name('api.v1.templates.categories');
     Route::get('/templates/biblioteca', [TemplateController::class, 'biblioteca'])->name('api.v1.templates.biblioteca');
     Route::post('/templates', [TemplateController::class, 'store'])->name('api.v1.templates.store');
     Route::post('/templates/a-partir-de/{template}', [TemplateController::class, 'storeFromTemplate'])->name('api.v1.templates.storeFromTemplate');
