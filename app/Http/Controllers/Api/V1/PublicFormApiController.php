@@ -140,6 +140,7 @@ class PublicFormApiController extends Controller
                     'person_id' => $person->id,
                     'code' => $person->code,
                     'name' => $person->name,
+                    'prefill' => $this->buildPersonPrefillData($person),
                 ],
             ]);
         }
@@ -162,8 +163,40 @@ class PublicFormApiController extends Controller
                 'person_id' => $person->id,
                 'code' => $person->code,
                 'name' => $person->name,
+                'prefill' => $this->buildPersonPrefillData($person),
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPersonPrefillData(Person $person): array
+    {
+        return [
+            'id' => $person->id,
+            'code' => $person->code,
+            'name' => $person->name,
+            'cpf' => $person->cpf,
+            'rg' => $person->rg,
+            'email' => $person->email,
+            'phone' => $person->phone,
+            'phone_alt' => $person->phone_alt,
+            'birth_date' => optional($person->birth_date)->format('Y-m-d'),
+            'age' => $person->age,
+            'sex' => $person->sex,
+            'marital_status' => $person->marital_status,
+            'profession' => $person->profession,
+            'address' => $person->address,
+            'neighborhood' => $person->neighborhood,
+            'city' => $person->city,
+            'cep' => $person->cep,
+            'referred_by' => $person->referred_by,
+            'notes' => $person->notes,
+            'has_health_plan' => $person->has_health_plan,
+            'health_plan_operator' => $person->health_plan_operator,
+            'health_plan_card_number' => $person->health_plan_card_number,
+        ];
     }
 
     /**
