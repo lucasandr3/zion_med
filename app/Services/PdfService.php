@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FormSubmission;
+use App\Support\EsteticaStaffFieldRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PdfService
@@ -21,6 +22,7 @@ class PdfService
             'logoUrl' => $logoUrl,
             'valuesKeyed' => $valuesKeyed,
             'fields' => $fields,
+            'staffFields' => EsteticaStaffFieldRegistry::definitions($submission->template?->name ?? null),
         ])->setPaper('a4');
 
         $filename = 'protocolo-' . ($submission->protocol_number ?? $submission->id) . '.pdf';
@@ -42,6 +44,7 @@ class PdfService
             'logoUrl' => $logoUrl,
             'valuesKeyed' => $valuesKeyed,
             'fields' => $fields,
+            'staffFields' => EsteticaStaffFieldRegistry::definitions($submission->template?->name ?? null),
         ])->setPaper('a4');
 
         return $pdf->output();

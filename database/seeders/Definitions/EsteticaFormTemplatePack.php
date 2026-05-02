@@ -56,8 +56,6 @@ final class EsteticaFormTemplatePack
             'description' => 'Cadastro completo: dados pessoais, contato, origem, plano de saúde e LGPD.',
             'category' => 'cadastro_documentacao',
             'fields' => [
-                $f('text', 'Número da ficha', 'ficha_numero', false),
-                $f('date', 'Data', 'data', false),
                 $f('text', 'Nome completo', 'nome_completo'),
                 $f('date', 'Data de nascimento', 'data_nascimento'),
                 $f('text', 'Idade', 'idade', false),
@@ -109,15 +107,6 @@ final class EsteticaFormTemplatePack
                 $f('text', 'Nome do paciente', 'nome_paciente'),
                 $f('date', 'Data de nascimento', 'data_nascimento', false),
                 $f('text', 'CPF', 'cpf', false),
-                $f('text', 'Procedimento(s) a ser(em) realizado(s)', 'procedimentos'),
-                $f('text', 'Profissional responsável', 'profissional_responsavel', false),
-                $f('date', 'Data do procedimento', 'data_procedimento', false),
-                $f('textarea', 'Descrição específica do procedimento e técnica utilizada', 'descricao_procedimento_tecnica', false),
-                $f('textarea', 'Benefícios esperados', 'beneficios_esperados', false),
-                $f('textarea', 'Riscos e efeitos colaterais possíveis', 'riscos_efeitos_colaterais', false),
-                $f('text', 'Número de sessões previstas', 'numero_sessoes_previstas', false),
-                $f('text', 'Intervalo entre sessões', 'intervalo_sessoes', false),
-                $f('text', 'Valor do procedimento / pacote', 'valor_procedimento', false),
                 $f('checkbox', 'Autorizo registro fotográfico exclusivamente para documentação clínica', 'foto_doc_clinica', false),
                 $f('checkbox', 'Autorizo uso de imagens sem identificação (educação/marketing)', 'foto_sem_id', false),
                 $f('checkbox', 'Não autorizo uso de imagens além da documentação clínica', 'foto_nao_autorizo', false),
@@ -126,10 +115,8 @@ final class EsteticaFormTemplatePack
                 $f('checkbox', 'Estou ciente de que posso revogar o consentimento a qualquer momento', 'decl_revogacao', false),
                 $f('checkbox', 'Autorizo a realização do(s) procedimento(s) de forma livre e esclarecida', 'decl_autorizo_proc', false),
                 $f('checkbox', 'Declaro ciência dos cuidados pós-procedimento e compromisso de seguí-los', 'decl_pos', false),
-                $f('textarea', 'Orientações pós-procedimento (preenchimento profissional)', 'orientacoes_pos', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
                 $f('signature', 'Responsável legal (se menor de 18 anos)', 'assinatura_responsavel', false),
-                $f('signature', 'Profissional responsável', 'assinatura_profissional', false),
                 $f('text', 'Data e local', 'data_local', false),
             ],
         ];
@@ -163,7 +150,6 @@ final class EsteticaFormTemplatePack
                 $f('radio', 'Imagem: não autorizo qualquer uso além da documentação clínica', 'img_nao_autorizo_extra', false, ['Sim', 'Não']),
                 $f('signature', 'Assinatura do titular / paciente', 'assinatura_titular', false),
                 $f('signature', 'Responsável legal (se menor de 18 anos)', 'assinatura_responsavel', false),
-                $f('signature', 'Encarregado de dados / responsável clínica', 'assinatura_encarregado', false),
                 $f('text', 'Data e local', 'data_local', false),
             ],
         ];
@@ -176,46 +162,22 @@ final class EsteticaFormTemplatePack
     {
         $o = 0;
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
+
         $fields = [
-            $f('text', 'Número do orçamento', 'orcamento_numero', false),
-            $f('date', 'Data do orçamento', 'data_orcamento', false),
             $f('text', 'Nome do paciente', 'nome_paciente'),
             $f('text', 'CPF', 'cpf', false),
             $f('text', 'Telefone', 'telefone', false),
-            $f('text', 'Profissional responsável', 'profissional_responsavel', false),
-            $f('date', 'Validade deste orçamento', 'validade_orcamento', false),
-        ];
-        for ($i = 1; $i <= 6; $i++) {
-            $fields[] = $f('text', "Procedimento / serviço (linha {$i})", "orc_linha{$i}_procedimento", false);
-            $fields[] = $f('text', "Sessões (linha {$i})", "orc_linha{$i}_sessoes", false);
-            $fields[] = $f('text', "Valor unitário (linha {$i})", "orc_linha{$i}_valor_unit", false);
-            $fields[] = $f('text', "Desconto (linha {$i})", "orc_linha{$i}_desconto", false);
-            $fields[] = $f('text', "Subtotal (linha {$i})", "orc_linha{$i}_subtotal", false);
-        }
-        $fields = array_merge($fields, [
-            $f('text', 'Desconto geral aplicado', 'desconto_geral', false),
-            $f('text', 'Total do tratamento', 'total_tratamento', false),
-            $f('text', 'Cartão de crédito — parcelamento disponível', 'pag_cartao_parcelas', false),
-            $f('text', 'PIX / transferência — desconto à vista', 'pag_pix_desconto', false),
-            $f('text', 'Dinheiro — desconto à vista', 'pag_dinheiro_desconto', false),
             $f('select', 'Forma de pagamento escolhida', 'forma_pagamento', false, [
                 'PIX à vista', 'Dinheiro à vista', 'Cartão de débito', 'Cartão de crédito à vista', 'Cartão de crédito parcelado', 'Combinado / misto',
             ]),
             $f('text', 'Parcelas / observação', 'parcelas_obs', false),
             $f('text', 'Valor da entrada', 'valor_entrada', false),
             $f('date', 'Data do primeiro pagamento', 'data_primeiro_pagamento', false),
-            $f('select', 'Frequência das sessões', 'frequencia_sessoes', false, [
-                '1x por semana', '2x por semana', 'A cada 15 dias', '1x por mês', 'Outra frequência',
-            ]),
-            $f('text', 'Duração estimada do tratamento', 'duracao_estimada', false),
-            $f('date', 'Data de início prevista', 'data_inicio_prevista', false),
-            $f('textarea', 'Observações sobre o plano', 'observacoes_plano', false),
             $f('checkbox', 'Aceite: li e aceito as condições deste orçamento e plano', 'aceite_condicoes', false),
             $f('checkbox', 'Aceite: ciente de que pacote garante sessões, não resultado específico', 'aceite_pacote', false),
             $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-            $f('signature', 'Responsável comercial / clínico', 'assinatura_responsavel_comercial', false),
             $f('signature', 'Data (confirmação)', 'assinatura_data', false),
-        ]);
+        ];
 
         return [
             'name' => 'Orçamento e Plano de Tratamento',
@@ -312,7 +274,6 @@ final class EsteticaFormTemplatePack
                 $f('checkbox', 'Queixa cutânea: fotoenvelhecimento', 'queixa_fotoenvelhecimento', false),
                 $f('textarea', 'Há algo mais que devemos saber?', 'observacoes_finais', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional responsável', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data_assinatura', false),
             ],
         ];
@@ -366,15 +327,7 @@ final class EsteticaFormTemplatePack
             $f('radio', 'Bruxismo diagnosticado?', 'bruxismo', false, ['Sim', 'Não', 'Suspeita']),
             $f('radio', 'Usa placa de bruxismo?', 'placa_bruxismo', false, ['Sim', 'Não']),
             $f('textarea', 'Preocupações ou dúvidas do paciente', 'duvidas', false),
-            $f('select', 'Produto a utilizar (profissional)', 'produto_utilizado', false, [
-                'Botox 100U (Allergan)', 'Dysport 300U (Ipsen)', 'Xeomin 100U (Merz)', 'Prosigne 100U', 'Outro',
-            ]),
-            $f('text', 'Lote', 'lote', false),
-            $f('date', 'Validade do produto', 'validade_produto', false),
-            $f('textarea', 'Unidades aplicadas por área', 'unidades_por_area', false),
-            $f('textarea', 'Observações clínicas', 'obs_clinicas', false),
             $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-            $f('signature', 'Profissional responsável / registro', 'assinatura_profissional', false),
             $f('signature', 'Data', 'data', false),
         ]);
 
@@ -433,17 +386,7 @@ final class EsteticaFormTemplatePack
                 $f('textarea', 'O que mais incomoda na área a tratar', 'incomodo', false),
                 $f('radio', 'Tem referência ou foto de resultado desejado?', 'tem_referencia', false, ['Sim', 'Não']),
                 $f('radio', 'Já conhece o produto a ser utilizado?', 'conhece_produto', false, ['Sim', 'Não']),
-                $f('text', 'Produto / marca utilizado (profissional)', 'produto_usado', false),
-                $f('select', 'Viscosidade / tipo de gel', 'viscosidade', false, [
-                    'Monofásico baixa viscosidade', 'Monofásico alta viscosidade', 'Bifásico', 'Skinbooster',
-                ]),
-                $f('text', 'Volume total utilizado (ml)', 'volume_total_ml', false),
-                $f('text', 'Lote', 'lote', false),
-                $f('date', 'Validade', 'validade', false),
-                $f('select', 'Técnica utilizada', 'tecnica', false, ['Agulha', 'Cânula', 'Mista (agulha + cânula)']),
-                $f('textarea', 'Volume por área e observações técnicas', 'volume_por_area', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];
@@ -512,15 +455,7 @@ final class EsteticaFormTemplatePack
                 $f('checkbox', 'Área: corpo (especificar)', 'area_corpo', false),
                 $f('checkbox', 'Área: couro cabeludo', 'area_cc', false),
                 $f('text', 'Especificações adicionais da área', 'area_obs', false),
-                $f('text', 'Equipamento utilizado', 'equipamento', false),
-                $f('text', 'Comprimento de onda', 'comprimento_onda', false),
-                $f('text', 'Fluência (J/cm²)', 'fluencia', false),
-                $f('text', 'Spot size', 'spot_size', false),
-                $f('text', 'Frequência (Hz)', 'frequencia_hz', false),
-                $f('text', 'Passadas realizadas', 'passadas', false),
-                $f('textarea', 'Observações técnicas / intercorrências', 'obs_tecnicas', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];
@@ -593,12 +528,7 @@ final class EsteticaFormTemplatePack
                 $f('text', 'Qual distúrbio hormonal', 'hormonal_qual', false),
                 $f('radio', 'Usa anticoncepcional ou reposição hormonal?', 'uso_hormonio', false, ['Sim', 'Não']),
                 $f('text', 'Qual e há quanto tempo', 'hormonio_detalhe', false),
-                $f('text', 'Equipamento / comprimento de onda', 'equip_onda', false),
-                $f('text', 'Fluência (J/cm²)', 'fluencia', false),
-                $f('text', 'Spot size / duração pulso', 'spot_pulso', false),
-                $f('textarea', 'Observações técnicas', 'obs_tecnicas', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];
@@ -674,9 +604,7 @@ final class EsteticaFormTemplatePack
                 $f('select', 'Alimentação', 'alimentacao', false, ['Muito saudável', 'Razoavelmente saudável', 'Com muitos excessos']),
                 $f('radio', 'Tabagismo', 'tabagismo', false, ['Não', 'Sim', 'Ex-fumante']),
                 $f('radio', 'Em dieta / acompanhamento nutricional?', 'nutri', false, ['Sim', 'Não']),
-                $f('textarea', 'Avaliação clínica inicial / protocolo proposto', 'avaliacao_protocolo', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];
@@ -695,11 +623,6 @@ final class EsteticaFormTemplatePack
             'description' => 'Identificação da sessão, pré-sessão, execução, fotos, avaliação e orientações.',
             'category' => 'acompanhamento_controle',
             'fields' => [
-                $f('text', 'Sessão nº', 'sessao_numero', false),
-                $f('date', 'Data da sessão', 'data_sessao', false),
-                $f('text', 'Tratamento / protocolo', 'tratamento_protocolo', false),
-                $f('text', 'Profissional que realizou', 'profissional', false),
-                $f('date', 'Próxima sessão agendada', 'proxima_sessao', false),
                 $f('textarea', 'Período entre sessões — relato do paciente', 'relato_periodo', false),
                 $f('radio', 'Seguiu orientações pós-sessão anterior?', 'seguiu_orient', false, [
                     'Sim, completamente', 'Parcialmente', 'Não conseguiu', 'Primeira sessão',
@@ -717,26 +640,9 @@ final class EsteticaFormTemplatePack
                 $f('checkbox', 'Reação: ardência', 'rea_ardencia', false),
                 $f('checkbox', 'Reação: prurido', 'rea_prurido', false),
                 $f('checkbox', 'Reação: herpes', 'rea_herpes', false),
-                $f('text', 'Procedimento realizado nesta sessão', 'procedimento_realizado', false),
-                $f('textarea', 'Produtos / insumos utilizados', 'produtos_insumos', false),
-                $f('text', 'Parâmetros do equipamento', 'parametros_equipamento', false),
-                $f('radio', 'Intercorrências durante a sessão', 'intercorrencia', false, [
-                    'Nenhuma', 'Desconforto leve', 'Desconforto intenso', 'Intercorrência (detalhar)',
-                ]),
-                $f('textarea', 'Detalhamento de intercorrências / observações clínicas', 'intercorrencia_detalhe', false),
-                $f('textarea', 'Registro fotográfico — referências (antes frente/perfil/depois)', 'fotos_referencia', false),
-                $f('text', 'Fotos arquivadas em (código / pasta)', 'fotos_arquivo', false),
-                $f('number', 'Avaliação: resposta ao tratamento (1–5)', 'nota_resposta', false),
-                $f('number', 'Avaliação: tolerância do paciente (1–5)', 'nota_tolerancia', false),
-                $f('radio', 'Manter protocolo atual?', 'manter_protocolo', false, [
-                    'Sim, manter', 'Ajustar parâmetros', 'Trocar protocolo', 'Encaminhar',
-                ]),
-                $f('text', 'Ajuste proposto / justificativa', 'ajuste_proposto', false),
                 $f('number', 'Satisfação do paciente até o momento (1–10)', 'satisfacao_paciente', false),
                 $f('textarea', 'Comentários do paciente', 'comentarios_paciente', false),
-                $f('textarea', 'Orientações pós-sessão prescritas', 'orientacoes_pos', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];
@@ -758,7 +664,6 @@ final class EsteticaFormTemplatePack
                 $f('text', 'Tratamento realizado', 'tratamento', false),
                 $f('text', 'Total de sessões realizadas', 'total_sessoes', false),
                 $f('date', 'Data da última sessão', 'data_ultima_sessao', false),
-                $f('text', 'Profissional responsável', 'profissional', false),
                 $f('select', 'Tipo de retorno', 'tipo_retorno', false, [
                     'Retorno de rotina (entre sessões)', 'Avaliação de resultado final', 'Intercorrência / complicação', 'Manutenção', 'Novo tratamento',
                 ]),
@@ -776,23 +681,11 @@ final class EsteticaFormTemplatePack
                 $f('checkbox', 'Reação: queimação', 'react_queimacao', false),
                 $f('checkbox', 'Reação: dor persistente', 'react_dor', false),
                 $f('textarea', 'Descrição das reações (intensidade, localização, evolução)', 'react_descricao', false),
-                $f('radio', 'Atitude para tratar a reação', 'atitude_reacao', false, [
-                    'Não foi necessário', 'Sim, hidratante/cicatrizante', 'Consultou outro profissional',
-                ]),
-                $f('radio', 'As reações já estão resolvidas?', 'reacoes_resolvidas', false, ['Sim, totalmente', 'Parcialmente', 'Ainda persistem']),
-                $f('radio', 'Avaliação do profissional — resultado', 'resultado_prof', false, ['Excelente', 'Bom', 'Regular', 'Insatisfatório']),
                 $f('radio', 'Avaliação do paciente — resultado', 'resultado_pac', false, ['Excelente', 'Bom', 'Regular', 'Insatisfatório']),
                 $f('textarea', 'Comentários do paciente sobre o resultado', 'comentarios_paciente', false),
-                $f('textarea', 'Observações clínicas do profissional', 'obs_profissional', false),
                 $f('number', 'NPS — probabilidade de indicar a clínica (0 a 10)', 'nps', false),
                 $f('textarea', 'O que poderia ter sido melhor?', 'nps_melhorar', false),
-                $f('radio', 'Conduta após retorno', 'conduta', false, [
-                    'Alta — resultado satisfatório', 'Manutenção agendada', 'Continuar protocolo', 'Ajustar protocolo', 'Tratar intercorrência', 'Encaminhar a especialista',
-                ]),
-                $f('date', 'Próxima consulta agendada', 'proxima_consulta', false),
-                $f('text', 'Novo procedimento indicado', 'novo_procedimento', false),
                 $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Profissional / registro', 'assinatura_profissional', false),
                 $f('signature', 'Data', 'data', false),
             ],
         ];

@@ -58,6 +58,44 @@
         </tbody>
     </table>
 
+    @if(!empty($staffFields))
+        <p style="margin:16px 0 8px 0;font-size:12px;font-weight:bold;">Registro da equipe (clínica)</p>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:35%">Campo</th>
+                    <th>Resposta</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($staffFields as $sf)
+                    @php
+                        $k = $sf['name_key'];
+                        $val = $valuesKeyed->get($k);
+                    @endphp
+                    <tr>
+                        <td><strong>{{ $sf['label'] }}</strong></td>
+                        <td>
+                            @if($val)
+                                @if($val->value_json !== null)
+                                    @if(is_array($val->value_json))
+                                        {{ json_encode($val->value_json, JSON_UNESCAPED_UNICODE) }}
+                                    @else
+                                        {{ $val->value_json }}
+                                    @endif
+                                @else
+                                    {{ $val->value_text }}
+                                @endif
+                            @else
+                                —
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
     @if($submission->signatures->isNotEmpty())
         <div class="signature-block">
             <strong>Assinatura(s)</strong>

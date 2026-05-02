@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\EsteticaStaffFieldRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,6 +13,7 @@ class ProtocolDetailResource extends JsonResource
         $base = (new ProtocolResource($this->resource))->toArray($request);
 
         return array_merge($base, [
+            'staff_fields' => EsteticaStaffFieldRegistry::definitions($this->template?->name ?? null),
             'values' => $this->whenLoaded('values', function () {
                 return $this->values->mapWithKeys(function ($v) {
                     $value = $v->value_json ?? $v->value_text;

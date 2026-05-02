@@ -20,6 +20,7 @@ use App\Notifications\NovoComentario;
 use App\Notifications\NovoProtocoloRecebido;
 use App\Notifications\ProtocoloAprovado;
 use App\Notifications\ProtocoloReprovado;
+use App\Support\EsteticaStaffFieldRegistry;
 use App\Support\FrontendUrl;
 use App\Support\PersonPiiHasher;
 use App\Support\MailBrand;
@@ -384,6 +385,66 @@ class SubmissionService
         }
 
         return $event;
+    }
+
+    /**
+     * Persiste valores preenchidos pela equipe no protocolo (campos definidos em EsteticaStaffFieldsPack).
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function syncStaffFieldValues(FormSubmission $submission, array $values, int $userId): void
+    {
+        $submission->loadMissing('template');
+        $allowed = EsteticaStaffFieldRegistry::allowedKeys($submission->template?->name);
+        if ($allowed === []) {
+            throw ValidationException::withMessages([
+                'values' => ['Este modelo não possui campos internos de equipe configurados.'],
+            ]);
+        }
+
+        $allowedSet = array_flip($allowed);
+
+        DB::transaction(function () use ($submission, $values, $allowedSet) {
+            foreach ($values as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($allowedSet[$key])) {
+                    continue;
+                }
+
+                $existing = SubmissionValue::where('submission_id', $submission->id)
+                    ->where('key', $key)
+                    ->orderBy('id')
+                    ->first();
+
+                if (is_array($raw)) {
+                    $payload = [
+                        'field_id' => null,
+                        'value_text' => null,
+                        'value_json' => $raw,
+                    ];
+                } else {
+                    $str = $raw === null ? '' : trim((string) $raw);
+                    $payload = [
+                        'field_id' => null,
+                        'value_text' => $str === '' ? null : $str,
+                        'value_json' => null,
+                    ];
+                }
+
+                if ($existing) {
+                    $existing->update($payload);
+                } else {
+                    SubmissionValue::create(array_merge($payload, [
+                        'submission_id' => $submission->id,
+                        'key' => $key,
+                    ]));
+                }
+            }
+        });
+
+        Event::dispatch(new AuditEvent('submission.staff_values', FormSubmission::class, $submission->id, [
+            'keys' => array_keys($values),
+        ], $submission->organization_id ?? $submission->clinic_id, $userId));
     }
 
     /** Notifica todos os usuários da clínica sobre novo protocolo (chamado após commit). */

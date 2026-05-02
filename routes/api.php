@@ -150,6 +150,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::get('/protocols/{protocol}/dossie', [ProtocolController::class, 'exportarDossie'])->name('api.v1.protocols.dossie');
     Route::post('/protocols/{protocol}/revisao', [ProtocolController::class, 'aprovar'])->name('api.v1.protocols.revisao');
     Route::post('/protocols/{protocol}/comentario', [ProtocolController::class, 'comentario'])->name('api.v1.protocols.comentario');
+    Route::patch('/protocols/{protocol}/staff-values', [ProtocolController::class, 'staffValues'])->name('api.v1.protocols.staff-values');
 
     Route::get('/links-publicos', [LinksPublicosController::class, 'index'])->name('api.v1.links-publicos.index');
 

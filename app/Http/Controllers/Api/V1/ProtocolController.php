@@ -263,4 +263,29 @@ class ProtocolController extends Controller
             'data' => ['message' => 'Comentário adicionado.'],
         ], 201);
     }
+
+    /**
+     * Atualiza valores preenchidos pela equipe (campos internos do modelo Estética).
+     */
+    public function staffValues(Request $request, FormSubmission $protocol): JsonResponse
+    {
+        $this->authorize('view-submission', $protocol);
+
+        $validated = $request->validate([
+            'values' => ['required', 'array'],
+        ]);
+
+        $this->submissionService->syncStaffFieldValues(
+            $protocol,
+            $validated['values'],
+            (int) $request->user()->id
+        );
+
+        $protocol->refresh();
+        $protocol->load(['template.fields', 'values', 'template', 'person', 'events.user', 'attachments', 'signatures']);
+
+        return response()->json([
+            'data' => new ProtocolDetailResource($protocol),
+        ]);
+    }
 }
