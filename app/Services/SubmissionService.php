@@ -6,6 +6,7 @@ use App\Enums\SubmissionStatus;
 use App\Events\AuditEvent;
 use App\Models\Clinic;
 use App\Models\Person;
+use App\Models\FormField;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\FormTemplateVersion;
@@ -25,10 +26,12 @@ use App\Support\FrontendUrl;
 use App\Support\PersonPiiHasher;
 use App\Support\MailBrand;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -301,7 +304,7 @@ class SubmissionService
         }
     }
 
-    public function approve(FormSubmission $submission, string $status, ?string $comment, int $userId): void
+    public function approve(FormSubmission $submission, string $status, ?string $comment, int $userId, ?Request $request = null): void
     {
         $submission->update([
             'status' => $status === 'approved' ? SubmissionStatus::Approved : SubmissionStatus::Rejected,
@@ -309,6 +312,16 @@ class SubmissionService
             'approved_at' => now(),
             'review_comment' => $comment,
         ]);
+
+        $reviewer = User::find($userId);
+
+        if ($status === 'approved' && $reviewer) {
+            try {
+                $this->attachApproverElectronicSignature($submission, $reviewer, $request);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         if ($status === 'approved' && $submission->person_id) {
             try {
@@ -332,7 +345,6 @@ class SubmissionService
         $event = $status === 'approved' ? 'submission.approved' : 'submission.rejected';
         $this->webhookService->dispatch($submission->organization_id ?? $submission->clinic_id, $event, $this->webhookPayload($submission));
 
-        $reviewer = User::find($userId);
         if ($reviewer) {
             $submission->load(['template']);
             $recipients = $this->getClinicUsers($submission->organization_id ?? $submission->clinic_id)
@@ -344,6 +356,170 @@ class SubmissionService
                 Notification::send($recipients, new ProtocoloReprovado($submission, $reviewer));
             }
         }
+    }
+
+    /**
+     * Copia a assinatura eletrônica gravada no perfil do revisor para o primeiro espaço de assinatura
+     * do modelo ainda vazio (preferindo campos cuja etiqueta sugira profissional da clínica).
+     */
+    private function attachApproverElectronicSignature(FormSubmission $submission, User $reviewer, ?Request $request): void
+    {
+        $storagePath = $reviewer->electronic_signature_path ?? null;
+        if ($storagePath === null || $storagePath === '') {
+            return;
+        }
+
+        $disk = Storage::disk('minio_submissions');
+        try {
+            if (! $disk->exists($storagePath)) {
+                return;
+            }
+            $bytes = $disk->get($storagePath);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        if ($bytes === null || $bytes === '') {
+            return;
+        }
+
+        $submission->loadMissing(['template.fields', 'signatures']);
+        $template = $submission->template;
+        if (! $template) {
+            return;
+        }
+
+        $orgId = (int) ($submission->organization_id ?? $submission->clinic_id ?? 0);
+        if ($orgId < 1) {
+            return;
+        }
+
+        /** @var Collection<int, FormField> $slots */
+        $slots = collect($template->fields)
+            ->filter(fn ($f) => $f instanceof FormField && $f->type === 'signature')
+            ->sortBy(fn ($f) => $f instanceof FormField ? ($f->sort_order ?? 0) : 0)
+            ->values();
+
+        $filledKeys = $submission->signatures->pluck('field_key')->filter()->unique()->all();
+        /** @var Collection<int, FormField> $empty */
+        $empty = $slots->filter(fn ($f) => $f instanceof FormField && ! in_array($f->name_key, $filledKeys, true));
+        if ($empty->isEmpty()) {
+            return;
+        }
+
+        $chosen = $this->pickProfessionalSignatureSlot($empty);
+        if (! $chosen instanceof FormField) {
+            return;
+        }
+
+        try {
+            $filename = 'approver-' . Str::random(10) . '.png';
+            $relativeDir = 'organizations/' . $orgId . '/signatures/' . $submission->id;
+            $imagePath = $relativeDir . '/' . $filename;
+            $disk->put($imagePath, $bytes);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        $signedAt = now();
+        $fieldKey = (string) $chosen->name_key;
+        $signedName = $reviewer->name;
+        $locale = $submission->locale ?: 'pt_BR';
+        $timezone = $submission->timezone ?: config('app.timezone', 'America/Sao_Paulo');
+        $acceptedTextAt = now();
+        $signingChannel = 'approval';
+
+        $evidencePayload = implode('|', [
+            (string) $submission->id,
+            $fieldKey,
+            $signedAt->toIso8601String(),
+            (string) $signedName,
+        ]);
+        $signatureHash = hash('sha256', $evidencePayload);
+        $documentHash = (string) ($submission->document_hash ?? '');
+        $templateVersionId = $submission->template_version_id;
+
+        $evidencePackage = [
+            'submission_id' => $submission->id,
+            'field_key' => $fieldKey,
+            'template_version_id' => $templateVersionId,
+            'signed_name' => $signedName,
+            'signed_ip' => $request?->ip(),
+            'signed_user_agent' => $request ? Str::limit((string) $request->userAgent(), 512) : null,
+            'signed_at' => $signedAt->toIso8601String(),
+            'signed_hash' => $signatureHash,
+            'document_hash' => $documentHash,
+            'channel' => $signingChannel,
+            'locale' => $locale,
+            'timezone' => $timezone,
+            'accepted_text_at' => $acceptedTextAt->toIso8601String(),
+        ];
+        $evidenceHash = hash('sha256', json_encode($evidencePackage));
+
+        SubmissionSignature::create([
+            'submission_id' => $submission->id,
+            'form_template_version_id' => $templateVersionId,
+            'image_path' => $imagePath,
+            'field_key' => $fieldKey,
+            'document_hash' => $documentHash !== '' ? $documentHash : null,
+            'evidence_hash' => $evidenceHash,
+            'channel' => $signingChannel,
+            'status' => 'completed',
+            'accepted_text_at' => $acceptedTextAt,
+            'locale' => $locale,
+            'timezone' => $timezone,
+            'signed_name' => $signedName,
+            'signed_ip' => $request?->ip(),
+            'signed_user_agent' => $request ? Str::limit((string) $request->userAgent(), 512) : null,
+            'signed_hash' => $signatureHash,
+            'signed_at' => $signedAt,
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, FormField>  $emptyFields
+     */
+    private function pickProfessionalSignatureSlot(Collection $emptyFields): ?FormField
+    {
+        if ($emptyFields->isEmpty()) {
+            return null;
+        }
+
+        $positive = ['profissional', 'responsável', 'responsavel', 'clínica', 'clinica', 'equipe', 'médico', 'medico', 'dr.', 'dra.', 'doctor', 'prestador', 'cirurgião', 'cirurgiao'];
+        $negativePhrases = ['paciente', 'cliente', 'titular', 'genitor', 'genitora', 'acompanhante', 'assistido', 'responsável legal', 'responsavel legal'];
+
+        $best = null;
+        $bestScore = PHP_INT_MIN;
+        foreach ($emptyFields as $field) {
+            $haystack = mb_strtolower((string) $field->name_key . ' ' . (string) $field->label);
+            $score = 0;
+            foreach ($positive as $word) {
+                if (str_contains($haystack, $word)) {
+                    $score += 3;
+                }
+            }
+            foreach ($negativePhrases as $word) {
+                if (str_contains($haystack, $word)) {
+                    $score -= 5;
+                }
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $field;
+            }
+        }
+
+        if ($bestScore > 0 && $best instanceof FormField) {
+            return $best;
+        }
+
+        /** @var FormField|null */
+        return $emptyFields->last();
     }
 
     protected function webhookPayload(FormSubmission $submission): array

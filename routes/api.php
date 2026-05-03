@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\IntegrationsController;
 use App\Http\Controllers\Api\V1\LinkBioController;
 use App\Http\Controllers\Api\V1\LinksPublicosController;
 use App\Http\Controllers\Api\V1\MeAppearanceController;
+use App\Http\Controllers\Api\V1\MeElectronicSignatureController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
@@ -80,6 +81,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
     Route::patch('/me/appearance', [MeAppearanceController::class, 'update'])->name('api.v1.me.appearance');
+    Route::patch('/me/electronic-signature', [MeElectronicSignatureController::class, 'update'])
+        ->name('api.v1.me.electronic-signature');
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('api.v1.notificacoes.index');
     Route::patch('/notificacoes/{id}/lida', [NotificationController::class, 'markAsRead'])->name('api.v1.notificacoes.read');
     Route::post('/notificacoes/marcar-todas', [NotificationController::class, 'markAllAsRead'])->name('api.v1.notificacoes.read.all');

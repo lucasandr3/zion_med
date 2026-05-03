@@ -7,6 +7,7 @@ use App\Support\Permission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -26,6 +27,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'can_switch_clinic',
         'ui_theme',
         'ui_dark_mode',
+        'electronic_signature_path',
+        'electronic_signature_updated_at',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -51,6 +54,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'active' => 'boolean',
             'can_switch_clinic' => 'boolean',
             'ui_dark_mode' => 'boolean',
+            'electronic_signature_updated_at' => 'datetime',
         ];
     }
 
@@ -210,5 +214,30 @@ class User extends Authenticatable implements MustVerifyEmail
         $enum = $this->roleEnum();
 
         return ($enum !== null && $enum->canSwitchClinic()) || (bool) ($this->can_switch_clinic ?? false);
+    }
+
+    /** URL temporária para pré-visualização da assinatura guardada em MinIO. */
+    public function electronicSignatureUrl(): ?string
+    {
+        $path = $this->electronic_signature_path ?? null;
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        try {
+            if (Storage::disk('minio_submissions')->exists($path)) {
+                return Storage::disk('minio_submissions')->temporaryUrl(
+                    $path,
+                    now()->addMinutes(15)
+                );
+            }
+        } catch (\Throwable) {
+        }
+
+        try {
+            return Storage::disk('public')->url($path);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

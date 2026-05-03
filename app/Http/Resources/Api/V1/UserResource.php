@@ -20,6 +20,8 @@ class UserResource extends JsonResource
             'can_switch_clinic' => $this->can_switch_clinic ?? false,
             'ui_theme' => $this->ui_theme,
             'ui_dark_mode' => $this->ui_dark_mode,
+            'electronic_signature_url' => $this->resource->electronicSignatureUrl(),
+            'electronic_signature_updated_at' => $this->electronic_signature_updated_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -239,11 +239,16 @@ class ProtocolController extends Controller
             $protocol,
             $validated['status'],
             $validated['review_comment'] ?? null,
-            $request->user()->id
+            $request->user()->id,
+            $request,
         );
 
         return response()->json([
-            'data' => new ProtocolDetailResource($protocol->fresh(['template', 'values'])),
+            'data' => new ProtocolDetailResource($protocol->fresh([
+                'template.fields',
+                'values',
+                'signatures',
+            ])),
         ]);
     }
 
