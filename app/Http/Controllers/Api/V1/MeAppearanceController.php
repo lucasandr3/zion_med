@@ -17,6 +17,7 @@ class MeAppearanceController extends Controller
         $validated = $request->validate([
             'ui_theme' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/^[a-z0-9-]+$/'],
             'ui_dark_mode' => ['sometimes', 'nullable', 'boolean'],
+            'ui_shell_preset' => ['sometimes', 'nullable', 'string', 'max:32', 'regex:/^(tinted|sidebar_dark)$/'],
         ]);
 
         $user = $request->user();
@@ -26,6 +27,10 @@ class MeAppearanceController extends Controller
         }
         if (array_key_exists('ui_dark_mode', $validated)) {
             $user->ui_dark_mode = $validated['ui_dark_mode'];
+        }
+        if (array_key_exists('ui_shell_preset', $validated)) {
+            $v = $validated['ui_shell_preset'];
+            $user->ui_shell_preset = ($v === null || $v === '') ? null : $v;
         }
 
         $user->save();

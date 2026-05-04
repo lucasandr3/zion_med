@@ -27,6 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'can_switch_clinic',
         'ui_theme',
         'ui_dark_mode',
+        'ui_shell_preset',
         'electronic_signature_path',
         'electronic_signature_updated_at',
     ];
