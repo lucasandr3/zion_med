@@ -36,6 +36,14 @@ class LandingAnalyticsService
         $parsed = parse_url($raw, PHP_URL_PATH);
         $normalized = is_string($parsed) && $parsed !== '' ? $parsed : $raw;
         $normalized = '/' . ltrim($normalized, '/');
+        if ($normalized === '/index.html') {
+            $normalized = '/';
+        } elseif (str_ends_with($normalized, '/index.html')) {
+            $normalized = substr($normalized, 0, -strlen('/index.html')) ?: '/';
+        }
+        if ($normalized !== '/' && str_ends_with($normalized, '/')) {
+            $normalized = rtrim($normalized, '/') ?: '/';
+        }
         if (strlen($normalized) > 500) {
             $normalized = substr($normalized, 0, 500);
         }
@@ -44,7 +52,7 @@ class LandingAnalyticsService
     }
 
     /**
-     * Registra visita única: um IP por dia (não incrementa se o IP já visitou hoje).
+     * Registra visita única: um IP por dia por página (não duplica o mesmo path no mesmo dia).
      */
     public function recordUniqueVisit(Request $request, string $path): bool
     {
@@ -52,22 +60,15 @@ class LandingAnalyticsService
         $ipHash = $this->hashIp($request);
         $path = $this->normalizePath($path);
 
-        $existing = LandingSiteVisit::query()
-            ->where('ip_hash', $ipHash)
-            ->where('visit_date', $visitDate)
-            ->first();
+        $visit = LandingSiteVisit::query()->firstOrCreate(
+            [
+                'ip_hash'    => $ipHash,
+                'visit_date' => $visitDate,
+                'path'       => $path,
+            ]
+        );
 
-        if ($existing) {
-            return false;
-        }
-
-        LandingSiteVisit::query()->create([
-            'ip_hash'    => $ipHash,
-            'visit_date' => $visitDate,
-            'path'       => $path,
-        ]);
-
-        return true;
+        return $visit->wasRecentlyCreated;
     }
 
     public function ctaLabel(string $channel): string

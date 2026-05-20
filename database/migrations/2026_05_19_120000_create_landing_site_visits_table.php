@@ -15,8 +15,8 @@ return new class extends Migration
             $table->string('path', 500)->default('/');
             $table->timestamps();
 
-            // Um registro por IP por dia (primeiro path acessado no dia fica salvo).
-            $table->unique(['ip_hash', 'visit_date']);
+            // Um registro por IP por dia por página (path).
+            $table->unique(['ip_hash', 'visit_date', 'path'], 'landing_site_visits_ip_date_path_unique');
             $table->index(['visit_date', 'path']);
         });
     }
