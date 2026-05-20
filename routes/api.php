@@ -22,7 +22,9 @@ use App\Http\Controllers\Api\V1\ProtocolController;
 use App\Http\Controllers\Api\V1\TemplateController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
 use App\Http\Controllers\Api\V1\DemonstrationRequestController;
+use App\Http\Controllers\Api\V1\LandingAnalyticsController;
 use App\Http\Controllers\Api\V1\LandingController;
+use App\Services\LandingAnalyticsService;
 use App\Http\Controllers\Api\V1\PublicFormApiController;
 use App\Http\Controllers\Api\V1\PublicFormOtpController;
 use App\Http\Controllers\Api\V1\StatusController;
@@ -35,6 +37,7 @@ use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsControl
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
+use App\Http\Controllers\Api\V1\Platform\LandingAnalyticsController as PlatformLandingAnalyticsController;
 use App\Http\Controllers\Api\V1\Platform\OrganizationPresenceController as PlatformOrganizationPresenceController;
 use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Models\DocumentSend;
@@ -51,6 +54,16 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
     Route::get('/landing', LandingController::class)->name('api.v1.landing');
+    Route::match(['get', 'post'], '/landing/analytics/view', [LandingAnalyticsController::class, 'recordView'])
+        ->middleware('throttle:120,1')
+        ->name('api.v1.landing.analytics.view');
+    Route::post('/landing/analytics/cta', [LandingAnalyticsController::class, 'recordCta'])
+        ->middleware('throttle:120,1')
+        ->name('api.v1.landing.analytics.cta');
+    Route::get('/landing/analytics/cta/{channel}', [LandingAnalyticsController::class, 'redirectCta'])
+        ->where('channel', implode('|', LandingAnalyticsService::CTA_CHANNELS))
+        ->middleware('throttle:120,1')
+        ->name('api.v1.landing.analytics.cta-redirect');
     Route::get('/status', [StatusController::class, 'index'])->name('api.v1.status');
     Route::get('/link-bio/public/{slug}/go/{linkId}', [LinkBioController::class, 'publicRedirectLink'])
         ->whereNumber('linkId')
@@ -105,6 +118,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::put('/settings', [PlatformSettingsController::class, 'update'])->name('api.v1.platform.settings.update');
         Route::get('/logs', [PlatformAuditLogController::class, 'index'])->name('api.v1.platform.logs.index');
         Route::get('/organization-presences', PlatformOrganizationPresenceController::class)->name('api.v1.platform.organization-presences.index');
+        Route::get('/landing-analytics', PlatformLandingAnalyticsController::class)->name('api.v1.platform.landing-analytics');
     });
 });
 
