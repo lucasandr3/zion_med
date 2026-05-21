@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\FormTemplate;
 use Database\Seeders\Definitions\EsteticaFormTemplatePack;
+use Database\Seeders\Definitions\VeterinariaFormTemplatePack;
 
 class FormTemplateDefinitions
 {
@@ -22,6 +23,7 @@ class FormTemplateDefinitions
             self::oftalmologia(),
             self::dermatologia(),
             self::laboratorio(),
+            self::veterinaria(),
             self::complianceExtras(),
         );
     }
@@ -419,6 +421,11 @@ class FormTemplateDefinitions
     private static function estetica(): array
     {
         return EsteticaFormTemplatePack::templates();
+    }
+
+    private static function veterinaria(): array
+    {
+        return VeterinariaFormTemplatePack::templates();
     }
 
     private static function fisioterapia(): array
@@ -1157,6 +1164,7 @@ class FormTemplateDefinitions
             'oftalmologia' => self::oftalmologia(),
             'dermatologia' => self::dermatologia(),
             'laboratorio' => self::laboratorio(),
+            'veterinaria' => self::veterinaria(),
             default => self::estetica(),
         };
 
@@ -1169,6 +1177,18 @@ class FormTemplateDefinitions
 
         $geral = self::geral();
         if ($niche === 'estetica') {
+            $skip = [
+                'Cadastro do Paciente (Básico)',
+                'Anamnese (Básica)',
+                'Termo de Consentimento (Atendimento/Procedimento)',
+            ];
+            $geral = array_values(array_filter(
+                $geral,
+                static fn (array $t): bool => ! in_array($t['name'] ?? '', $skip, true)
+            ));
+        }
+
+        if ($niche === 'veterinaria') {
             $skip = [
                 'Cadastro do Paciente (Básico)',
                 'Anamnese (Básica)',

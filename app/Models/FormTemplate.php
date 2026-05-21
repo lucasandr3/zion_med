@@ -61,6 +61,7 @@ class FormTemplate extends Model
             'oftalmologia' => 'Oftalmologia',
             'dermatologia' => 'Dermatologia',
             'laboratorio' => 'Laboratório / Coleta',
+            'veterinaria' => 'Veterinária',
         ];
     }
 

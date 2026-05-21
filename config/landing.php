@@ -16,7 +16,7 @@ return [
 
     'subheadline' => env('LANDING_SUBHEADLINE', 'Organize a documentação da sua clínica, reduza papelada e tenha trilha de evidências em um fluxo simples para equipe e pacientes.'),
 
-    'niches' => ['estetica', 'odontologia'],
+    'niches' => ['estetica', 'odontologia', 'veterinaria'],
 
     /** Pontos de confiança (hero / trust bar) — sobrescreva via LANDING_TRUST_POINTS JSON array opcional */
     'trust_points' => json_decode((string) env('LANDING_TRUST_POINTS', ''), true) ?: [

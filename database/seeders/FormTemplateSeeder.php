@@ -8,6 +8,7 @@ use App\Models\FormTemplate;
 use App\Models\Organization;
 use App\Models\User;
 use Database\Seeders\Definitions\EsteticaFormTemplatePack;
+use Database\Seeders\Definitions\VeterinariaFormTemplatePack;
 use Illuminate\Database\Seeder;
 
 class FormTemplateSeeder extends Seeder
@@ -125,6 +126,36 @@ class FormTemplateSeeder extends Seeder
     public static function seedEsteticaNichePackForOrganization(Organization $organization, ?User $owner = null): void
     {
         foreach (EsteticaFormTemplatePack::templates() as $t) {
+            $fields = $t['fields'];
+            $category = $t['category'];
+            unset($t['fields'], $t['category']);
+
+            $template = FormTemplate::withoutGlobalScopes()->create([
+                'organization_id' => $organization->id,
+                'name' => $t['name'],
+                'description' => $t['description'],
+                'category' => $category,
+                'is_active' => true,
+                'public_enabled' => false,
+                'created_by' => $owner?->id,
+            ]);
+
+            foreach ($fields as $f) {
+                $opts = $f['options'] ?? null;
+                unset($f['options']);
+                $f['template_id'] = $template->id;
+                $f['options_json'] = $opts ? ['options' => $opts] : null;
+                FormField::create($f);
+            }
+        }
+    }
+
+    /**
+     * Pacote padrão do nicho Veterinária (internação, cadastro pet/tutor, cirurgia, vacinas, etc.).
+     */
+    public static function seedVeterinariaNichePackForOrganization(Organization $organization, ?User $owner = null): void
+    {
+        foreach (VeterinariaFormTemplatePack::templates() as $t) {
             $fields = $t['fields'];
             $category = $t['category'];
             unset($t['fields'], $t['category']);

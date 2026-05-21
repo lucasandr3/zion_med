@@ -103,6 +103,14 @@ class TemplateController extends Controller
                     ['key' => 'plano_tratamento', 'name' => 'Acordo de Plano de Tratamento', 'description' => 'Acordo e aceite do plano de tratamento proposto.'],
                 ],
             ],
+            'veterinaria' => [
+                'label' => $categories['veterinaria'] ?? 'Veterinária',
+                'templates' => [
+                    ['key' => 'internacao_veterinaria', 'name' => 'Termo de Autorização para Internação e Tratamento Clínico', 'description' => 'Contrato de internação, consentimentos, honorários e assinatura do tutor.'],
+                    ['key' => 'cadastro_pet_veterinaria', 'name' => 'Ficha de Cadastro do Tutor e do Animal', 'description' => 'Cadastro do responsável e identificação do animal.'],
+                    ['key' => 'cirurgia_veterinaria', 'name' => 'Termo de Consentimento para Cirurgia Veterinária', 'description' => 'Autorização para procedimento cirúrgico e anestesia.'],
+                ],
+            ],
         ];
         if ($request->filled('category')) {
             $cat = $request->category;
