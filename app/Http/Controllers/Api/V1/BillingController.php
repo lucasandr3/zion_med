@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Services\AsaasService;
+use App\Services\OrganizationBillingCancellationService;
 use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class BillingController extends Controller
 {
     public function __construct(
         private AsaasService $asaasService,
+        private OrganizationBillingCancellationService $billingCancellation,
         private WhatsAppNotificationService $whatsAppNotificationService,
     ) {}
 
@@ -149,7 +151,7 @@ class BillingController extends Controller
         }
 
         if ($organization->isAwaitingFirstBillingPayment()) {
-            $this->cancelActiveGatewaySubscriptions($organization);
+            $this->billingCancellation->cancelActiveGatewaySubscriptions($organization);
             $organization->refresh();
         }
 
@@ -310,7 +312,7 @@ class BillingController extends Controller
             ], 422);
         }
 
-        $this->cancelActiveGatewaySubscriptions($organization);
+        $this->billingCancellation->cancelActiveGatewaySubscriptions($organization);
         $organization->refresh();
 
         $doc = preg_replace('/\D/', '', $organization->billing_document ?? '');
@@ -375,29 +377,6 @@ class BillingController extends Controller
                 'next_due_date' => $nextDue,
             ],
         ], 200);
-    }
-
-    private function cancelActiveGatewaySubscriptions(Organization $organization): void
-    {
-        $subs = $organization->subscriptions()
-            ->whereNotNull('asaas_subscription_id')
-            ->whereIn('status', ['active', 'ACTIVE'])
-            ->get();
-
-        foreach ($subs as $sub) {
-            try {
-                if ($this->asaasService->isConfigured() && $sub->asaas_subscription_id) {
-                    $this->asaasService->cancelSubscription($sub->asaas_subscription_id);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Asaas cancelSubscription failed', [
-                    'subscription_id' => $sub->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-            $sub->deleteUnpaidLocalPayments();
-            $sub->update(['status' => 'CANCELED']);
-        }
     }
 
     private function currentOrganization(Request $request): ?Organization

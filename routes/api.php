@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\IntegrationsController;
 use App\Http\Controllers\Api\V1\LinkBioController;
 use App\Http\Controllers\Api\V1\LinksPublicosController;
+use App\Http\Controllers\Api\V1\MeAccountController;
+use App\Http\Controllers\Api\V1\MeDataExportController;
 use App\Http\Controllers\Api\V1\MeAppearanceController;
 use App\Http\Controllers\Api\V1\MeElectronicSignatureController;
 use App\Http\Controllers\Api\V1\MeController;
@@ -96,6 +98,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::patch('/me/appearance', [MeAppearanceController::class, 'update'])->name('api.v1.me.appearance');
     Route::patch('/me/electronic-signature', [MeElectronicSignatureController::class, 'update'])
         ->name('api.v1.me.electronic-signature');
+    Route::delete('/me/account', [MeAccountController::class, 'destroy'])->name('api.v1.me.account.destroy');
+    Route::get('/me/data-export', MeDataExportController::class)->name('api.v1.me.data-export');
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('api.v1.notificacoes.index');
     Route::patch('/notificacoes/{id}/lida', [NotificationController::class, 'markAsRead'])->name('api.v1.notificacoes.read');
     Route::post('/notificacoes/marcar-todas', [NotificationController::class, 'markAllAsRead'])->name('api.v1.notificacoes.read.all');
