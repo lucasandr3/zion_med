@@ -32,11 +32,19 @@ use App\Http\Controllers\Api\V1\PublicFormOtpController;
 use App\Http\Controllers\Api\V1\StatusController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\WhatsappEvolutionController;
+use App\Http\Controllers\Api\V1\Connector\AssinaturasController as ConnectorAssinaturasController;
+use App\Http\Controllers\Api\V1\Connector\ClientesController as ConnectorClientesController;
+use App\Http\Controllers\Api\V1\Connector\ContatosController as ConnectorContatosController;
+use App\Http\Controllers\Api\V1\Connector\EmpresasController as ConnectorEmpresasController;
+use App\Http\Controllers\Api\V1\Connector\FaturasController as ConnectorFaturasController;
+use App\Http\Controllers\Api\V1\Connector\HealthController as ConnectorHealthController;
+use App\Http\Controllers\Api\V1\Connector\LeadsController as ConnectorLeadsController;
 use App\Http\Controllers\Api\V1\Platform\AuditLogController as PlatformAuditLogController;
 use App\Http\Controllers\Api\V1\Platform\BillingOverviewController as PlatformBillingOverviewController;
 use App\Http\Controllers\Api\V1\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsController;
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
+use App\Http\Controllers\Api\V1\Platform\IntegrationsController as PlatformIntegrationsController;
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
 use App\Http\Controllers\Api\V1\Platform\LandingAnalyticsController as PlatformLandingAnalyticsController;
@@ -87,6 +95,24 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::post('/formulario-publico/{token}/otp/verify', [PublicFormOtpController::class, 'verify'])->name('api.v1.formulario-publico.otp.verify');
 });
 
+// Conector Business Hub (gestor_app): visão do dono da plataforma, auth Bearer + X-Tenant-Id
+Route::prefix('v1/conector')->middleware(['business_hub.connector', 'throttle:api'])->group(function () {
+    Route::get('/', ConnectorHealthController::class)->name('api.v1.conector.root');
+    Route::get('/health', ConnectorHealthController::class)->name('api.v1.conector.health');
+    Route::get('/empresas', [ConnectorEmpresasController::class, 'index'])->name('api.v1.conector.empresas.index');
+    Route::get('/empresas/{externalId}', [ConnectorEmpresasController::class, 'show'])->name('api.v1.conector.empresas.show');
+    Route::get('/clientes', [ConnectorClientesController::class, 'index'])->name('api.v1.conector.clientes.index');
+    Route::get('/clientes/{externalId}', [ConnectorClientesController::class, 'show'])->name('api.v1.conector.clientes.show');
+    Route::get('/contatos', [ConnectorContatosController::class, 'index'])->name('api.v1.conector.contatos.index');
+    Route::get('/contatos/{externalId}', [ConnectorContatosController::class, 'show'])->name('api.v1.conector.contatos.show');
+    Route::get('/leads', [ConnectorLeadsController::class, 'index'])->name('api.v1.conector.leads.index');
+    Route::get('/leads/{externalId}', [ConnectorLeadsController::class, 'show'])->name('api.v1.conector.leads.show');
+    Route::get('/assinaturas', [ConnectorAssinaturasController::class, 'index'])->name('api.v1.conector.assinaturas.index');
+    Route::get('/assinaturas/{externalId}', [ConnectorAssinaturasController::class, 'show'])->name('api.v1.conector.assinaturas.show');
+    Route::get('/faturas', [ConnectorFaturasController::class, 'index'])->name('api.v1.conector.faturas.index');
+    Route::get('/faturas/{externalId}', [ConnectorFaturasController::class, 'show'])->name('api.v1.conector.faturas.show');
+});
+
 Route::bind('protocol', fn ($value) => FormSubmission::findOrFail($value));
 Route::bind('documentSend', fn ($value) => DocumentSend::findOrFail($value));
 
@@ -120,6 +146,11 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::get('/invoices', [PlatformBillingOverviewController::class, 'payments'])->name('api.v1.platform.invoices.index');
         Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('api.v1.platform.settings.index');
         Route::put('/settings', [PlatformSettingsController::class, 'update'])->name('api.v1.platform.settings.update');
+        Route::get('/integrations', [PlatformIntegrationsController::class, 'index'])->name('api.v1.platform.integrations.index');
+        Route::get('/integrations/business-hub', [PlatformIntegrationsController::class, 'showBusinessHub'])->name('api.v1.platform.integrations.business-hub.show');
+        Route::put('/integrations/business-hub', [PlatformIntegrationsController::class, 'updateBusinessHub'])->name('api.v1.platform.integrations.business-hub.update');
+        Route::post('/integrations/business-hub/regenerate-token', [PlatformIntegrationsController::class, 'regenerateBusinessHubToken'])->name('api.v1.platform.integrations.business-hub.regenerate-token');
+        Route::post('/integrations/business-hub/test', [PlatformIntegrationsController::class, 'testBusinessHub'])->name('api.v1.platform.integrations.business-hub.test');
         Route::get('/logs', [PlatformAuditLogController::class, 'index'])->name('api.v1.platform.logs.index');
         Route::get('/organization-presences', PlatformOrganizationPresenceController::class)->name('api.v1.platform.organization-presences.index');
         Route::get('/landing-analytics', PlatformLandingAnalyticsController::class)->name('api.v1.platform.landing-analytics');

@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => \App\Http\Middleware\EnsureTenantUser::class,
             'tenant.billing' => \App\Http\Middleware\EnsureTenantBillingActive::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'business_hub.connector' => \App\Http\Middleware\AuthenticateBusinessHubConnector::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
