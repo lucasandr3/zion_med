@@ -27,12 +27,6 @@ RUN apk add --no-cache \
     opcache \
     && rm -rf /var/cache/apk/*
 
-# Redis
-RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del .build-deps
-
 # Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
