@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\V1\Platform\AuditLogController as PlatformAuditLogC
 use App\Http\Controllers\Api\V1\Platform\BillingOverviewController as PlatformBillingOverviewController;
 use App\Http\Controllers\Api\V1\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsController;
+use App\Http\Controllers\Api\V1\Platform\ManualEmailController as PlatformManualEmailController;
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\IntegrationsController as PlatformIntegrationsController;
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
@@ -146,6 +147,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::get('/invoices', [PlatformBillingOverviewController::class, 'payments'])->name('api.v1.platform.invoices.index');
         Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('api.v1.platform.settings.index');
         Route::put('/settings', [PlatformSettingsController::class, 'update'])->name('api.v1.platform.settings.update');
+        Route::post('/settings/email-branding/upload', [PlatformSettingsController::class, 'uploadEmailBranding'])->name('api.v1.platform.settings.email-branding.upload');
         Route::get('/integrations', [PlatformIntegrationsController::class, 'index'])->name('api.v1.platform.integrations.index');
         Route::get('/integrations/business-hub', [PlatformIntegrationsController::class, 'showBusinessHub'])->name('api.v1.platform.integrations.business-hub.show');
         Route::put('/integrations/business-hub', [PlatformIntegrationsController::class, 'updateBusinessHub'])->name('api.v1.platform.integrations.business-hub.update');
@@ -154,6 +156,9 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::get('/logs', [PlatformAuditLogController::class, 'index'])->name('api.v1.platform.logs.index');
         Route::get('/organization-presences', PlatformOrganizationPresenceController::class)->name('api.v1.platform.organization-presences.index');
         Route::get('/landing-analytics', PlatformLandingAnalyticsController::class)->name('api.v1.platform.landing-analytics');
+        Route::get('/emails/recipients', [PlatformManualEmailController::class, 'recipients'])->name('api.v1.platform.emails.recipients');
+        Route::get('/emails', [PlatformManualEmailController::class, 'index'])->name('api.v1.platform.emails.index');
+        Route::post('/emails/send', [PlatformManualEmailController::class, 'send'])->name('api.v1.platform.emails.send');
     });
 });
 

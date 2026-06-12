@@ -10,13 +10,25 @@ use Illuminate\Support\Facades\Schema;
 class PlatformConfigService
 {
     /**
-     * Mescla configurações do banco (platform_settings + plans) com config/asaas e .env,
+     * Mescla configurações do banco (platform_settings + plans) com config/asaas,
      * e define o resultado em Config::get('asaas') para que config('asaas.xxx') continue funcionando.
-     * Secrets (base_url, api_key, webhook_secret) vêm sempre de config/.env.
+     * Credenciais ASAAS e MinIO vêm de platform_settings (com fallback legado em .env).
      */
     public static function mergeIntoConfig(): void
     {
-        if (! Schema::hasTable('platform_settings') || ! Schema::hasTable('plans')) {
+        if (! Schema::hasTable('platform_settings')) {
+            return;
+        }
+
+        $asaasConfig = app(AsaasConfigService::class);
+        $minioConfig = app(MinioConfigService::class);
+        $resendConfig = app(ResendConfigService::class);
+
+        $asaasConfig->mergeIntoConfig();
+        $minioConfig->applyFilesystemConfig();
+        $resendConfig->mergeIntoConfig();
+
+        if (! Schema::hasTable('plans')) {
             return;
         }
 
