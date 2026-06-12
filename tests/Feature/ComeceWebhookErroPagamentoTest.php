@@ -33,6 +33,7 @@ class ComeceWebhookErroPagamentoTest extends TestCase
             'password' => 'senha12345',
             'password_confirmation' => 'senha12345',
             'plan_key' => 'solo',
+            'phone' => '11999998888',
             'niche' => 'estetica',
             'accepted_terms' => true,
         ], $overrides);
@@ -105,6 +106,11 @@ class ComeceWebhookErroPagamentoTest extends TestCase
         ]);
 
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'erro-pagamento'));
+
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Clínica Teste',
+            'phone' => '11999998888',
+        ]);
     }
 
     public function test_webhook_not_called_when_url_not_configured(): void

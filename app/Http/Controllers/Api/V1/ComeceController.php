@@ -55,6 +55,17 @@ class ComeceController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
+            'phone' => [
+                'required',
+                'string',
+                'max:20',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $digits = preg_replace('/\D/', '', (string) $value);
+                    if (strlen($digits) < 10 || strlen($digits) > 11) {
+                        $fail('Informe um WhatsApp válido com DDD.');
+                    }
+                },
+            ],
             'niche' => ['nullable', 'string', 'max:64', Rule::in(array_keys(FormTemplate::categoryLabels()))],
             'accepted_terms' => ['accepted'],
         ], [
@@ -63,8 +74,11 @@ class ComeceController extends Controller
             'email.unique' => 'Este e-mail já está em uso. Faça login ou use outro e-mail.',
             'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
             'billing_document.required' => 'O CPF/CNPJ é obrigatório para gerar a assinatura e o boleto.',
+            'phone.required' => 'Informe um WhatsApp válido com DDD.',
             'accepted_terms.accepted' => 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar.',
         ]);
+
+        $validated['phone'] = preg_replace('/\D/', '', (string) $validated['phone']);
 
         try {
             $trialDays = (int) config('asaas.trial_days', 14);
@@ -88,6 +102,7 @@ class ComeceController extends Controller
                 'billing_email' => $validated['email'],
                 'billing_name' => $validated['company_name'],
                 'billing_document' => $validated['billing_document'] ?? null,
+                'phone' => $validated['phone'],
                 'plan_key' => $validated['plan_key'],
                 'trial_ends_at' => now()->addDays($trialDays),
                 'subscription_status' => 'trial',
