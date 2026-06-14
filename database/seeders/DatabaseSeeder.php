@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             PlatformSettingsSeeder::class,
             OrganizationSeeder::class,
             FormTemplateSeeder::class,
+            ReleaseNotesSeeder::class,
         ]);
     }
 }

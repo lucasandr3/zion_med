@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\PermissionCatalogController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
+use App\Http\Controllers\Api\V1\ReleaseNotesController;
 use App\Http\Controllers\Api\V1\TemplateController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
 use App\Http\Controllers\Api\V1\DemonstrationRequestController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Api\V1\Platform\DashboardController as PlatformDashboar
 use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsController;
 use App\Http\Controllers\Api\V1\Platform\ManualEmailController as PlatformManualEmailController;
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
+use App\Http\Controllers\Api\V1\Platform\ReleaseNotesController as PlatformReleaseNotesController;
 use App\Http\Controllers\Api\V1\Platform\IntegrationsController as PlatformIntegrationsController;
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
@@ -132,6 +134,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::post('/notificacoes/marcar-todas', [NotificationController::class, 'markAllAsRead'])->name('api.v1.notificacoes.read.all');
     Route::delete('/notificacoes/limpar-tudo', [NotificationController::class, 'destroyAll'])->name('api.v1.notificacoes.destroy.all');
     Route::delete('/notificacoes/{id}', [NotificationController::class, 'destroy'])->name('api.v1.notificacoes.destroy');
+    Route::get('/release-notes', [ReleaseNotesController::class, 'index'])->name('api.v1.release-notes.index');
+    Route::get('/release-notes/latest', [ReleaseNotesController::class, 'latest'])->name('api.v1.release-notes.latest');
 
     // Área da plataforma: apenas platform_admin
     Route::prefix('platform')->middleware('platform')->group(function () {
@@ -159,6 +163,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::get('/emails/recipients', [PlatformManualEmailController::class, 'recipients'])->name('api.v1.platform.emails.recipients');
         Route::get('/emails', [PlatformManualEmailController::class, 'index'])->name('api.v1.platform.emails.index');
         Route::post('/emails/send', [PlatformManualEmailController::class, 'send'])->name('api.v1.platform.emails.send');
+        Route::get('/release-notes', [PlatformReleaseNotesController::class, 'index'])->name('api.v1.platform.release-notes.index');
+        Route::post('/release-notes', [PlatformReleaseNotesController::class, 'store'])->name('api.v1.platform.release-notes.store');
+        Route::put('/release-notes/{releaseNote}', [PlatformReleaseNotesController::class, 'update'])->name('api.v1.platform.release-notes.update');
+        Route::delete('/release-notes/{releaseNote}', [PlatformReleaseNotesController::class, 'destroy'])->name('api.v1.platform.release-notes.destroy');
     });
 });
 
