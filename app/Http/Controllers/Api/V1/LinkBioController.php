@@ -473,6 +473,12 @@ class LinkBioController extends Controller
             $data['google_reviews_enabled'] = (bool) $data['google_reviews_enabled'];
         }
 
+        if (array_key_exists('google_place_id', $data)) {
+            $data['google_place_id'] = GooglePlacesReviewsService::normalizePlaceId($data['google_place_id']);
+        } elseif (array_key_exists('maps_url', $data) && ! empty($data['maps_url'])) {
+            $data['google_place_id'] = GooglePlacesReviewsService::extractPlaceIdFromMapsUrl($data['maps_url']);
+        }
+
         // Preserva todo o JSON de link_bio_extra enviado pelo front (arrays aninhados).
         if ($request->has('link_bio_extra')) {
             $extra = $request->input('link_bio_extra');

@@ -28,13 +28,44 @@ class GooglePlacesReviewsService
             return $matches[1];
         }
 
+        if (preg_match('/!1s(0x[a-fA-F0-9]+:0x[a-fA-F0-9]+)/', $mapsUrl, $matches)) {
+            return $matches[1];
+        }
+
+        if (preg_match('/!16s(?:%2F|\/)g(?:%2F|\/)([A-Za-z0-9_-]+)/i', $mapsUrl, $matches)) {
+            return 'g/'.$matches[1];
+        }
+
+        if (preg_match('/(?:^|[?&#!\/])g\/([A-Za-z0-9_-]{8,})/i', $mapsUrl, $matches)) {
+            return 'g/'.$matches[1];
+        }
+
         return null;
+    }
+
+    public static function normalizePlaceId(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if (
+            str_starts_with($value, 'http')
+            || str_contains($value, 'google.com/maps')
+            || str_contains($value, 'maps.app.goo.gl')
+        ) {
+            return self::extractPlaceIdFromMapsUrl($value);
+        }
+
+        return $value;
     }
 
     public function resolvePlaceId(Organization $organization): ?string
     {
-        $explicit = trim((string) ($organization->google_place_id ?? ''));
-        if ($explicit !== '') {
+        $explicit = self::normalizePlaceId($organization->google_place_id);
+        if ($explicit !== null && $explicit !== '') {
             return $explicit;
         }
 
@@ -47,7 +78,13 @@ class GooglePlacesReviewsService
             return null;
         }
 
-        return 'https://search.google.com/local/writereview?placeid=' . rawurlencode(trim($placeId));
+        $id = trim($placeId);
+
+        if (preg_match('/^0x[a-fA-F0-9]+:0x[a-fA-F0-9]+$/', $id)) {
+            return 'https://www.google.com/maps/place//data=!4m3!3m2!1s' . rawurlencode($id) . '!12e1';
+        }
+
+        return 'https://search.google.com/local/writereview?placeid=' . rawurlencode($id);
     }
 
     /**
