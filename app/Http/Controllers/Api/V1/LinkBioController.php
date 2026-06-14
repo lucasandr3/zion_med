@@ -13,6 +13,7 @@ use App\Models\OrganizationSlugAlias;
 use App\Models\LinkBioCtaClick;
 use App\Models\LinkBioLinkClick;
 use App\Models\LinkBioPageView;
+use App\Services\GooglePlacesReviewsService;
 use App\Services\ThemeService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +31,10 @@ class LinkBioController extends Controller
     /** CTAs da página pública (botões que não são links cadastrados na aba Links). */
     private const LINK_BIO_CTA_CHANNELS = ['whatsapp', 'maps', 'email', 'phone', 'instagram', 'team_whatsapp'];
 
-    public function __construct(private ThemeService $themeService) {}
+    public function __construct(
+        private ThemeService $themeService,
+        private GooglePlacesReviewsService $googlePlacesReviews,
+    ) {}
 
     /**
      * Redireciona para a URL do link público e registra o clique (estatísticas).
@@ -164,12 +168,15 @@ class LinkBioController extends Controller
                     'phone' => $clinic->phone,
                     'meta_description' => $clinic->meta_description,
                     'maps_url' => $clinic->getMapsUrl(),
+                    'google_place_id' => $clinic->google_place_id,
+                    'google_reviews_enabled' => (bool) $clinic->google_reviews_enabled,
                     'accent_hex' => $accentHex,
                     'is_open_now' => $clinic->isOpenNow(),
                     'business_hours_grid' => $clinic->getBusinessHoursGrid(),
                 ],
                 'links' => ClinicLinkResource::collection($bioLinks),
                 'form_links' => $formLinks->values(),
+                'google_reviews' => $this->googlePlacesReviews->forOrganization($clinic),
             ],
         ]);
     }
@@ -435,9 +442,11 @@ class LinkBioController extends Controller
             'founded_year' => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'maps_url' => ['nullable', 'url', 'max:500'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
+            'google_reviews_enabled' => ['nullable', 'boolean'],
         ]);
 
-        foreach (['public_theme', 'accent_hex', 'cover_color', 'cover_mode', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url'] as $key) {
+        foreach (['public_theme', 'accent_hex', 'cover_color', 'cover_mode', 'short_description', 'specialties', 'founded_year', 'contact_email', 'maps_url', 'google_place_id'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
@@ -460,7 +469,18 @@ class LinkBioController extends Controller
             }
         }
 
+        if (array_key_exists('google_reviews_enabled', $data)) {
+            $data['google_reviews_enabled'] = (bool) $data['google_reviews_enabled'];
+        }
+
+        // Preserva todo o JSON de link_bio_extra enviado pelo front (arrays aninhados).
+        if ($request->has('link_bio_extra')) {
+            $extra = $request->input('link_bio_extra');
+            $data['link_bio_extra'] = is_array($extra) ? $extra : null;
+        }
+
         $clinic->update($data);
+        $this->googlePlacesReviews->forgetOrganizationCache((int) $clinic->id);
 
         return response()->json([
             'data' => new ClinicResource($clinic->fresh()),
