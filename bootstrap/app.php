@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -36,6 +37,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->reportable(function (Throwable $e): void {
+            app(\App\Services\ErrorHubService::class)->reportException($e);
+        });
+
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
             // API ou Accept: application/json → deixar o Laravel retornar JSON (evita renderizar layout platform sem user).
             if ($request->expectsJson() || $request->is('api/*')) {
