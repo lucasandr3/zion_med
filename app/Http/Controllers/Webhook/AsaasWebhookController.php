@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Services\AsaasService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -66,6 +67,9 @@ class AsaasWebhookController extends Controller
                 'value' => $paymentData['value'] ?? null,
                 'bank_slip_url' => $paymentData['bankSlipUrl'] ?? $paymentData['invoiceUrl'] ?? null,
             ]);
+            if ($sub && strtoupper((string) ($sub->billing_type ?? '')) === 'PIX') {
+                app(AsaasService::class)->syncPixQrCodeForPayment($payment);
+            }
         } else {
             $payment->update([
                 'status' => $paymentData['status'] ?? $payment->status,

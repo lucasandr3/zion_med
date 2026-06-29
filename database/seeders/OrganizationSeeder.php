@@ -36,22 +36,22 @@ class OrganizationSeeder extends Seeder
         ]);
 
         User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'qa-owner@gestgo.test'],
+            ['email' => 'lucasvieiraandrade58@gmail.com'],
             [
                 'organization_id' => $organization->id,
                 'name' => 'QA Organização',
-                'password' => 'senha123',
+                'password' => '12345678',
                 'role' => Role::Owner->value,
                 'active' => true,
             ]
         );
 
         User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'admin@gestgo.com'],
+            ['email' => 'admin@gestgo.com.br'],
             [
                 'organization_id' => null,
                 'name' => 'Admin Plataforma',
-                'password' => bcrypt('senha123'),
+                'password' => bcrypt('12345678'),
                 'role' => Role::PlatformAdmin->value,
                 'active' => true,
             ]

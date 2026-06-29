@@ -17,6 +17,8 @@ class Payment extends Model
         'paid_at',
         'value',
         'bank_slip_url',
+        'pix_qr_encoded_image',
+        'pix_copy_paste',
     ];
 
     protected $casts = [

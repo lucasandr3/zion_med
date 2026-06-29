@@ -44,6 +44,7 @@ class ClinicSettingsController extends Controller
             'id' => $s->id,
             'asaas_subscription_id' => $s->asaas_subscription_id,
             'plan_key' => $s->plan_key,
+            'billing_type' => $s->billing_type ?? 'BOLETO',
             'status' => $s->status,
             'next_due_date' => $s->next_due_date,
             'created_at' => $s->created_at?->toIso8601String(),
@@ -55,6 +56,8 @@ class ClinicSettingsController extends Controller
             'paid_at' => $p->paid_at?->toIso8601String(),
             'value' => $p->value,
             'bank_slip_url' => $p->bank_slip_url,
+            'pix_qr_encoded_image' => $p->pix_qr_encoded_image,
+            'pix_copy_paste' => $p->pix_copy_paste,
         ]);
 
         $multiEmpresaPlan = config('asaas.multi_empresa_plan', 'enterprise');

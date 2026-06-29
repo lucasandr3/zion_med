@@ -414,7 +414,7 @@ class Organization extends Model
             'show_pending_first_payment' => $pending,
             'show_plan_selection' => $this->billingUiShowsPlanSelection(),
             'pending_first_payment_message' => $pending
-                ? 'Seu trial encerrou e a assinatura ainda não teve pagamento confirmado. Pague o boleto abaixo ou assine novamente para gerar uma nova cobrança.'
+                ? 'Seu trial encerrou e a assinatura ainda não teve pagamento confirmado. Pague via PIX ou boleto abaixo, ou assine novamente para gerar uma nova cobrança.'
                 : null,
         ];
     }
@@ -480,6 +480,14 @@ class Organization extends Model
      */
     public function canAccessTenantAppFeatures(): bool
     {
+        if ($this->isBillingBlocked()) {
+            return false;
+        }
+
+        if ($this->isAwaitingFirstBillingPayment()) {
+            return false;
+        }
+
         if ($this->subscription_status === 'past_due') {
             if ($this->grace_ends_at && now()->lte($this->grace_ends_at)) {
                 return true;

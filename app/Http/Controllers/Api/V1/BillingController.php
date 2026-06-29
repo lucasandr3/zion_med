@@ -65,6 +65,7 @@ class BillingController extends Controller
             'id' => $s->id,
             'asaas_subscription_id' => $s->asaas_subscription_id,
             'plan_key' => $s->plan_key,
+            'billing_type' => $s->billing_type ?? 'BOLETO',
             'status' => $s->status,
             'next_due_date' => $s->next_due_date,
             'created_at' => $s->created_at?->toIso8601String(),
@@ -76,6 +77,8 @@ class BillingController extends Controller
             'paid_at' => $p->paid_at?->toIso8601String(),
             'value' => $p->value,
             'bank_slip_url' => $p->bank_slip_url,
+            'pix_qr_encoded_image' => $p->pix_qr_encoded_image,
+            'pix_copy_paste' => $p->pix_copy_paste,
         ]);
 
         return response()->json([
@@ -112,9 +115,11 @@ class BillingController extends Controller
 
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
+            'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido. Escolha um dos planos disponíveis.',
+            'billing_type.in' => 'Forma de pagamento inválida. Use Boleto ou PIX.',
         ]);
 
         $organization = $this->currentOrganization($request);
@@ -157,13 +162,14 @@ class BillingController extends Controller
 
         $wasOnTrial = $organization->isOnTrial();
         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
+        $billingType = $this->asaasService->normalizeBillingType($request->input('billing_type', 'PIX'));
 
         try {
             $payload = $this->asaasService->createSubscription(
                 $organization,
                 $planKey,
                 (float) $plan['value'],
-                'BOLETO',
+                $billingType,
                 $firstDue
             );
         } catch (\Throwable $e) {
@@ -184,11 +190,12 @@ class BillingController extends Controller
             'organization_id' => $organization->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
+            'billing_type' => $billingType,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);
 
-        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId);
+        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId, $billingType);
 
         $organizationUpdates = [
             'plan_key' => $planKey,
@@ -208,9 +215,12 @@ class BillingController extends Controller
         ]);
 
         $dueFormatted = Carbon::parse($nextDue)->format('d/m/Y');
+        $paymentHint = $billingType === 'PIX'
+            ? 'O PIX da primeira cobrança está disponível abaixo nesta página.'
+            : 'Sua primeira cobrança foi gerada e em breve você receberá o boleto por e-mail.';
         $successMessage = $wasOnTrial
             ? 'Assinatura registrada. Você permanece em período de trial. A primeira cobrança vencerá em '.$dueFormatted.'.'
-            : 'Assinatura ativa. Sua primeira cobrança foi gerada e em breve você receberá o boleto por e-mail.';
+            : 'Assinatura ativa. '.$paymentHint;
 
         return response()->json([
             'data' => [
@@ -286,9 +296,11 @@ class BillingController extends Controller
 
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
+            'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido.',
+            'billing_type.in' => 'Forma de pagamento inválida.',
         ]);
 
         $organization = $this->currentOrganization($request);
@@ -322,13 +334,14 @@ class BillingController extends Controller
 
         $wasOnTrial = $organization->isOnTrial();
         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
+        $billingType = $this->asaasService->normalizeBillingType($request->input('billing_type', 'PIX'));
 
         try {
             $payload = $this->asaasService->createSubscription(
                 $organization,
                 $planKey,
                 (float) $plan['value'],
-                'BOLETO',
+                $billingType,
                 $firstDue
             );
         } catch (\Throwable $e) {
@@ -348,11 +361,12 @@ class BillingController extends Controller
             'organization_id' => $organization->id,
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
+            'billing_type' => $billingType,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);
 
-        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId);
+        $this->syncSubscriptionPaymentsFromAsaas($organization, $subscription, $asaasId, $billingType);
 
         $organizationUpdates = [
             'plan_key' => $planKey,
@@ -389,8 +403,12 @@ class BillingController extends Controller
         return Organization::query()->find($organizationId);
     }
 
-    private function syncSubscriptionPaymentsFromAsaas(Organization $organization, Subscription $subscription, string $asaasSubscriptionId): void
-    {
+    private function syncSubscriptionPaymentsFromAsaas(
+        Organization $organization,
+        Subscription $subscription,
+        string $asaasSubscriptionId,
+        ?string $billingType = null,
+    ): void {
         try {
             $payments = $this->asaasService->getSubscriptionPayments($asaasSubscriptionId);
         } catch (\Throwable $e) {
@@ -400,22 +418,19 @@ class BillingController extends Controller
         }
 
         foreach ($payments as $item) {
-            $asaasPaymentId = $item['id'] ?? null;
-            if (! $asaasPaymentId) {
-                continue;
+            try {
+                $this->asaasService->upsertPaymentFromAsaasItem(
+                    $organization,
+                    $subscription,
+                    $item,
+                    $billingType ?? $subscription->billing_type,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Asaas upsert payment failed', [
+                    'subscription_id' => $asaasSubscriptionId,
+                    'error' => $e->getMessage(),
+                ]);
             }
-            Payment::updateOrCreate(
-                ['asaas_payment_id' => $asaasPaymentId],
-                [
-                    'organization_id' => $organization->id,
-                    'subscription_id' => $subscription->id,
-                    'status' => $item['status'] ?? 'PENDING',
-                    'due_date' => isset($item['dueDate']) ? $item['dueDate'] : null,
-                    'paid_at' => isset($item['paymentDate']) ? $item['paymentDate'] : null,
-                    'value' => $item['value'] ?? null,
-                    'bank_slip_url' => $item['bankSlipUrl'] ?? $item['invoiceUrl'] ?? null,
-                ]
-            );
         }
     }
 

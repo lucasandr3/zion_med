@@ -55,6 +55,7 @@ class ComeceController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
+            'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
             'phone' => [
                 'required',
                 'string',
@@ -138,11 +139,12 @@ class ComeceController extends Controller
                     try {
                         $organization->refresh();
                         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
+                        $billingType = $this->asaasService->normalizeBillingType($validated['billing_type'] ?? 'PIX');
                         $payload = $this->asaasService->createSubscription(
                             $organization,
                             $validated['plan_key'],
                             (float) $plan['value'],
-                            'BOLETO',
+                            $billingType,
                             $firstDue
                         );
                         $asaasId = $payload['id'] ?? null;
@@ -152,6 +154,7 @@ class ComeceController extends Controller
                                 'organization_id' => $organization->id,
                                 'asaas_subscription_id' => $asaasId,
                                 'plan_key' => $validated['plan_key'],
+                                'billing_type' => $billingType,
                                 'status' => 'active',
                                 'next_due_date' => $firstInvoiceDueDate,
                             ]);
@@ -159,7 +162,6 @@ class ComeceController extends Controller
                                 'plan_key' => $validated['plan_key'],
                                 'billing_status' => 'ok',
                                 'grace_ends_at' => null,
-                                'subscription_status' => 'active',
                             ]);
                             $subscriptionCreated = true;
                         }

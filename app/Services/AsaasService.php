@@ -27,6 +27,14 @@ class AsaasService
         return $this->apiKey !== '';
     }
 
+    /**
+     * Normaliza tipo de cobrança aceito pelo Asaas (BOLETO ou PIX).
+     */
+    public function normalizeBillingType(?string $billingType): string
+    {
+        return strtoupper(trim((string) $billingType)) === 'PIX' ? 'PIX' : 'BOLETO';
+    }
+
     private function request(string $method, string $path, array $data = []): Response
     {
         $url = $this->baseUrl.'/'.ltrim($path, '/');
@@ -112,6 +120,7 @@ class AsaasService
 
         $productName = config('asaas.product_name', 'Gestgo');
         $nextDue = $nextDueDate ?? now()->format('Y-m-d');
+        $billingType = $this->normalizeBillingType($billingType);
 
         $payload = [
             'customer' => $customerId,
@@ -126,6 +135,84 @@ class AsaasService
         $resp->throw();
 
         return $resp->json();
+    }
+
+    /**
+     * QR Code e copia-e-cola PIX de uma cobrança no Asaas.
+     *
+     * @return array{encodedImage?: string, payload?: string, expirationDate?: string}|null
+     */
+    public function getPaymentPixQrCode(string $asaasPaymentId): ?array
+    {
+        $resp = $this->request('GET', '/payments/'.$asaasPaymentId.'/pixQrCode');
+        if (! $resp->successful()) {
+            return null;
+        }
+
+        return $resp->json();
+    }
+
+    /**
+     * Cria ou atualiza pagamento local a partir de item da API Asaas e sincroniza PIX quando aplicável.
+     */
+    public function upsertPaymentFromAsaasItem(
+        Organization $organization,
+        Subscription $subscription,
+        array $item,
+        ?string $billingType = null,
+    ): Payment {
+        $asaasPaymentId = $item['id'] ?? null;
+        if (! $asaasPaymentId) {
+            throw new \InvalidArgumentException('Cobrança ASAAS sem ID.');
+        }
+
+        $resolvedBillingType = $this->normalizeBillingType($item['billingType'] ?? $billingType ?? $subscription->billing_type ?? 'BOLETO');
+
+        $payment = Payment::updateOrCreate(
+            ['asaas_payment_id' => $asaasPaymentId],
+            [
+                'organization_id' => $organization->id,
+                'subscription_id' => $subscription->id,
+                'status' => $item['status'] ?? 'PENDING',
+                'due_date' => $item['dueDate'] ?? null,
+                'paid_at' => $item['paymentDate'] ?? null,
+                'value' => $item['value'] ?? null,
+                'bank_slip_url' => $item['bankSlipUrl'] ?? $item['invoiceUrl'] ?? null,
+            ]
+        );
+
+        if ($resolvedBillingType === 'PIX' && ! $payment->isPaid()) {
+            $this->syncPixQrCodeForPayment($payment);
+        }
+
+        return $payment;
+    }
+
+    /**
+     * Busca QR Code / copia-e-cola PIX no Asaas e grava no pagamento local.
+     */
+    public function syncPixQrCodeForPayment(Payment $payment): void
+    {
+        if ($payment->isPaid() || ! $payment->asaas_payment_id) {
+            return;
+        }
+
+        try {
+            $pix = $this->getPaymentPixQrCode($payment->asaas_payment_id);
+            if (! $pix) {
+                return;
+            }
+            $payment->update([
+                'pix_qr_encoded_image' => $pix['encodedImage'] ?? null,
+                'pix_copy_paste' => $pix['payload'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Asaas pixQrCode failed', [
+                'payment_id' => $payment->id,
+                'asaas_payment_id' => $payment->asaas_payment_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -222,23 +309,15 @@ class AsaasService
                 continue;
             }
             foreach ($payments as $item) {
-                $asaasPaymentId = $item['id'] ?? null;
-                if (! $asaasPaymentId) {
-                    continue;
-                }
-                $status = strtoupper($item['status'] ?? 'PENDING');
-                Payment::updateOrCreate(
-                    ['asaas_payment_id' => $asaasPaymentId],
-                    [
+                try {
+                    $this->upsertPaymentFromAsaasItem($organization, $subscription, $item);
+                } catch (\Throwable $e) {
+                    Log::warning('Asaas upsert payment failed', [
                         'organization_id' => $organization->id,
                         'subscription_id' => $subscription->id,
-                        'status' => $status,
-                        'due_date' => $item['dueDate'] ?? null,
-                        'paid_at' => $item['paymentDate'] ?? null,
-                        'value' => $item['value'] ?? null,
-                        'bank_slip_url' => $item['bankSlipUrl'] ?? $item['invoiceUrl'] ?? null,
-                    ]
-                );
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         }
         $hasPaidPending = $organization->payments()
