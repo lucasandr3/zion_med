@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ClinicScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AuditLog extends Model
 {
     const UPDATED_AT = null;
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ClinicScope);
+    }
 
     protected $fillable = [
         'organization_id',

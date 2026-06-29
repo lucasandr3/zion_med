@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ProtocolIndexRequest;
 use App\Http\Resources\Api\V1\ProtocolDetailResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\FormSubmission;
 use App\Services\DossierService;
+use App\Support\ApiPagination;
 use App\Support\PersonPiiHasher;
 use App\Services\PdfService;
 use App\Services\SubmissionService;
@@ -24,29 +26,29 @@ class ProtocolController extends Controller
     /**
      * Lista protocolos da clínica com filtros e paginação.
      */
-    public function index(Request $request): JsonResponse
+    public function index(ProtocolIndexRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
+        $validated = $request->validated();
 
         $query = FormSubmission::with(['template', 'person'])->latest();
 
-        if ($request->filled('template_id')) {
-            $query->where('template_id', $request->template_id);
+        if (! empty($validated['template_id'])) {
+            $query->where('template_id', $validated['template_id']);
         }
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
         }
-        if ($request->filled('data_inicio')) {
-            $query->whereDate('created_at', '>=', $request->data_inicio);
+        if (! empty($validated['data_inicio'])) {
+            $query->whereDate('created_at', '>=', $validated['data_inicio']);
         }
-        if ($request->filled('data_fim')) {
-            $query->whereDate('created_at', '<=', $request->data_fim);
+        if (! empty($validated['data_fim'])) {
+            $query->whereDate('created_at', '<=', $validated['data_fim']);
         }
-        if ($request->filled('person_id')) {
-            $query->where('person_id', $request->person_id);
+        if (! empty($validated['person_id'])) {
+            $query->where('person_id', $validated['person_id']);
         }
-        if ($request->filled('busca')) {
-            $rawBusca = trim((string) $request->busca);
+        if (! empty($validated['busca'])) {
+            $rawBusca = trim((string) $validated['busca']);
             $busca = '%'.$rawBusca.'%';
             $digits = preg_replace('/\D+/', '', $rawBusca) ?? '';
             $query->where(function ($q) use ($busca, $rawBusca, $digits) {
@@ -66,24 +68,11 @@ class ProtocolController extends Controller
             });
         }
 
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $protocols = $query->paginate($perPage)->withQueryString();
+        $paginator = $query->paginate($request->perPage())->withQueryString();
 
-        return response()->json([
-            'data' => ProtocolResource::collection($protocols->items()),
-            'meta' => [
-                'current_page' => $protocols->currentPage(),
-                'last_page' => $protocols->lastPage(),
-                'per_page' => $protocols->perPage(),
-                'total' => $protocols->total(),
-            ],
-            'links' => [
-                'first' => $protocols->url(1),
-                'last' => $protocols->url($protocols->lastPage()),
-                'prev' => $protocols->previousPageUrl(),
-                'next' => $protocols->nextPageUrl(),
-            ],
-        ]);
+        return response()->json(
+            ApiPagination::wrap($paginator, ProtocolResource::collection($paginator->items()))
+        );
     }
 
     /**

@@ -31,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform' => \App\Http\Middleware\EnsurePlatformAdmin::class,
             'tenant' => \App\Http\Middleware\EnsureTenantUser::class,
             'tenant.billing' => \App\Http\Middleware\EnsureTenantBillingActive::class,
-            'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'verified' => \App\Http\Middleware\EnsureEmailIsVerifiedApi::class,
             'business_hub.connector' => \App\Http\Middleware\AuthenticateBusinessHubConnector::class,
         ]);
     })

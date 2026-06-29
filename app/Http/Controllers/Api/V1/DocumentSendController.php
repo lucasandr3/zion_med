@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DocumentSendIndexRequest;
 use App\Models\DocumentSend;
 use App\Models\FormTemplate;
 use App\Models\Person;
 use App\Services\DocumentSendService;
+use App\Support\ApiPagination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,20 +19,20 @@ class DocumentSendController extends Controller
     /**
      * Lista envios de documentos da clínica (caixas: pendentes, assinados, expirados).
      */
-    public function index(Request $request): JsonResponse
+    public function index(DocumentSendIndexRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
-
         $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
         if (! $orgId) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
 
+        $validated = $request->validated();
+
         $query = DocumentSend::with(['formTemplate', 'formSubmission', 'person'])
             ->where('organization_id', $orgId);
 
-        if ($request->filled('caixa')) {
-            match ($request->caixa) {
+        if (! empty($validated['caixa'])) {
+            match ($validated['caixa']) {
                 'pendentes' => $query->notCancelled()
                     ->whereNull('form_submission_id')
                     ->where(function ($q) {
@@ -44,18 +46,17 @@ class DocumentSendController extends Controller
                 default => null,
             };
         }
-        if ($request->filled('template_id')) {
-            $query->where('form_template_id', $request->template_id);
+        if (! empty($validated['template_id'])) {
+            $query->where('form_template_id', $validated['template_id']);
         }
-        if ($request->filled('channel')) {
-            $query->where('channel', $request->channel);
+        if (! empty($validated['channel'])) {
+            $query->where('channel', $validated['channel']);
         }
 
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $sends = $query->orderByDesc('sent_at')->paginate($perPage)->withQueryString();
+        $paginator = $query->orderByDesc('sent_at')->paginate($request->perPage())->withQueryString();
 
-        return response()->json([
-            'data' => $sends->map(fn (DocumentSend $s) => [
+        return response()->json(
+            ApiPagination::wrap($paginator, $paginator->map(fn (DocumentSend $s) => [
                 'delivery_status' => $s->sent_at ? 'enviado' : 'nao_enviado',
                 'signature_status' => $s->form_submission_id ? 'assinado' : ($s->isCancelled() ? 'cancelado' : ($s->isExpired() ? 'expirado' : 'aguardando_assinatura')),
                 'id' => $s->id,
@@ -78,20 +79,8 @@ class DocumentSendController extends Controller
                 'status' => $s->isCancelled() ? 'cancelado' : ($s->form_submission_id ? 'assinado' : ($s->isExpired() ? 'expirado' : 'pendente')),
                 'cancelled_at' => $s->cancelled_at?->toIso8601String(),
                 'reminded_at' => $s->reminded_at?->toIso8601String(),
-            ]),
-            'meta' => [
-                'current_page' => $sends->currentPage(),
-                'last_page' => $sends->lastPage(),
-                'per_page' => $sends->perPage(),
-                'total' => $sends->total(),
-            ],
-            'links' => [
-                'first' => $sends->url(1),
-                'last' => $sends->url($sends->lastPage()),
-                'prev' => $sends->previousPageUrl(),
-                'next' => $sends->nextPageUrl(),
-            ],
-        ]);
+            ]))
+        );
     }
 
     /**

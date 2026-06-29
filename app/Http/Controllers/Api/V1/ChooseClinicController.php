@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Models\Clinic;
-use App\Models\Organization;
+use App\Services\OrganizationAccessService;
 use App\Services\OrganizationPresenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +13,9 @@ use Illuminate\Validation\Rule;
 
 class ChooseClinicController extends Controller
 {
+    public function __construct(
+        private readonly OrganizationAccessService $organizationAccess,
+    ) {}
     /**
      * Lista organizações que o usuário pode escolher (para trocar contexto).
      */
@@ -21,7 +24,7 @@ class ChooseClinicController extends Controller
         $this->authorizeClinicSwitch($request);
 
         $user = $request->user();
-        $organizations = $this->organizationsAllowedForUser($user);
+        $organizations = $this->organizationAccess->allowedOrganizationsForUser($user);
         $currentOrganizationId = session('current_organization_id') ?? session('current_clinic_id');
 
         return response()->json([
@@ -40,7 +43,7 @@ class ChooseClinicController extends Controller
         $this->authorizeClinicSwitch($request);
 
         $user = $request->user();
-        $allowedIds = $this->organizationsAllowedForUser($user)->pluck('id')->all();
+        $allowedIds = $this->organizationAccess->allowedOrganizationIdsForUser($user);
 
         if (empty($allowedIds)) {
             return response()->json(['message' => 'Nenhuma empresa disponível para seleção.'], 403);
@@ -95,15 +98,4 @@ class ChooseClinicController extends Controller
         abort(403);
     }
 
-    private function organizationsAllowedForUser($user): \Illuminate\Database\Eloquent\Collection
-    {
-        $tenantId = $user->clinic?->tenant_id;
-        if ($tenantId === null) {
-            return $user->clinic_id
-                ? Organization::where('id', $user->clinic_id)->withCount('users')->get()
-                : Organization::whereRaw('0 = 1')->withCount('users')->get();
-        }
-
-        return Organization::withoutGlobalScopes()->where('tenant_id', $tenantId)->orderBy('name')->withCount('users')->get();
-    }
 }

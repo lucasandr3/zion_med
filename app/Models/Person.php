@@ -98,6 +98,7 @@ class Person extends Model
             'neighborhood' => 'encrypted',
             'city' => 'encrypted',
             'cep' => 'encrypted',
+            'health_plan_card_number' => 'encrypted',
         ];
     }
 

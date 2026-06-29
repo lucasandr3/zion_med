@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PersonIndexRequest;
 use App\Http\Resources\Api\V1\PersonResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\Person;
+use App\Support\ApiPagination;
 use App\Support\PersonPiiHasher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,17 +17,17 @@ use Illuminate\Validation\Rule;
 
 class PersonController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(PersonIndexRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
+        $validated = $request->validated();
 
         $query = Person::query()
             ->withCount('submissions')
             ->withMax('submissions', 'submitted_at')
             ->latest('id');
 
-        if ($request->filled('search')) {
-            $raw = trim((string) $request->search);
+        if (! empty($validated['search'])) {
+            $raw = trim((string) $validated['search']);
             $term = '%'.$raw.'%';
             $digits = preg_replace('/\D+/', '', $raw) ?? '';
             $query->where(function ($w) use ($term, $raw, $digits) {
@@ -40,44 +42,29 @@ class PersonController extends Controller
             });
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
         }
 
-        if ($request->has('has_protocols')) {
-            $v = $request->query('has_protocols');
-            if ($v === '1' || $v === 'true' || $v === true) {
-                $query->has('submissions');
-            } elseif ($v === '0' || $v === 'false' || $v === false) {
-                $query->doesntHave('submissions');
-            }
+        $hasProtocols = $request->hasProtocolsFilter();
+        if ($hasProtocols === true) {
+            $query->has('submissions');
+        } elseif ($hasProtocols === false) {
+            $query->doesntHave('submissions');
         }
 
-        if ($request->filled('created_from')) {
-            $query->whereDate('created_at', '>=', $request->created_from);
+        if (! empty($validated['created_from'])) {
+            $query->whereDate('created_at', '>=', $validated['created_from']);
         }
-        if ($request->filled('created_to')) {
-            $query->whereDate('created_at', '<=', $request->created_to);
+        if (! empty($validated['created_to'])) {
+            $query->whereDate('created_at', '<=', $validated['created_to']);
         }
 
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $paginator = $query->paginate($perPage)->withQueryString();
+        $paginator = $query->paginate($request->perPage())->withQueryString();
 
-        return response()->json([
-            'data' => PersonResource::collection($paginator->items()),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
-            ],
-        ]);
+        return response()->json(
+            ApiPagination::wrap($paginator, PersonResource::collection($paginator->items()))
+        );
     }
 
     public function store(Request $request): JsonResponse
@@ -167,7 +154,7 @@ class PersonController extends Controller
         $person->loadCount('submissions')->loadMax('submissions', 'submitted_at');
 
         return response()->json([
-            'data' => new PersonResource($person),
+            'data' => (new PersonResource($person))->exposePii(),
         ], 201);
     }
 
@@ -189,7 +176,7 @@ class PersonController extends Controller
             ->get();
 
         $pessoa->loadMax('submissions', 'submitted_at');
-        $base = (new PersonResource($pessoa))->toArray($request);
+        $base = (new PersonResource($pessoa))->exposePii()->toArray($request);
 
         return response()->json([
             'data' => array_merge($base, [
@@ -245,7 +232,7 @@ class PersonController extends Controller
         $pessoa->loadCount('submissions')->loadMax('submissions', 'submitted_at');
 
         return response()->json([
-            'data' => new PersonResource($pessoa),
+            'data' => (new PersonResource($pessoa))->exposePii(),
         ]);
     }
 

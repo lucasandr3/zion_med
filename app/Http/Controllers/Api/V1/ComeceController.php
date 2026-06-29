@@ -34,19 +34,20 @@ class ComeceController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $billingDocumentRules = $this->asaasService->isConfigured()
-            ? [
-                'required',
-                'string',
-                'max:25',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    $doc = preg_replace('/\D/', '', (string) $value);
-                    if (strlen($doc) !== 11 && strlen($doc) !== 14) {
-                        $fail('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido para faturamento.');
-                    }
-                },
-            ]
-            : ['nullable', 'string', 'max:25'];
+        $billingDocumentRules = [
+            'nullable',
+            'string',
+            'max:25',
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                if ($value === null || $value === '') {
+                    return;
+                }
+                $doc = preg_replace('/\D/', '', (string) $value);
+                if (strlen($doc) !== 11 && strlen($doc) !== 14) {
+                    $fail('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido para faturamento.');
+                }
+            },
+        ];
 
         $validated = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
@@ -74,7 +75,7 @@ class ComeceController extends Controller
             'responsible_name.required' => 'Informe o seu nome (responsável).',
             'email.unique' => 'Este e-mail já está em uso. Faça login ou use outro e-mail.',
             'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
-            'billing_document.required' => 'O CPF/CNPJ é obrigatório para gerar a assinatura e o boleto.',
+            'billing_document.required' => 'Informe CPF ou CNPJ apenas se quiser já configurar faturamento.',
             'phone.required' => 'Informe um WhatsApp válido com DDD.',
             'accepted_terms.accepted' => 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar.',
         ]);
@@ -102,7 +103,9 @@ class ComeceController extends Controller
                 'notification_email' => $validated['email'],
                 'billing_email' => $validated['email'],
                 'billing_name' => $validated['company_name'],
-                'billing_document' => $validated['billing_document'] ?? null,
+                'billing_document' => isset($validated['billing_document']) && $validated['billing_document'] !== ''
+                    ? preg_replace('/\D/', '', (string) $validated['billing_document'])
+                    : null,
                 'phone' => $validated['phone'],
                 'plan_key' => $validated['plan_key'],
                 'trial_ends_at' => now()->addDays($trialDays),
@@ -132,7 +135,8 @@ class ComeceController extends Controller
 
             $subscriptionCreated = false;
             $firstInvoiceDueDate = null;
-            if ($this->asaasService->isConfigured()) {
+            $billingDoc = $organization->billing_document;
+            if ($this->asaasService->isConfigured() && $billingDoc !== null && $billingDoc !== '') {
                 $plans = config('asaas.plans', []);
                 $plan = $plans[$validated['plan_key']] ?? null;
                 if ($plan) {

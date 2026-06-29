@@ -16,7 +16,12 @@ class AsaasWebhookController extends Controller
     public function handle(Request $request): JsonResponse
     {
         $secret = config('asaas.webhook_secret');
-        if ($secret !== '' && $request->header('asaas-access-token') !== $secret) {
+        if ($secret === '' || $secret === null) {
+            if (app()->environment('production')) {
+                Log::error('Asaas webhook: ASAAS_WEBHOOK_SECRET not configured');
+                return response()->json(['received' => false, 'message' => 'Webhook not configured'], 503);
+            }
+        } elseif ($request->header('asaas-access-token') !== $secret) {
             Log::warning('Asaas webhook: invalid or missing token');
             return response()->json(['received' => false], 401);
         }
@@ -33,7 +38,7 @@ class AsaasWebhookController extends Controller
             }
         } catch (\Throwable $e) {
             Log::error('Asaas webhook processing failed', ['event' => $event, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return response()->json(['received' => true], 200);
+            return response()->json(['received' => false, 'message' => 'Processing failed'], 500);
         }
 
         return response()->json(['received' => true], 200);

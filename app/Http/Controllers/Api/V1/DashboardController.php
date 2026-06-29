@@ -43,6 +43,10 @@ class DashboardController extends Controller
                     'ultimas_submissoes' => [],
                     'modelos_mais_usados' => [],
                     'respostas_por_template' => [],
+                    'onboarding' => [
+                        'needs_public_link' => false,
+                        'public_links_count' => 0,
+                    ],
                 ],
             ]);
         }
@@ -196,6 +200,10 @@ class DashboardController extends Controller
                 'ultimas_submissoes' => $ultimasSubmissoes,
                 'modelos_mais_usados' => $modelosMaisUsados,
                 'respostas_por_template' => $respostasPorTemplate,
+                'onboarding' => [
+                    'needs_public_link' => $linksPublicosCount === 0,
+                    'public_links_count' => $linksPublicosCount,
+                ],
             ],
         ]);
     }

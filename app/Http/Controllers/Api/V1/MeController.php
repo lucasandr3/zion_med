@@ -19,7 +19,6 @@ class MeController extends Controller
         $user = $request->user();
         $organizationId = session('current_organization_id') ?? session('current_clinic_id');
         $organization = $organizationId ? Organization::query()->find($organizationId) : null;
-        $organization?->syncExpiredTrialStateIfNeeded();
         if ($organization) {
             $organization->refresh();
         }

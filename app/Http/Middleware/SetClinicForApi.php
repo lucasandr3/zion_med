@@ -3,15 +3,20 @@
 namespace App\Http\Middleware;
 
 use App\Models\Organization;
+use App\Services\OrganizationAccessService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetClinicForApi
 {
+    public function __construct(
+        private readonly OrganizationAccessService $organizationAccess,
+    ) {}
+
     /**
      * Define a organização do contexto para requisições API (Sanctum).
-     * Usa organization_id do usuário; header X-Organization-Id ou X-Clinic-Id se pode trocar de empresa.
+     * Usa organization_id do usuário; header X-Organization-Id ou X-Clinic-Id se permitido e válido.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -20,11 +25,10 @@ class SetClinicForApi
             return $next($request);
         }
 
-        $organizationId = $user->clinic_id;
         $headerOrgId = $request->header('X-Organization-Id') ?? $request->header('X-Clinic-Id');
-        if ($user->canSwitchClinic() && $headerOrgId !== null && $headerOrgId !== '') {
-            $organizationId = (int) $headerOrgId;
-        }
+        $requestedOrgId = ($headerOrgId !== null && $headerOrgId !== '') ? (int) $headerOrgId : null;
+
+        $organizationId = $this->organizationAccess->resolveOrganizationIdForUser($user, $requestedOrgId);
 
         if ($organizationId !== null) {
             session([
@@ -32,7 +36,6 @@ class SetClinicForApi
                 'current_organization_id' => $organizationId,
             ]);
             $organization = Organization::query()->find($organizationId);
-            $organization?->syncExpiredTrialStateIfNeeded();
         }
 
         return $next($request);

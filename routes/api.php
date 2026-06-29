@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
 use App\Http\Controllers\Api\V1\PermissionCatalogController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\OnboardingController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
 use App\Http\Controllers\Api\V1\ReleaseNotesController;
@@ -168,6 +169,12 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
         Route::put('/release-notes/{releaseNote}', [PlatformReleaseNotesController::class, 'update'])->name('api.v1.platform.release-notes.update');
         Route::delete('/release-notes/{releaseNote}', [PlatformReleaseNotesController::class, 'destroy'])->name('api.v1.platform.release-notes.destroy');
     });
+});
+
+// Onboarding pós-cadastro (tenant autenticado; e-mail pode estar pendente de verificação)
+Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->group(function () {
+    Route::get('/onboarding/templates', [OnboardingController::class, 'templates'])->name('api.v1.onboarding.templates');
+    Route::post('/onboarding/templates/{template}/link-publico', [OnboardingController::class, 'gerarLink'])->name('api.v1.onboarding.link');
 });
 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.

@@ -2,11 +2,22 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\PiiMasker;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class PersonResource extends JsonResource
 {
+    /** Exibe PII completo (detalhe/edição); listagens permanecem mascaradas. */
+    public bool $exposePii = false;
+
+    public function exposePii(bool $value = true): static
+    {
+        $this->exposePii = $value;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $lastProtocol = null;
@@ -18,21 +29,21 @@ class PersonResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
-            'phone' => $this->phone,
-            'phone_alt' => $this->phone_alt,
-            'email' => $this->email,
+            'phone' => $this->exposePii ? $this->phone : PiiMasker::maskPhone($this->phone),
+            'phone_alt' => $this->exposePii ? $this->phone_alt : PiiMasker::maskPhone($this->phone_alt),
+            'email' => $this->exposePii ? $this->email : PiiMasker::maskEmail($this->email),
             'birth_date' => $this->birth_date?->format('Y-m-d'),
             'age' => $this->age,
             'sex' => $this->sex,
-            'cpf' => $this->cpf,
-            'rg' => $this->rg,
+            'cpf' => $this->exposePii ? $this->cpf : PiiMasker::maskCpf($this->cpf),
+            'rg' => $this->exposePii ? $this->rg : PiiMasker::maskGeneric($this->rg),
             'marital_status' => $this->marital_status,
             'profession' => $this->profession,
             'referred_by' => $this->referred_by,
-            'address' => $this->address,
+            'address' => $this->exposePii ? $this->address : PiiMasker::maskGeneric($this->address, 0),
             'neighborhood' => $this->neighborhood,
             'city' => $this->city,
-            'cep' => $this->cep,
+            'cep' => $this->exposePii ? $this->cep : PiiMasker::maskGeneric($this->cep, 3),
             'lead_source_instagram' => (bool) $this->lead_source_instagram,
             'lead_source_google' => (bool) $this->lead_source_google,
             'lead_source_facebook' => (bool) $this->lead_source_facebook,
@@ -42,7 +53,9 @@ class PersonResource extends JsonResource
             'lead_source_outro' => $this->lead_source_outro,
             'has_health_plan' => $this->has_health_plan,
             'health_plan_operator' => $this->health_plan_operator,
-            'health_plan_card_number' => $this->health_plan_card_number,
+            'health_plan_card_number' => $this->exposePii
+                ? $this->health_plan_card_number
+                : PiiMasker::maskGeneric($this->health_plan_card_number),
             'lgpd_accept_comms' => (bool) $this->lgpd_accept_comms,
             'lgpd_accept_reminders' => (bool) $this->lgpd_accept_reminders,
             'notes' => $this->notes,

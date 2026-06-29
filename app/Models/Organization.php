@@ -617,10 +617,13 @@ class Organization extends Model
         $maxUsers = $def['max_users'] ?? null;
         $maxOrgs = $def['max_organizations_per_tenant'] ?? null;
 
+        $linkBioEnabled = $def['link_bio_enabled'] ?? true;
+
         return [
             'plan_key' => $this->plan_key,
             'max_users' => $maxUsers !== null ? (int) $maxUsers : null,
             'max_organizations_per_tenant' => $maxOrgs !== null ? (int) $maxOrgs : null,
+            'link_bio_enabled' => (bool) $linkBioEnabled,
             'users_count' => $this->users()->count(),
             'organizations_in_tenant' => $this->organizationsInTenantCount(),
             'can_add_user' => $this->canAddAnotherUser(),

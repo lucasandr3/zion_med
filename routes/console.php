@@ -68,3 +68,5 @@ Artisan::command('documents:send-reminders', function () use ($reminderDays) {
 Schedule::command('documents:send-reminders')->dailyAt('09:00');
 
 Schedule::command('people:purge-inactive')->dailyAt('04:15');
+
+Schedule::command('organizations:sync-expired-trials')->hourly();

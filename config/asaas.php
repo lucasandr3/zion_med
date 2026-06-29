@@ -29,6 +29,7 @@ return [
             'description' => 'Plano completo: fichas digitais, consentimentos, assinatura eletrônica, protocolo, PDF, link da bio, templates e usuários ilimitados.',
             'max_users' => null,
             'max_organizations_per_tenant' => 1,
+            'link_bio_enabled' => true,
         ],
     ],
 
