@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Enums\Role;
-use App\Models\Clinic;
 use App\Models\Organization;
 use App\Support\Permission;
 use App\Models\FormSubmission;
@@ -180,16 +179,17 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('update-clinic', function (User $user, Organization $organization) {
-            $contextId = session('current_organization_id') ?? session('current_clinic_id');
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $organization->id === (string) $contextId;
+                return $contextId !== null && (string) $organization->id === (string) $contextId;
             }
 
             return $user->isOwner() && $user->clinic_id === $organization->id;
         });
         Gate::define('update-user', function (User $user, User $target) {
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $target->clinic_id === (string) session('current_clinic_id');
+                return $contextId !== null && (string) $target->clinic_id === (string) $contextId;
             }
             if (! $user->isOwner()) {
                 return false;
@@ -200,8 +200,9 @@ class AppServiceProvider extends ServiceProvider
             if (! $user->hasPermission(Permission::SUBMISSIONS_VIEW)) {
                 return false;
             }
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $template->clinic_id === (string) session('current_clinic_id');
+                return $contextId !== null && (string) $template->clinic_id === (string) $contextId;
             }
             return $user->clinic_id === $template->clinic_id;
         });
@@ -209,8 +210,9 @@ class AppServiceProvider extends ServiceProvider
             if (! $user->hasPermission(Permission::TEMPLATES_MANAGE)) {
                 return false;
             }
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $template->clinic_id === (string) session('current_clinic_id');
+                return $contextId !== null && (string) $template->clinic_id === (string) $contextId;
             }
             return $user->clinic_id === $template->clinic_id;
         });
@@ -218,8 +220,9 @@ class AppServiceProvider extends ServiceProvider
             if (! $user->hasPermission(Permission::SUBMISSIONS_VIEW)) {
                 return false;
             }
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $submission->clinic_id === (string) session('current_clinic_id');
+                return $contextId !== null && (string) $submission->clinic_id === (string) $contextId;
             }
             return $user->clinic_id === $submission->clinic_id;
         });
@@ -227,8 +230,9 @@ class AppServiceProvider extends ServiceProvider
             if (! $user->hasPermission(Permission::SUBMISSIONS_APPROVE)) {
                 return false;
             }
+            $contextId = $user->currentOrganizationId();
             if ($user->canSwitchClinic()) {
-                return (string) $submission->clinic_id === (string) session('current_clinic_id');
+                return $contextId !== null && (string) $submission->clinic_id === (string) $contextId;
             }
             return $user->clinic_id === $submission->clinic_id;
         });

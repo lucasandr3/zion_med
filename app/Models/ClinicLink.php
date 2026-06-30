@@ -44,7 +44,7 @@ class ClinicLink extends Model
     /** @deprecated Use organization(). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class, 'organization_id');
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function getClinicIdAttribute(): ?int

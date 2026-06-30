@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Events\AuditEvent;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UserStoreRequest;
 use App\Http\Requests\UserUpdateRequest;
@@ -16,14 +17,17 @@ use Illuminate\Support\Facades\Event;
 
 class UserController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     /**
      * Lista usuários da clínica.
      */
     public function index(Request $request): JsonResponse
     {
         $this->authorize('manage-users');
+        $orgId = $this->currentOrganizationId($request);
         $users = User::withoutGlobalScopes()
-            ->where('organization_id', session('current_clinic_id'))
+            ->where('organization_id', $orgId)
             ->orderBy('name')
             ->get();
 
@@ -35,10 +39,10 @@ class UserController extends Controller
     /**
      * Lista papéis atribuíveis da organização atual (organization_roles).
      */
-    public function roles(): JsonResponse
+    public function roles(Request $request): JsonResponse
     {
         $this->authorize('manage-users');
-        $orgId = session('current_clinic_id');
+        $orgId = $this->currentOrganizationId($request);
         if ($orgId === null || $orgId === '') {
             return response()->json(['data' => []]);
         }
@@ -62,7 +66,7 @@ class UserController extends Controller
     public function store(UserStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $organizationId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $organizationId = $this->currentOrganizationId($request);
         $organization = $organizationId ? Organization::query()->find((int) $organizationId) : null;
         if ($organization && ! $organization->canAddAnotherUser()) {
             return response()->json([

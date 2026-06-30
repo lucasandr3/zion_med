@@ -95,9 +95,17 @@ class User extends Authenticatable implements MustVerifyEmail
         return Role::tryFrom((string) ($this->attributes['role'] ?? ''));
     }
 
-    /** Contexto da organização atual (sessão API) ou organização do usuário. */
+    /** Contexto da organização atual (token Sanctum, sessão API ou org do usuário). */
     public function currentOrganizationId(): ?int
     {
+        $tokenOrgId = \App\Support\SanctumTenantAbility::fromToken($this->currentAccessToken());
+        if ($tokenOrgId !== null) {
+            $access = app(\App\Services\OrganizationAccessService::class);
+            if ($access->userMayAccessOrganization($this, $tokenOrgId)) {
+                return $tokenOrgId;
+            }
+        }
+
         $sid = session('current_organization_id') ?? session('current_clinic_id');
 
         return $sid !== null && $sid !== '' ? (int) $sid : ($this->organization_id !== null ? (int) $this->organization_id : null);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AuditLogIndexRequest;
 use App\Http\Resources\Api\V1\AuditLogResource;
@@ -11,12 +12,14 @@ use Illuminate\Http\JsonResponse;
 
 class AuditLogController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     /**
      * Lista logs de auditoria da clínica atual.
      */
     public function index(AuditLogIndexRequest $request): JsonResponse
     {
-        if (! session('current_clinic_id')) {
+        if (! $this->currentOrganizationId($request)) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
 

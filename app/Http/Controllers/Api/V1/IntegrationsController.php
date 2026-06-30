@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Jobs\DispatchWebhookJob;
 use App\Models\ClinicWebhook;
@@ -16,6 +17,8 @@ use Illuminate\Validation\Rule;
 
 class IntegrationsController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function __construct(
         private readonly FeegowClient $feegow
     ) {}
@@ -26,7 +29,7 @@ class IntegrationsController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         if (! $clinicId) {
             return response()->json(['message' => 'Selecione uma clínica.'], 422);
         }
@@ -85,7 +88,7 @@ class IntegrationsController extends Controller
     public function createToken(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         if (! $clinicId) {
             return response()->json(['message' => 'Selecione uma empresa.'], 422);
         }
@@ -124,7 +127,7 @@ class IntegrationsController extends Controller
     public function storeWebhook(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         if (! $clinicId) {
             return response()->json(['message' => 'Selecione uma empresa.'], 422);
         }
@@ -161,7 +164,7 @@ class IntegrationsController extends Controller
     public function updateWebhook(Request $request, ClinicWebhook $webhook): JsonResponse
     {
         $this->authorize('manage-clinic');
-        if ((string) $webhook->organization_id !== (string) session('current_clinic_id')) {
+        if ((string) $webhook->organization_id !== (string) $this->currentOrganizationId($request)) {
             abort(403);
         }
 
@@ -196,7 +199,7 @@ class IntegrationsController extends Controller
     public function destroyWebhook(ClinicWebhook $webhook): JsonResponse
     {
         $this->authorize('manage-clinic');
-        if ((string) $webhook->organization_id !== (string) session('current_clinic_id')) {
+        if ((string) $webhook->organization_id !== (string) $this->currentOrganizationId($request)) {
             abort(403);
         }
         $webhook->delete();
@@ -212,7 +215,7 @@ class IntegrationsController extends Controller
     public function retryWebhookDelivery(Request $request, WebhookDelivery $delivery): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         if (! $clinicId) {
             return response()->json(['message' => 'Selecione uma clínica.'], 422);
         }
@@ -545,7 +548,7 @@ class IntegrationsController extends Controller
 
     private function currentOrganization(Request $request): ?Organization
     {
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organizationId = $this->currentOrganizationId($request);
         if (! $organizationId) {
             return null;
         }

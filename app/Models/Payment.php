@@ -35,7 +35,7 @@ class Payment extends Model
     /** @deprecated Use organization(). Alias para compatibilidade (Clinic = Organization). */
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class, 'organization_id');
+        return $this->belongsTo(Organization::class, 'organization_id');
     }
 
     public function subscription(): BelongsTo

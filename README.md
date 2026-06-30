@@ -157,9 +157,44 @@ O build usa **Dockerfile** + **Supervisor**. No arranque do container (entrypoin
 | **Scheduler** | Loop a cada 60s `php artisan schedule:run` via Supervisor (ex.: `platform:notify-billing` diário). |
 | **Webhook ASAAS** | Rota `POST /webhooks/asaas` excluída do CSRF em `bootstrap/app.php`. |
 
-No Easy Panel basta configurar as **variáveis de ambiente** de produção (APP_ENV=production, APP_DEBUG=false, APP_URL, DB_*, ASAAS_* produção, MinIO, etc.) e fazer o deploy. Não é necessário rodar queue ou cron manualmente.
+No Easy Panel basta configurar as **variáveis de ambiente** de produção (APP_ENV=production, APP_DEBUG=false, APP_URL, DB_*, **REDIS_HOST** (serviço Redis no painel), **QUEUE_CONNECTION=redis**, **CACHE_STORE=redis**, ASAAS_* produção, MinIO, etc.) e fazer o deploy. A imagem Docker já inclui a extensão **phpredis**. Não é necessário rodar queue ou cron manualmente.
 
 Se usar mais de um container (réplicas), rode `migrate` apenas em um job de deploy e desative o `migrate` no entrypoint.
+
+### Schema dump (B22 — squash parcial)
+
+O repositório inclui `database/schema/sqlite-schema.sql`, gerado com `php artisan schema:dump` após todas as migrations.
+
+| Cenário | Comportamento |
+|---------|---------------|
+| **Testes / dev SQLite** | `RefreshDatabase` carrega o dump e pula reexecutar as 102 migrations — suite mais rápida. |
+| **Produção já migrada** | Nada muda; a tabela `migrations` existente continua válida. |
+| **Novo ambiente PostgreSQL** | Rode `php artisan migrate --force` normalmente, ou regenere `pgsql-schema.sql` com `DB_CONNECTION=pgsql php artisan schema:dump`. |
+
+**Não usamos `schema:dump --prune`:** dezenas de migrations fazem backfill/seed de dados que não entram no SQL estrutural.
+
+Para regenerar o dump SQLite (sem afetar o `.env` local):
+
+```bash
+DB_CONNECTION=sqlite DB_DATABASE=storage/app/squash_temp.sqlite php artisan migrate:fresh --force --seed
+DB_CONNECTION=sqlite DB_DATABASE=storage/app/squash_temp.sqlite php artisan schema:dump
+```
+
+### Checklist de deploy manual (EasyPanel)
+
+Antes de abrir tráfego ou após upgrade de versão:
+
+1. **Variáveis de ambiente** — `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `FRONTEND_URL`, `DB_*`, `REDIS_*`, `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`, ASAAS (produção), MinIO, `SANCTUM_EXPIRATION`.
+2. **Deploy / migrate** — o entrypoint roda `php artisan migrate --force`; em multi-réplica, rode migrate uma vez só no job de deploy.
+3. **Scheduler** — Supervisor já executa `schedule:run` a cada 60s (inclui `organizations:sync-expired-trials` de hora em hora).
+4. **Queue** — Supervisor já executa `queue:work`; confirme `QUEUE_CONNECTION=redis` e Redis acessível.
+5. **PII legada (uma vez por ambiente, se houver dados antigos)** — `php artisan people:encrypt-pii --dry-run` e depois `php artisan people:encrypt-pii`.
+6. **Smoke pós-deploy**
+   - `GET /up` ou healthcheck do container
+   - Login SPA + `GET /api/v1/me`
+   - Formulário público `/f/{token}` (envio gera protocolo)
+   - Webhook ASAAS (token configurado; rota excluída do CSRF)
+7. **Landing** — preencher CNPJ/endereço em `gestgo-site/assets/js/legal-entity.js` antes do go-live comercial.
 
 ## Comandos úteis
 

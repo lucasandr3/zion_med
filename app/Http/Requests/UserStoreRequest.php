@@ -15,7 +15,7 @@ class UserStoreRequest extends FormRequest
 
     public function rules(): array
     {
-        $clinicId = $this->user()?->clinic_id ?? session('current_clinic_id');
+        $clinicId = $this->user()?->currentOrganizationId();
 
         return [
             'name' => ['required', 'string', 'max:255'],

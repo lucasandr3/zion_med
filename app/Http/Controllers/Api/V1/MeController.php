@@ -17,7 +17,7 @@ class MeController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $user = $request->user();
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organizationId = $user->currentOrganizationId();
         $organization = $organizationId ? Organization::query()->find($organizationId) : null;
         if ($organization) {
             $organization->refresh();

@@ -3,20 +3,25 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionStatus;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PersonIndexRequest;
+use App\Http\Requests\PersonStoreRequest;
+use App\Http\Requests\PersonUpdateRequest;
 use App\Http\Resources\Api\V1\PersonResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Models\Person;
 use App\Support\ApiPagination;
+use App\Support\ApiErrorResponse;
 use App\Support\PersonPiiHasher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 class PersonController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function index(PersonIndexRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -67,46 +72,13 @@ class PersonController extends Controller
         );
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(PersonStoreRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'phone_alt' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'birth_date' => ['nullable', 'date'],
-            'age' => ['nullable', 'integer', 'min:0', 'max:150'],
-            'sex' => ['nullable', 'string', Rule::in(['F', 'M', 'O'])],
-            'cpf' => ['nullable', 'string', 'max:14'],
-            'rg' => ['nullable', 'string', 'max:30'],
-            'marital_status' => ['nullable', 'string', 'max:50'],
-            'profession' => ['nullable', 'string', 'max:255'],
-            'referred_by' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'neighborhood' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'cep' => ['nullable', 'string', 'max:20'],
-            'lead_source_instagram' => ['nullable', 'boolean'],
-            'lead_source_google' => ['nullable', 'boolean'],
-            'lead_source_facebook' => ['nullable', 'boolean'],
-            'lead_source_indicacao_amigo' => ['nullable', 'boolean'],
-            'lead_source_indicacao_medica' => ['nullable', 'boolean'],
-            'lead_source_plano_saude' => ['nullable', 'boolean'],
-            'lead_source_outro' => ['nullable', 'string', 'max:255'],
-            'has_health_plan' => ['nullable', 'string', Rule::in(['sim', 'nao'])],
-            'health_plan_operator' => ['nullable', 'string', 'max:255'],
-            'health_plan_card_number' => ['nullable', 'string', 'max:100'],
-            'lgpd_accept_comms' => ['nullable', 'boolean'],
-            'lgpd_accept_reminders' => ['nullable', 'boolean'],
-            'notes' => ['nullable', 'string', 'max:5000'],
-            'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
-        ]);
-
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $this->currentOrganizationId($request);
         if (! $orgId) {
-            return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
+            return ApiErrorResponse::make('organization_required', 'Nenhuma empresa selecionada.', 422);
         }
 
         $person = DB::transaction(function () use ($validated, $orgId) {
@@ -191,42 +163,9 @@ class PersonController extends Controller
         ]);
     }
 
-    public function update(Request $request, Person $pessoa): JsonResponse
+    public function update(PersonUpdateRequest $request, Person $pessoa): JsonResponse
     {
-        $this->authorize('view-submissions');
-
-        $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'phone_alt' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'birth_date' => ['nullable', 'date'],
-            'age' => ['nullable', 'integer', 'min:0', 'max:150'],
-            'sex' => ['nullable', 'string', Rule::in(['F', 'M', 'O'])],
-            'cpf' => ['nullable', 'string', 'max:14'],
-            'rg' => ['nullable', 'string', 'max:30'],
-            'marital_status' => ['nullable', 'string', 'max:50'],
-            'profession' => ['nullable', 'string', 'max:255'],
-            'referred_by' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'neighborhood' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'cep' => ['nullable', 'string', 'max:20'],
-            'lead_source_instagram' => ['nullable', 'boolean'],
-            'lead_source_google' => ['nullable', 'boolean'],
-            'lead_source_facebook' => ['nullable', 'boolean'],
-            'lead_source_indicacao_amigo' => ['nullable', 'boolean'],
-            'lead_source_indicacao_medica' => ['nullable', 'boolean'],
-            'lead_source_plano_saude' => ['nullable', 'boolean'],
-            'lead_source_outro' => ['nullable', 'string', 'max:255'],
-            'has_health_plan' => ['nullable', 'string', Rule::in(['sim', 'nao'])],
-            'health_plan_operator' => ['nullable', 'string', 'max:255'],
-            'health_plan_card_number' => ['nullable', 'string', 'max:100'],
-            'lgpd_accept_comms' => ['nullable', 'boolean'],
-            'lgpd_accept_reminders' => ['nullable', 'boolean'],
-            'notes' => ['nullable', 'string', 'max:5000'],
-            'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
-        ]);
+        $validated = $request->validated();
 
         $pessoa->update($validated);
         $pessoa->loadCount('submissions')->loadMax('submissions', 'submitted_at');

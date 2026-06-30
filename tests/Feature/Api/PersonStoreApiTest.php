@@ -32,6 +32,21 @@ class PersonStoreApiTest extends TestCase
         $this->postJson('/api/v1/pessoas', ['name' => 'Teste'])->assertStatus(401);
     }
 
+    public function test_pessoas_store_validation_returns_envelope(): void
+    {
+        $this->actingOwner();
+
+        $response = $this->postJson('/api/v1/pessoas', [
+            'name' => '',
+            'email' => 'invalido',
+            'sex' => 'X',
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('code', 'validation_failed')
+            ->assertJsonStructure(['message', 'errors' => ['name', 'email', 'sex']]);
+    }
+
     public function test_pessoas_store_creates_person_for_tenant(): void
     {
         $user = $this->actingOwner();

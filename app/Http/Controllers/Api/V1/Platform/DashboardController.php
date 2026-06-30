@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Platform;
 
 use App\Http\Controllers\Controller;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\DemonstrationRequest;
 use App\Models\Tenant;
 use App\Models\User;
@@ -16,7 +16,7 @@ class DashboardController extends Controller
         return response()->json([
             'data' => [
                 'tenants_count' => Tenant::count(),
-                'clinics_count' => Clinic::count(),
+                'clinics_count' => Organization::count(),
                 'users_count' => User::count(),
                 'leads_count' => DemonstrationRequest::count(),
             ],

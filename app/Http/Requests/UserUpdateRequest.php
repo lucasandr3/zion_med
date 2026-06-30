@@ -16,7 +16,7 @@ class UserUpdateRequest extends FormRequest
     public function rules(): array
     {
         $user = $this->route('usuario');
-        $clinicId = $this->user()?->clinic_id ?? session('current_clinic_id');
+        $clinicId = $this->user()?->currentOrganizationId();
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => [

@@ -3,29 +3,24 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LinksPublicosIndexRequest;
 use App\Models\FormTemplate;
+use App\Support\ApiPagination;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class LinksPublicosController extends Controller
 {
     /**
      * Lista templates com link público ativo (para copiar/enviar).
      */
-    public function index(Request $request): JsonResponse
+    public function index(LinksPublicosIndexRequest $request): JsonResponse
     {
-        if (! $request->user()->can('manage-templates') && ! $request->user()->can('view-submissions')) {
-            abort(403);
-        }
-
-        $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
-
         $paginator = FormTemplate::query()
             ->whereNotNull('public_token')
             ->where('public_enabled', true)
             ->withCount('submissions')
             ->orderBy('name')
-            ->paginate($perPage)
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $base = rtrim(config('app.frontend_url', config('app.url')), '/');
@@ -44,20 +39,8 @@ class LinksPublicosController extends Controller
             ];
         })->values();
 
-        return response()->json([
-            'data' => $data,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
-            ],
-        ]);
+        return response()->json(
+            ApiPagination::wrap($paginator, $data)
+        );
     }
 }

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
+use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -41,10 +42,10 @@ class AuthController extends Controller
         $user = Auth::guard('web')->user();
 
         $user->tokens()->where('name', 'spa')->delete();
-        $token = $user->createToken('spa')->plainTextToken;
+        $currentOrganizationId = $user->clinic_id ? (int) $user->clinic_id : null;
+        $token = $user->createToken('spa', SanctumTenantAbility::tokenAbilitiesForOrganization($currentOrganizationId))->plainTextToken;
 
         $organizations = $this->organizationsForUser($user);
-        $currentOrganizationId = $user->clinic_id;
         if ($organizations->isNotEmpty() && $currentOrganizationId) {
             session([
                 'current_clinic_id' => $currentOrganizationId,

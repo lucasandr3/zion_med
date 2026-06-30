@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Events\AuditEvent;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FormFieldRequest;
 use App\Http\Requests\FormTemplateRequest;
+use App\Http\Requests\TemplateBibliotecaRequest;
+use App\Http\Requests\TemplateIndexRequest;
 use App\Http\Resources\Api\V1\FormFieldResource;
 use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\FormField;
@@ -23,6 +26,8 @@ use Illuminate\Validation\Rule;
 
 class TemplateController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function __construct(
         private PublicLinkService $publicLinkService,
         private TemplateVersionService $templateVersionService,
@@ -35,7 +40,7 @@ class TemplateController extends Controller
     {
         $this->authorize('manage-templates');
 
-        $organizationId = (int) (session('current_clinic_id') ?? session('current_organization_id') ?? $request->user()?->organization_id ?? 0);
+        $organizationId = (int) ($this->currentOrganizationId($request) ?? 0);
         if ($organizationId <= 0) {
             return response()->json(['data' => []]);
         }
@@ -82,9 +87,8 @@ class TemplateController extends Controller
     /**
      * Lista sugestões da biblioteca por categoria (estética, odontologia, etc.) para criar templates.
      */
-    public function biblioteca(Request $request): JsonResponse
+    public function biblioteca(TemplateBibliotecaRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
         $categories = FormTemplate::categoryLabels();
         $biblioteca = [
             'estetica' => [
@@ -113,7 +117,7 @@ class TemplateController extends Controller
             ],
         ];
         if ($request->filled('category')) {
-            $cat = $request->category;
+            $cat = $request->validated('category');
             $biblioteca = isset($biblioteca[$cat]) ? [$cat => $biblioteca[$cat]] : $biblioteca;
         }
         return response()->json(['data' => $biblioteca]);
@@ -122,17 +126,18 @@ class TemplateController extends Controller
     /**
      * Lista templates da clínica.
      */
-    public function index(Request $request): JsonResponse
+    public function index(TemplateIndexRequest $request): JsonResponse
     {
-        $this->authorize('view-submissions');
+        $validated = $request->validated();
         $query = FormTemplate::query();
-        if ($request->filled('is_active')) {
-            $query->where('is_active', (bool) $request->boolean('is_active'));
+        $activeFilter = $request->isActiveFilter();
+        if ($activeFilter !== null) {
+            $query->where('is_active', $activeFilter);
         }
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
+        if (! empty($validated['category'])) {
+            $query->where('category', $validated['category']);
         } else {
-            $orgId = (int) (session('current_clinic_id') ?? session('current_organization_id') ?? 0);
+            $orgId = (int) ($this->currentOrganizationId($request) ?? 0);
             $niche = 'estetica';
             if ($orgId > 0) {
                 $niche = (string) (Organization::query()->whereKey($orgId)->value('niche') ?: 'estetica');
@@ -192,7 +197,7 @@ class TemplateController extends Controller
             'fields.*.sort_order' => ['integer', 'min:0'],
         ]);
 
-        $organizationId = session('current_clinic_id') ?? $request->user()->organization_id ?? $request->user()->clinic_id;
+        $organizationId = $this->currentOrganizationId($request);
         if (! $organizationId) {
             return response()->json(['message' => 'Organização não definida.'], 422);
         }
@@ -258,7 +263,7 @@ class TemplateController extends Controller
     {
         $this->authorize('update-template', $template);
         $validated = $request->validated();
-        $organizationId = (int) ($template->organization_id ?? session('current_clinic_id') ?? $request->user()->organization_id ?? 0);
+        $organizationId = (int) ($template->organization_id ?? $this->currentOrganizationId($request) ?? 0);
 
         $hasCategoryInput = array_key_exists('category', $validated) || array_key_exists('new_category', $validated);
         if ($hasCategoryInput) {
@@ -314,7 +319,7 @@ class TemplateController extends Controller
         $this->authorize('manage-templates');
         $this->authorize('update-template', $template);
 
-        $clinicId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         $newTemplate = FormTemplate::create([
             'organization_id' => $clinicId,
             'name' => $template->name,
@@ -502,7 +507,7 @@ class TemplateController extends Controller
         $this->authorize('manage-templates');
         $this->authorize('update-template', $template);
         $name = $request->validate(['name' => ['nullable', 'string', 'max:255']])['name'] ?? ($template->name . ' (cópia)');
-        $clinicId = $request->user()->organization_id ?? $request->user()->clinic_id ?? session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         $newTemplate = FormTemplate::create([
             'organization_id' => $clinicId,
             'name' => $name,

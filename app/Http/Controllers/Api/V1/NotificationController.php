@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\NotificationIndexRequest;
 use App\Http\Resources\Api\V1\NotificationResource;
+use App\Support\ApiPagination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,35 +14,26 @@ class NotificationController extends Controller
     /**
      * Lista notificações do usuário (paginado).
      */
-    public function index(Request $request): JsonResponse
+    public function index(NotificationIndexRequest $request): JsonResponse
     {
-        $this->authorize('view-notifications');
-
         $user = $request->user();
-        $filter = $request->get('filtro', 'todas');
+        $filter = $request->filter();
 
         $query = $filter === 'nao_lidas'
             ? $user->unreadNotifications()
             : $user->notifications();
 
-        $notifications = $query->latest()->paginate(min((int) $request->input('per_page', 20), 50))->withQueryString();
+        $notifications = $query->latest()->paginate($request->perPage())->withQueryString();
 
-        return response()->json([
-            'data' => NotificationResource::collection($notifications->items()),
-            'meta' => [
-                'current_page' => $notifications->currentPage(),
-                'last_page' => $notifications->lastPage(),
-                'per_page' => $notifications->perPage(),
-                'total' => $notifications->total(),
-                'unread_count' => $user->unreadNotifications()->count(),
-            ],
-            'links' => [
-                'first' => $notifications->url(1),
-                'last' => $notifications->url($notifications->lastPage()),
-                'prev' => $notifications->previousPageUrl(),
-                'next' => $notifications->nextPageUrl(),
-            ],
-        ]);
+        return response()->json(array_merge(
+            ApiPagination::wrap($notifications, NotificationResource::collection($notifications->items())),
+            [
+                'meta' => array_merge(
+                    ApiPagination::meta($notifications),
+                    ['unread_count' => $user->unreadNotifications()->count()]
+                ),
+            ]
+        ));
     }
 
     /**

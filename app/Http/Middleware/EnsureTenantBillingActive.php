@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ApiErrorResponse;
 use App\Models\Organization;
 use Closure;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class EnsureTenantBillingActive
             return $next($request);
         }
 
-        $orgId = session('current_organization_id') ?? session('current_clinic_id') ?? $user->clinic_id;
+        $orgId = $user->currentOrganizationId() ?? $user->clinic_id;
         if (! $orgId) {
             return $next($request);
         }
@@ -40,10 +41,11 @@ class EnsureTenantBillingActive
             return $next($request);
         }
 
-        return response()->json([
-            'message' => 'Seu período de avaliação terminou ou a assinatura está inativa. Acesse Cobrança / Assinatura para regularizar o pagamento.',
-            'code' => 'billing_blocked',
-        ], 403);
+        return ApiErrorResponse::make(
+            'billing_blocked',
+            'Seu período de avaliação terminou ou a assinatura está inativa. Acesse Cobrança / Assinatura para regularizar o pagamento.',
+            403,
+        );
     }
 
     private function shouldBypass(Request $request): bool

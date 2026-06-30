@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
-use Illuminate\Support\Facades\Auth;
+use App\Support\OrganizationContext;
 
 class AuditService
 {
@@ -15,8 +15,8 @@ class AuditService
         ?int $clinicId = null,
         ?int $userId = null
     ): AuditLog {
-        $organizationId = $clinicId ?? Auth::user()?->organization_id ?? Auth::user()?->clinic_id ?? session('current_clinic_id');
-        $userId = $userId ?? Auth::id();
+        $organizationId = $clinicId ?? OrganizationContext::id();
+        $userId = $userId ?? \Illuminate\Support\Facades\Auth::id();
 
         return AuditLog::create([
             'organization_id' => $organizationId,

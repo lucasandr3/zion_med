@@ -12,8 +12,14 @@ class Tenant extends Model
         'slug',
     ];
 
+    public function organizations(): HasMany
+    {
+        return $this->hasMany(Organization::class);
+    }
+
+    /** @deprecated Use organizations(). */
     public function clinics(): HasMany
     {
-        return $this->hasMany(Clinic::class);
+        return $this->organizations();
     }
 }

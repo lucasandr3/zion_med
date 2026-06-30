@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\V1\Platform\OrganizationPresenceController as Platf
 use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Models\DocumentSend;
 use App\Models\FormSubmission;
+use App\Support\OrganizationScopedRouteBinding;
 use Illuminate\Support\Facades\Route;
 
 // Auth e formulário público (sem auth:sanctum)
@@ -117,8 +118,8 @@ Route::prefix('v1/conector')->middleware(['business_hub.connector', 'throttle:ap
     Route::get('/faturas/{externalId}', [ConnectorFaturasController::class, 'show'])->name('api.v1.conector.faturas.show');
 });
 
-Route::bind('protocol', fn ($value) => FormSubmission::findOrFail($value));
-Route::bind('documentSend', fn ($value) => DocumentSend::findOrFail($value));
+Route::bind('protocol', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(FormSubmission::class, $value));
+Route::bind('documentSend', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(DocumentSend::class, $value));
 
 // Rotas que qualquer usuário autenticado pode acessar (incl. platform_admin): logout, me, notificações
 Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {

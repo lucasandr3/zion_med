@@ -48,9 +48,9 @@ class OrganizationAccessService
     }
 
     /**
-     * Resolve a org do contexto API. Ignora header inválido (cross-tenant IDOR).
+     * Resolve a org do contexto API. Ignora header/token inválido (cross-tenant IDOR).
      */
-    public function resolveOrganizationIdForUser(User $user, ?int $headerOrgId): ?int
+    public function resolveOrganizationIdForUser(User $user, ?int $headerOrgId, ?int $tokenOrgId = null): ?int
     {
         $defaultId = $user->clinic_id !== null ? (int) $user->clinic_id : null;
 
@@ -60,6 +60,10 @@ class OrganizationAccessService
 
         if ($headerOrgId !== null && $headerOrgId > 0 && $this->userMayAccessOrganization($user, $headerOrgId)) {
             return $headerOrgId;
+        }
+
+        if ($tokenOrgId !== null && $tokenOrgId > 0 && $this->userMayAccessOrganization($user, $tokenOrgId)) {
+            return $tokenOrgId;
         }
 
         return $defaultId;

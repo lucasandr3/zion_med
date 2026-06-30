@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ApiErrorResponse;
 use Closure;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\Request;
@@ -20,10 +21,11 @@ class EnsureEmailIsVerifiedApi
         }
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Verifique seu e-mail para continuar.',
-                'code' => 'email_unverified',
-            ], 403);
+            return ApiErrorResponse::make(
+                'email_unverified',
+                'Verifique seu e-mail para continuar.',
+                403,
+            );
         }
 
         return redirect()->guest($redirectToRoute ? route($redirectToRoute) : route('verification.notice'));

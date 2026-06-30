@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
 
 class ComeceController extends Controller
@@ -180,7 +181,12 @@ class ComeceController extends Controller
             }
 
             $user->tokens()->where('name', 'spa')->delete();
-            $token = $user->createToken('spa')->plainTextToken;
+            $token = $user->createToken('spa', SanctumTenantAbility::tokenAbilitiesForOrganization((int) $organization->id))->plainTextToken;
+
+            session([
+                'current_clinic_id' => $organization->id,
+                'current_organization_id' => $organization->id,
+            ]);
 
             $organizations = Organization::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderBy('name')->withCount('users')->get();
             if ($organizations->isEmpty()) {

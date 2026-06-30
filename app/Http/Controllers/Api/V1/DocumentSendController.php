@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentSendIndexRequest;
 use App\Models\DocumentSend;
@@ -14,6 +15,8 @@ use Illuminate\Http\Request;
 
 class DocumentSendController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function __construct(private DocumentSendService $documentSendService) {}
 
     /**
@@ -21,7 +24,7 @@ class DocumentSendController extends Controller
      */
     public function index(DocumentSendIndexRequest $request): JsonResponse
     {
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $this->currentOrganizationId($request);
         if (! $orgId) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
@@ -102,7 +105,7 @@ class DocumentSendController extends Controller
         $template = FormTemplate::findOrFail($validated['template_id']);
         $this->authorize('update-template', $template);
 
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $this->currentOrganizationId($request);
         if (! $orgId) {
             return response()->json(['message' => 'Nenhuma empresa selecionada.'], 422);
         }
@@ -172,7 +175,7 @@ class DocumentSendController extends Controller
     public function reenvio(Request $request, DocumentSend $documentSend): JsonResponse
     {
         $this->authorize('view-submissions');
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $this->currentOrganizationId($request);
         if ((int) $documentSend->organization_id !== (int) $orgId) {
             abort(404);
         }
@@ -198,7 +201,7 @@ class DocumentSendController extends Controller
     public function cancel(Request $request, DocumentSend $documentSend): JsonResponse
     {
         $this->authorize('view-submissions');
-        $orgId = session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $this->currentOrganizationId($request);
         if ((int) $documentSend->organization_id !== (int) $orgId) {
             abort(404);
         }

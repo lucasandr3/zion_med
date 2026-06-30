@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ClinicLinkResource;
 use App\Http\Resources\Api\V1\ClinicResource;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Models\ClinicLink;
 use App\Models\FormSubmission;
 use App\Models\FormTemplate;
@@ -23,6 +24,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LinkBioController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     /**
      * Layouts do Link Bio (mesmos IDs do front Angular).
      */
@@ -188,12 +191,12 @@ class LinkBioController extends Controller
     {
         $this->authorize('manage-clinic');
 
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
         if (! $clinicId) {
             return response()->json(['message' => 'Nenhuma clínica selecionada.'], 422);
         }
 
-        $clinic = Clinic::findOrFail($clinicId);
+        $clinic = Organization::findOrFail($clinicId);
         $bioLinks = $clinic->bioLinks()->get();
         $base = rtrim(config('app.frontend_url', config('app.url')), '/');
         $publicUrl = $base . '/l/' . $clinic->slug;
@@ -357,8 +360,8 @@ class LinkBioController extends Controller
     public function store(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
-        $clinic = Clinic::findOrFail($clinicId);
+        $clinicId = $this->currentOrganizationId($request);
+        $clinic = Organization::findOrFail($clinicId);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
@@ -380,7 +383,7 @@ class LinkBioController extends Controller
     public function update(Request $request, ClinicLink $link): JsonResponse
     {
         $this->authorize('manage-clinic');
-        abort_unless((string) $link->clinic_id === (string) session('current_clinic_id'), 403);
+        abort_unless((string) $link->clinic_id === (string) $this->currentOrganizationId($request), 403);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
@@ -397,10 +400,10 @@ class LinkBioController extends Controller
         return response()->json(['data' => new ClinicLinkResource($link->fresh())]);
     }
 
-    public function destroy(ClinicLink $link): JsonResponse
+    public function destroy(Request $request, ClinicLink $link): JsonResponse
     {
         $this->authorize('manage-clinic');
-        abort_unless((string) $link->clinic_id === (string) session('current_clinic_id'), 403);
+        abort_unless((string) $link->clinic_id === (string) $this->currentOrganizationId($request), 403);
 
         $link->delete();
 
@@ -411,7 +414,7 @@ class LinkBioController extends Controller
     {
         $this->authorize('manage-clinic');
         $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
-        $clinicId = session('current_clinic_id');
+        $clinicId = $this->currentOrganizationId($request);
 
         foreach ($ids as $order => $id) {
             ClinicLink::where('id', $id)->where('organization_id', $clinicId)->update(['sort_order' => $order]);
@@ -423,8 +426,8 @@ class LinkBioController extends Controller
     public function updateAparencia(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
-        $clinic = Clinic::findOrFail($clinicId);
+        $clinicId = $this->currentOrganizationId($request);
+        $clinic = Organization::findOrFail($clinicId);
 
         $validThemes = $this->themeService->publicThemeKeysForValidation();
         $data = $request->validate([
@@ -499,8 +502,8 @@ class LinkBioController extends Controller
     public function uploadProfessionalPhoto(Request $request): JsonResponse
     {
         $this->authorize('manage-clinic');
-        $clinicId = session('current_clinic_id');
-        $clinic = Clinic::findOrFail($clinicId);
+        $clinicId = $this->currentOrganizationId($request);
+        $clinic = Organization::findOrFail($clinicId);
 
         $request->validate(
             [
@@ -634,7 +637,7 @@ class LinkBioController extends Controller
      */
     private function resolveClinicByPublicSlug(string $slug): ?Clinic
     {
-        $clinic = Clinic::withoutGlobalScopes()
+        $clinic = Organization::withoutGlobalScopes()
             ->where('slug', $slug)
             ->first();
         if ($clinic) {
@@ -646,7 +649,7 @@ class LinkBioController extends Controller
             return null;
         }
 
-        return Clinic::withoutGlobalScopes()->find($alias->organization_id);
+        return Organization::withoutGlobalScopes()->find($alias->organization_id);
     }
 
     /**

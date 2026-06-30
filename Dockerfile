@@ -1,7 +1,7 @@
 # Dockerfile para Laravel em produção (Easypanel)
 FROM php:8.4-fpm-alpine
 
-# Dependências do sistema
+# Dependências do sistema (+ extensão Redis para filas/cache em produção)
 RUN apk add --no-cache \
     nginx \
     supervisor \
@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     postgresql-dev \
     zip \
     unzip \
+    $PHPIZE_DEPS \
     && docker-php-ext-install \
     pdo \
     pdo_pgsql \
@@ -25,6 +26,9 @@ RUN apk add --no-cache \
     gd \
     zip \
     opcache \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del $PHPIZE_DEPS \
     && rm -rf /var/cache/apk/*
 
 # Composer

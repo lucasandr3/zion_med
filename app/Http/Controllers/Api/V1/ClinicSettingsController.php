@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Events\AuditEvent;
 use App\Http\Requests\ClinicSettingsRequest;
@@ -16,6 +17,8 @@ use Illuminate\Support\Arr;
 
 class ClinicSettingsController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function __construct(
         private ThemeService $themeService,
         private AsaasService $asaasService,
@@ -28,7 +31,7 @@ class ClinicSettingsController extends Controller
     {
         $this->authorize('manage-clinic');
 
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organizationId = $this->currentOrganizationId($request);
         $organization = Organization::query()->findOrFail($organizationId);
         $organization->load('addressData');
 
@@ -87,7 +90,7 @@ class ClinicSettingsController extends Controller
      */
     public function update(ClinicSettingsRequest $request): JsonResponse
     {
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organizationId = $this->currentOrganizationId($request);
         $organization = Organization::query()->findOrFail($organizationId);
         $organization->load('addressData');
         $this->authorize('update-clinic', $organization);

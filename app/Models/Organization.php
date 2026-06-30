@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Billing\BillingStateService;
 use App\Services\ThemeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -328,76 +329,35 @@ class Organization extends Model
      */
     public function isTrialWindowOpen(): bool
     {
-        if (! $this->trial_ends_at) {
-            return false;
-        }
-
-        return now()->lte($this->trial_ends_at->copy()->endOfDay());
+        return $this->billingState()->isTrialWindowOpen($this);
     }
 
     public function hasConfirmedBillingPayment(): bool
     {
-        return $this->payments()
-            ->whereIn('status', ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'])
-            ->exists();
+        return $this->billingState()->hasConfirmedBillingPayment($this);
     }
 
-    /**
-     * Registro local de assinatura no Asaas ainda marcado como ativo (não cancelado).
-     */
     public function hasActiveGatewaySubscription(): bool
     {
-        return $this->subscriptions()
-            ->whereNotNull('asaas_subscription_id')
-            ->whereIn('status', ['active', 'ACTIVE'])
-            ->exists();
+        return $this->billingState()->hasActiveGatewaySubscription($this);
     }
 
-    /**
-     * Trial já encerrado, existe assinatura no gateway, mas nenhum pagamento confirmado (acesso bloqueado até pagar ou refazer fluxo).
-     */
     public function isAwaitingFirstBillingPayment(): bool
     {
-        if ($this->hasConfirmedBillingPayment()) {
-            return false;
-        }
-        if (! $this->hasActiveGatewaySubscription()) {
-            return false;
-        }
-        if ($this->isTrialWindowOpen()) {
-            return false;
-        }
-
-        return true;
+        return $this->billingState()->isAwaitingFirstBillingPayment($this);
     }
 
-    /**
-     * UI: cartão “assinatura ativa” com próxima cobrança / cancelar — não usar no estado “só boleto pendente pós-trial”.
-     */
     public function billingUiShowsManagedActiveSubscription(): bool
     {
-        if ($this->isAwaitingFirstBillingPayment()) {
-            return false;
-        }
-
-        return $this->hasActiveGatewaySubscription();
+        return $this->billingState()->billingUiShowsManagedActiveSubscription($this);
     }
 
-    /**
-     * UI: exibir planos e ação de assinar (inclui refazer checkout após trial com assinatura Asaas ainda pendente).
-     */
     public function billingUiShowsPlanSelection(): bool
     {
-        if ($this->billingUiShowsManagedActiveSubscription()) {
-            return false;
-        }
-
-        return ! $this->hasActiveGatewaySubscription() || $this->isAwaitingFirstBillingPayment();
+        return $this->billingState()->billingUiShowsPlanSelection($this);
     }
 
     /**
-     * Estado para a aba Assinatura no SPA (evita misturar "inativo" da org com assinatura Asaas ainda pendente).
-     *
      * @return array{
      *     show_managed_subscription_card: bool,
      *     show_pending_first_payment: bool,
@@ -407,180 +367,73 @@ class Organization extends Model
      */
     public function billingUiState(): array
     {
-        $pending = $this->isAwaitingFirstBillingPayment();
-
-        return [
-            'show_managed_subscription_card' => $this->billingUiShowsManagedActiveSubscription(),
-            'show_pending_first_payment' => $pending,
-            'show_plan_selection' => $this->billingUiShowsPlanSelection(),
-            'pending_first_payment_message' => $pending
-                ? 'Seu trial encerrou e a assinatura ainda não teve pagamento confirmado. Pague via PIX ou boleto abaixo, ou assine novamente para gerar uma nova cobrança.'
-                : null,
-        ];
+        return $this->billingState()->billingUiState($this);
     }
 
-    /**
-     * Dias corridos até o último dia do trial (0 = encerra hoje). Só faz sentido com trial ainda aberto.
-     */
     public function trialCalendarDaysRemaining(): int
     {
-        if (! $this->trial_ends_at) {
-            return 0;
-        }
-        $today = now()->copy()->startOfDay();
-        $lastTrialDay = $this->trial_ends_at->copy()->startOfDay();
-
-        return max(0, (int) $today->diffInDays($lastTrialDay, false));
+        return $this->billingState()->trialCalendarDaysRemaining($this);
     }
 
     /**
-     * Aviso para o front (trial acabando, sem pagamento confirmado ainda).
-     *
      * @return array{visible: true, days_remaining: int, trial_ends_at: string, message: string}|null
      */
     public function trialEndingNoticeMeta(): ?array
     {
-        if (! $this->trial_ends_at || ! $this->isTrialWindowOpen()) {
-            return null;
-        }
-        if ($this->hasConfirmedBillingPayment()) {
-            return null;
-        }
-        $threshold = (int) config('asaas.trial_warning_days', 3);
-        $daysLeft = $this->trialCalendarDaysRemaining();
-        if ($daysLeft > $threshold) {
-            return null;
-        }
-
-        $message = $daysLeft === 0
-            ? 'Seu período de trial encerra hoje. Acesse Assinatura para evitar a suspensão do acesso.'
-            : sprintf(
-                'Seu trial encerra em %d %s. Acesse Assinatura para evitar a suspensão do acesso.',
-                $daysLeft,
-                $daysLeft === 1 ? 'dia' : 'dias'
-            );
-
-        return [
-            'visible' => true,
-            'days_remaining' => $daysLeft,
-            'trial_ends_at' => $this->trial_ends_at->toIso8601String(),
-            'message' => $message,
-        ];
+        return $this->billingState()->trialEndingNoticeMeta($this);
     }
 
     public function isOnTrial(): bool
     {
-        return $this->subscription_status === 'trial'
-            && $this->trial_ends_at !== null
-            && $this->isTrialWindowOpen();
+        return $this->billingState()->isOnTrial($this);
     }
 
-    /**
-     * Pode usar o app (dashboard, protocolos, etc.): trial válido, ou pagamento confirmado após o trial, ou assinatura ativa sem trial configurado.
-     */
     public function canAccessTenantAppFeatures(): bool
     {
-        if ($this->isBillingBlocked()) {
-            return false;
-        }
-
-        if ($this->isAwaitingFirstBillingPayment()) {
-            return false;
-        }
-
-        if ($this->subscription_status === 'past_due') {
-            if ($this->grace_ends_at && now()->lte($this->grace_ends_at)) {
-                return true;
-            }
-            if ($this->grace_ends_at && now()->gt($this->grace_ends_at) && $this->billing_status !== 'blocked') {
-                $this->forceFill(['billing_status' => 'blocked'])->save();
-            }
-
-            return false;
-        }
-
-        if ($this->trial_ends_at !== null) {
-            if ($this->isTrialWindowOpen()) {
-                return true;
-            }
-
-            return $this->hasConfirmedBillingPayment();
-        }
-
-        return $this->subscription_status === 'active'
-            && in_array((string) $this->billing_status, ['ok', 'attention'], true);
+        return $this->billingState()->canAccessTenantAppFeatures($this);
     }
 
     public function isPastDueInGrace(): bool
     {
-        if ($this->subscription_status !== 'past_due' || ! $this->grace_ends_at) {
-            return false;
-        }
-        return now()->lte($this->grace_ends_at);
+        return $this->billingState()->isPastDueInGrace($this);
     }
 
     public function isBillingBlocked(): bool
     {
-        return $this->billing_status === 'blocked';
+        return $this->billingState()->isBillingBlocked($this);
     }
 
     /**
-     * Definição do plano atual (nome, valor, limites) a partir de config('asaas.plans') já mesclado com o banco.
-     *
      * @return array<string, mixed>
      */
     public function planDefinition(): array
     {
-        $key = $this->plan_key;
-        $plans = config('asaas.plans', []);
-        if ($key !== null && $key !== '' && isset($plans[$key]) && is_array($plans[$key])) {
-            return $plans[$key];
-        }
-
-        return [];
+        return $this->billingState()->planDefinition($this);
     }
 
     public function planMaxUsers(): ?int
     {
-        $v = $this->planDefinition()['max_users'] ?? null;
-
-        return $v === null ? null : (int) $v;
+        return $this->billingState()->planMaxUsers($this);
     }
 
     public function planMaxOrganizationsPerTenant(): ?int
     {
-        $v = $this->planDefinition()['max_organizations_per_tenant'] ?? null;
-
-        return $v === null ? null : (int) $v;
+        return $this->billingState()->planMaxOrganizationsPerTenant($this);
     }
 
     public function organizationsInTenantCount(): int
     {
-        if (! $this->tenant_id) {
-            return 1;
-        }
-
-        return (int) self::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->count();
+        return $this->billingState()->organizationsInTenantCount($this);
     }
 
     public function canAddAnotherUser(): bool
     {
-        $max = $this->planMaxUsers();
-        if ($max === null) {
-            return true;
-        }
-
-        return $this->users()->count() < $max;
+        return $this->billingState()->canAddAnotherUser($this);
     }
 
     public function canAddOrganizationInTenant(): bool
     {
-        $max = $this->planMaxOrganizationsPerTenant();
-        if ($max === null) {
-            return true;
-        }
-
-        return $this->organizationsInTenantCount() < $max;
+        return $this->billingState()->canAddOrganizationInTenant($this);
     }
 
     /**
@@ -588,16 +441,7 @@ class Organization extends Model
      */
     public function meetsLimitsForPlanConfig(array $planConfig): bool
     {
-        $maxUsers = $planConfig['max_users'] ?? null;
-        if ($maxUsers !== null && $this->users()->count() > (int) $maxUsers) {
-            return false;
-        }
-        $maxOrgs = $planConfig['max_organizations_per_tenant'] ?? null;
-        if ($maxOrgs !== null && $this->organizationsInTenantCount() > (int) $maxOrgs) {
-            return false;
-        }
-
-        return true;
+        return $this->billingState()->meetsLimitsForPlanConfig($this, $planConfig);
     }
 
     /**
@@ -613,51 +457,16 @@ class Organization extends Model
      */
     public function planLimitsForApi(): array
     {
-        $def = $this->planDefinition();
-        $maxUsers = $def['max_users'] ?? null;
-        $maxOrgs = $def['max_organizations_per_tenant'] ?? null;
-
-        $linkBioEnabled = $def['link_bio_enabled'] ?? true;
-
-        return [
-            'plan_key' => $this->plan_key,
-            'max_users' => $maxUsers !== null ? (int) $maxUsers : null,
-            'max_organizations_per_tenant' => $maxOrgs !== null ? (int) $maxOrgs : null,
-            'link_bio_enabled' => (bool) $linkBioEnabled,
-            'users_count' => $this->users()->count(),
-            'organizations_in_tenant' => $this->organizationsInTenantCount(),
-            'can_add_user' => $this->canAddAnotherUser(),
-            'can_add_organization_in_tenant' => $this->canAddOrganizationInTenant(),
-        ];
+        return $this->billingState()->planLimitsForApi($this);
     }
 
-    /**
-     * Alinha status local com o fim do trial: sem pagamento confirmado → inativo/bloqueado (mesmo com assinatura Asaas pendente).
-     */
     public function syncExpiredTrialStateIfNeeded(): void
     {
-        if (! $this->trial_ends_at) {
-            return;
-        }
+        $this->billingState()->syncExpiredTrialStateIfNeeded($this);
+    }
 
-        if ($this->isTrialWindowOpen()) {
-            return;
-        }
-
-        if ($this->hasConfirmedBillingPayment()) {
-            if (in_array($this->subscription_status, ['trial', 'inactive'], true)) {
-                $this->forceFill([
-                    'subscription_status' => 'active',
-                    'billing_status' => 'ok',
-                ])->save();
-            }
-
-            return;
-        }
-
-        $this->forceFill([
-            'subscription_status' => 'inactive',
-            'billing_status' => 'blocked',
-        ])->save();
+    protected function billingState(): BillingStateService
+    {
+        return app(BillingStateService::class);
     }
 }

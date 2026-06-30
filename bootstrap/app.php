@@ -1,9 +1,13 @@
 <?php
 
+use App\Support\ApiErrorResponse;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -40,14 +44,40 @@ return Application::configure(basePath: dirname(__DIR__))
             app(\App\Services\ErrorHubService::class)->reportException($e);
         });
 
-        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
-            // API ou Accept: application/json → deixar o Laravel retornar JSON (evita renderizar layout platform sem user).
-            if ($request->expectsJson() || $request->is('api/*')) {
+        $exceptions->render(function (ValidationException $e, Request $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
                 return null;
             }
 
+            return ApiErrorResponse::validation($e->errors(), $e->getMessage() ?: null);
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return null;
+            }
+
+            return ApiErrorResponse::fromStatus(401);
+        });
+
+        $exceptions->render(function (ModelNotFoundException $e, Request $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return null;
+            }
+
+            return ApiErrorResponse::fromStatus(404);
+        });
+
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                $status = $e->getStatusCode();
+                $message = $e->getMessage() ?: ApiErrorResponse::messageForStatus($status);
+
+                return ApiErrorResponse::fromStatus($status, $message);
+            }
+
             $status = $e->getStatusCode();
-            $view = 'errors.' . $status;
+            $view = 'errors.'.$status;
 
             if (view()->exists($view)) {
                 return response()->view($view, [

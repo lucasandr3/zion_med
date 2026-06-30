@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Events\AuditEvent;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\AuditLog;
@@ -15,13 +16,15 @@ use Illuminate\Support\Facades\Event;
 
 class MeDataExportController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     /**
      * Exportação dos dados pessoais do titular (LGPD — portabilidade / acesso).
      */
     public function __invoke(Request $request): JsonResponse
     {
         $user = $request->user();
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id') ?? $user->organization_id;
+        $organizationId = $this->currentOrganizationId($request);
         $organization = $organizationId ? Organization::query()->find((int) $organizationId) : null;
 
         $auditLogs = AuditLog::query()

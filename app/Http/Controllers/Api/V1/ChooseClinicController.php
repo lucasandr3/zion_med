@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
-use App\Models\Clinic;
+use App\Models\Organization;
 use App\Services\OrganizationAccessService;
 use App\Services\OrganizationPresenceService;
+use App\Services\TenantContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,7 @@ class ChooseClinicController extends Controller
 {
     public function __construct(
         private readonly OrganizationAccessService $organizationAccess,
+        private readonly TenantContextService $tenantContext,
     ) {}
     /**
      * Lista organizações que o usuário pode escolher (para trocar contexto).
@@ -25,7 +27,7 @@ class ChooseClinicController extends Controller
 
         $user = $request->user();
         $organizations = $this->organizationAccess->allowedOrganizationsForUser($user);
-        $currentOrganizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $currentOrganizationId = $user->currentOrganizationId();
 
         return response()->json([
             'data' => [
@@ -56,13 +58,9 @@ class ChooseClinicController extends Controller
 
         $organizationId = (int) ($validated['organization_id'] ?? $validated['clinic_id']);
 
-        $oldOrganizationId = session('current_organization_id') ?? session('current_clinic_id');
-        $oldOrganizationId = $oldOrganizationId !== null && $oldOrganizationId !== '' ? (int) $oldOrganizationId : null;
+        $oldOrganizationId = $user->currentOrganizationId();
 
-        session([
-            'current_clinic_id' => $organizationId,
-            'current_organization_id' => $organizationId,
-        ]);
+        $this->tenantContext->applyOrganizationContext($request, $organizationId);
 
         $presence = app(OrganizationPresenceService::class);
         if ($user->isTenantUser()) {
@@ -76,7 +74,7 @@ class ChooseClinicController extends Controller
 
         return response()->json([
             'data' => [
-                'message' => 'Empresa alterada. Use o header X-Organization-Id nas próximas requisições com o valor '.$organizationId,
+                'message' => 'Empresa alterada. O contexto foi salvo no token e nas próximas requisições você pode usar o header X-Organization-Id com o valor '.$organizationId,
                 'current_organization_id' => $organizationId,
             ],
         ]);
@@ -92,7 +90,7 @@ class ChooseClinicController extends Controller
             return;
         }
         $clinic = $user->clinic;
-        if ($clinic?->tenant_id && Clinic::withoutGlobalScopes()->where('tenant_id', $clinic->tenant_id)->count() > 1) {
+        if ($clinic?->tenant_id && Organization::withoutGlobalScopes()->where('tenant_id', $clinic->tenant_id)->count() > 1) {
             return;
         }
         abort(403);

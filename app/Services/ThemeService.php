@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Clinic;
+use App\Models\Organization;
 
 class ThemeService
 {
@@ -153,7 +153,7 @@ class ThemeService
             : self::DEFAULT_THEME;
     }
 
-    public function getClinicTheme(?Clinic $clinic): string
+    public function getClinicTheme(?Organization $clinic): string
     {
         $theme = $clinic?->theme ?? self::DEFAULT_THEME;
         $theme = $this->resolveThemeKey($theme);
@@ -163,7 +163,7 @@ class ThemeService
             : self::DEFAULT_THEME;
     }
 
-    public function getBodyClasses(?Clinic $clinic): string
+    public function getBodyClasses(?Organization $clinic): string
     {
         $theme   = $this->getClinicTheme($clinic);
         $classes = "theme-{$theme}";

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Services\EvolutionGoClient;
@@ -13,6 +14,8 @@ use RuntimeException;
 
 class WhatsappEvolutionController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     public function __construct(
         private readonly EvolutionGoClient $evolution
     ) {}
@@ -331,7 +334,7 @@ class WhatsappEvolutionController extends Controller
 
     private function currentOrganization(Request $request): ?Organization
     {
-        $organizationId = session('current_organization_id') ?? session('current_clinic_id');
+        $organizationId = $this->currentOrganizationId($request);
         if (! $organizationId) {
             return null;
         }

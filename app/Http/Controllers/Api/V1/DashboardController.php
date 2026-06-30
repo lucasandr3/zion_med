@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionStatus;
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\DocumentSend;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     /**
      * Retorna os mesmos dados que a view dashboard (para o front montar a tela).
      */
@@ -22,7 +25,7 @@ class DashboardController extends Controller
     {
         $this->authorize('view-dashboard');
 
-        $orgId = session('current_clinic_id');
+        $orgId = $this->currentOrganizationId($request);
         if (! $orgId) {
             return response()->json([
                 'data' => [

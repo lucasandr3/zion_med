@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Models\OrganizationRole;
 use App\Support\Permission;
@@ -11,9 +12,11 @@ use Illuminate\Validation\Rule;
 
 class OrganizationRoleController extends Controller
 {
+    use ResolvesOrganizationContext;
+
     private function organizationId(Request $request): int
     {
-        $id = session('current_clinic_id') ?? $request->user()?->organization_id;
+        $id = $this->currentOrganizationId($request);
         if ($id === null || $id === '') {
             abort(422, 'Organização atual não definida.');
         }

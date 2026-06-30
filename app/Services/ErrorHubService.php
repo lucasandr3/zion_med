@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\ErrorHubSanitizer;
+use App\Support\OrganizationContext;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -169,11 +170,7 @@ class ErrorHubService
     /** @return array{0: ?string, 1: ?string} */
     private function resolveOrganizationContext(?Request $request): array
     {
-        $orgId = session('current_organization_id') ?? session('current_clinic_id');
-
-        if (($orgId === null || $orgId === '') && $request?->user() instanceof User) {
-            $orgId = $request->user()->clinic_id;
-        }
+        $orgId = OrganizationContext::id($request?->user());
 
         if ($orgId === null || $orgId === '') {
             return [null, null];

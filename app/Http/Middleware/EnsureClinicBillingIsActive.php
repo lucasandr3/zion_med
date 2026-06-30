@@ -82,7 +82,7 @@ class EnsureClinicBillingIsActive
 
     private function currentOrganization(Request $request): ?Organization
     {
-        $orgId = session('current_organization_id') ?? session('current_clinic_id') ?? $request->user()?->organization_id ?? $request->user()?->clinic_id;
+        $orgId = $request->user()?->currentOrganizationId() ?? $request->user()?->clinic_id;
         if (! $orgId) {
             return null;
         }
