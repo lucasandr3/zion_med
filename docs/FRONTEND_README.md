@@ -26,27 +26,23 @@ Defina a URL base da API (ex.: `environment.ts` / `environment.development.ts`):
 
 No Laravel, configure `FRONTEND_URL` (ex.: `http://localhost:4200`) para links de e-mail (reset de senha, verificação). Ver `.env.example`.
 
-## Proxy em desenvolvimento
+## CORS (sem proxy no Angular)
 
-Para evitar CORS no navegador durante o `ng serve`, use `proxy.conf.json` apontando para o backend:
+O SPA chama a API diretamente (`environment.apiUrl`, ex.: `http://localhost:8000` ou `https://api.gestgo.com.br`). O CORS fica no Laravel em `config/cors.php`.
 
-```json
-{
-  "/api": {
-    "target": "http://localhost:8000",
-    "secure": false,
-    "changeOrigin": true
-  }
-}
+Origens padrão permitidas:
+
+- `http://localhost:4200` e `http://127.0.0.1:4200` (dev com `ng serve`)
+- `http://zion_med.test` (dev com Herd/Valet, se o front usar esse host)
+- `https://app.gestgo.com.br` (produção)
+
+Para adicionar domínios (Easy Panel, staging, etc.), defina no `.env` do backend:
+
+```env
+CORS_ALLOWED_ORIGINS=http://localhost:4200,http://zion_med.test,https://app.gestgo.com.br
 ```
 
-Inicie o dev server com proxy, por exemplo:
-
-```bash
-ng serve --proxy-config proxy.conf.json
-```
-
-Ajuste `target` se a API estiver em outra porta ou no host do Docker (ex.: `http://zion_med.test`).
+Reinicie o backend após alterar o `.env`.
 
 ## Tema (UI)
 

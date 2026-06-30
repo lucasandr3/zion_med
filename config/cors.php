@@ -1,5 +1,17 @@
 <?php
 
+$defaultOrigins = [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200',
+    'http://zion_med.test',
+    'https://app.gestgo.com.br',
+];
+
+$configuredOrigins = array_values(array_filter(array_map(
+    static fn (string $origin): string => rtrim(trim($origin), '/'),
+    explode(',', (string) env('CORS_ALLOWED_ORIGINS', implode(',', $defaultOrigins)))
+)));
+
 return [
 
     /*
@@ -7,7 +19,8 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | Origens do SPA Angular (dev e produção).
+    | Origens do SPA Angular (dev e produção). Ajuste CORS_ALLOWED_ORIGINS no .env
+    | (separado por vírgula) ao publicar no Easy Panel ou em novos domínios.
     |
     */
 
@@ -15,10 +28,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:4200',
-        'https://app.gestgo.com.br',
-    ],
+    'allowed_origins' => $configuredOrigins,
 
     'allowed_origins_patterns' => [],
 

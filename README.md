@@ -19,7 +19,7 @@ MVP para clínicas: formulários operacionais, assinatura digital, geração de 
 
 ## Frontend (Angular)
 
-O SPA é um **repositório separado**. Guia de setup, proxy e deploy: [`docs/FRONTEND_README.md`](docs/FRONTEND_README.md).
+O SPA é um **repositório separado**. Guia de setup, CORS e deploy: [`docs/FRONTEND_README.md`](docs/FRONTEND_README.md).
 
 ## Setup local
 
