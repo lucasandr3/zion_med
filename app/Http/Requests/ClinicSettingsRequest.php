@@ -16,6 +16,7 @@ class ClinicSettingsRequest extends FormRequest
     public function rules(): array
     {
         $validThemes = app(ThemeService::class)->themeKeysForValidation();
+        $validPublicThemes = app(ThemeService::class)->publicThemeKeysForValidation();
 
         // Dark-mode-only AJAX request
         if ($this->boolean('dark_mode_only')) {
@@ -60,6 +61,9 @@ class ClinicSettingsRequest extends FormRequest
             'cover_image'        => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:3072'],
             'theme'              => ['nullable', 'string', Rule::in($validThemes)],
             'public_theme'       => ['nullable', 'string', Rule::in(array_merge([''], $validThemes))],
+            'form_public_theme'  => ['nullable', 'string', Rule::in(array_merge([''], $validPublicThemes))],
+            'form_accent_hex'    => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'hide_platform_branding' => ['nullable', 'boolean'],
             'cover_color'        => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'cover_mode'         => ['nullable', 'string', Rule::in(['banner', 'solid', 'none'])],
             'dark_mode'          => ['nullable', 'boolean'],

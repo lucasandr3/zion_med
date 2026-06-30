@@ -12,6 +12,7 @@ use App\Services\EvolutionGoClient;
 use App\Services\FeegowClient;
 use App\Services\OtpService;
 use App\Services\SubmissionService;
+use App\Services\ThemeService;
 use App\Support\PersonPiiHasher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,7 @@ class PublicFormApiController extends Controller
         private FeegowClient $feegowClient,
         private OtpService $otpService,
         private EvolutionGoClient $evolutionGoClient,
+        private ThemeService $themeService,
     ) {}
 
     /**
@@ -62,6 +64,8 @@ class PublicFormApiController extends Controller
         $feegow = $this->buildFeegowPublicMeta($organization);
         $signingLevel = $organization?->signing_security_level ?? 'basic';
         $waOtp = (bool) ($organization?->evolution_go_instance_token && $this->evolutionGoClient->isConfigured());
+        $formTheme = $organization?->form_public_theme;
+        $accentHex = $this->themeService->getPublicAccentHex($formTheme, $organization?->form_accent_hex);
 
         return response()->json([
             'data' => [
@@ -71,7 +75,12 @@ class PublicFormApiController extends Controller
                     'description' => $template->description,
                 ],
                 'clinic_name' => $clinic?->name,
+                'clinic_slug' => $organization?->slug,
                 'logo_url' => $clinic?->logo_url,
+                'form_public_theme' => $formTheme,
+                'public_theme' => $formTheme,
+                'accent_hex' => $accentHex,
+                'hide_platform_branding' => (bool) ($organization?->hide_platform_branding ?? false),
                 'signing_security_level' => $signingLevel,
                 'otp_whatsapp_available' => $waOtp,
                 'person_link' => [
