@@ -73,6 +73,10 @@ class ClinicSettingsController extends Controller
             'data' => [
                 'organization' => new OrganizationResource($organization),
                 'available_themes' => $this->themeService->getAvailableThemes(),
+                'available_public_themes' => array_merge(
+                    $this->themeService->getAvailableThemes(),
+                    $this->themeService->getPublicOnlyThemes(),
+                ),
                 'billing_plans' => $billingPlans,
                 'billing_ui' => $organization->billingUiState(),
                 'billing_subscriptions' => $billingSubscriptions,
@@ -150,7 +154,7 @@ class ClinicSettingsController extends Controller
             unset($data['address_data']);
         }
 
-        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'cover_color', 'cover_mode', 'signing_security_level'] as $key) {
+        foreach (['phone', 'contact_email', 'short_description', 'specialties', 'founded_year', 'meta_description', 'maps_url', 'billing_name', 'billing_email', 'billing_document', 'public_theme', 'form_public_theme', 'cover_color', 'cover_mode', 'signing_security_level'] as $key) {
             if (array_key_exists($key, $data) && trim((string) $data[$key]) === '') {
                 $data[$key] = null;
             }
@@ -161,6 +165,21 @@ class ClinicSettingsController extends Controller
         }
         if (array_key_exists('public_theme', $data)) {
             $data['public_theme'] = $this->themeService->normalizeThemeValue($data['public_theme']);
+        }
+        if (array_key_exists('form_public_theme', $data)) {
+            $raw = trim((string) ($data['form_public_theme'] ?? ''));
+            $data['form_public_theme'] = $raw === '' ? null : $this->themeService->normalizePublicThemeValue($raw);
+        }
+        if (array_key_exists('form_accent_hex', $data)) {
+            $resolvedFormTheme = $data['form_public_theme'] ?? $organization->form_public_theme;
+            if ($resolvedFormTheme !== 'custom') {
+                $data['form_accent_hex'] = null;
+            } elseif ($data['form_accent_hex'] !== null) {
+                $data['form_accent_hex'] = strtolower((string) $data['form_accent_hex']);
+            }
+        }
+        if (array_key_exists('hide_platform_branding', $data)) {
+            $data['hide_platform_branding'] = $request->boolean('hide_platform_branding');
         }
 
         $data['whatsapp_notifications_enabled'] = $request->boolean('whatsapp_notifications_enabled');
