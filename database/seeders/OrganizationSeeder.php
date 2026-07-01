@@ -45,16 +45,13 @@ class OrganizationSeeder extends Seeder
 
         $this->applyTrialBilling($organization, $trialEndsAt);
 
-        User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'lucasvieiraandrade58@gmail.com'],
-            [
-                'organization_id' => $organization->id,
-                'name' => 'QA Organização',
-                'password' => '12345678',
-                'role' => Role::Owner->value,
-                'active' => true,
-            ]
-        );
+        $this->seedUser('lucasvieiraandrade58@gmail.com', [
+            'organization_id' => $organization->id,
+            'name' => 'QA Organização',
+            'password' => '12345678',
+            'role' => Role::Owner->value,
+            'active' => true,
+        ]);
     }
 
     private function seedDemonstracaoMultiTenant(\DateTimeInterface $trialEndsAt): void
@@ -89,17 +86,14 @@ class OrganizationSeeder extends Seeder
         $this->applyTrialBilling($matriz, $trialEndsAt);
         $this->applyTrialBilling($unidade, $trialEndsAt);
 
-        User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'demonstracao@gestgo.test'],
-            [
-                'organization_id' => $matriz->id,
-                'name' => 'Demonstração Multi-clínica',
-                'password' => '12345678',
-                'role' => Role::Owner->value,
-                'active' => true,
-                'can_switch_clinic' => true,
-            ]
-        );
+        $this->seedUser('demonstracao@gestgo.test', [
+            'organization_id' => $matriz->id,
+            'name' => 'Demonstração Multi-clínica',
+            'password' => '12345678',
+            'role' => Role::Owner->value,
+            'active' => true,
+            'can_switch_clinic' => true,
+        ]);
     }
 
     private function seedDemonstracaoSingleTenant(\DateTimeInterface $trialEndsAt): void
@@ -122,30 +116,41 @@ class OrganizationSeeder extends Seeder
 
         $this->applyTrialBilling($organization, $trialEndsAt);
 
-        User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'demonstracao-single@gestgo.test'],
-            [
-                'organization_id' => $organization->id,
-                'name' => 'Demonstração Single',
-                'password' => '12345678',
-                'role' => Role::Owner->value,
-                'active' => true,
-            ]
-        );
+        $this->seedUser('demonstracao-single@gestgo.test', [
+            'organization_id' => $organization->id,
+            'name' => 'Demonstração Single',
+            'password' => '12345678',
+            'role' => Role::Owner->value,
+            'active' => true,
+        ]);
     }
 
     private function seedPlatformAdmin(): void
     {
-        User::withoutGlobalScopes()->firstOrCreate(
-            ['email' => 'admin@gestgo.com.br'],
-            [
-                'organization_id' => null,
-                'name' => 'Admin Plataforma',
-                'password' => '12345678',
-                'role' => Role::PlatformAdmin->value,
-                'active' => true,
-            ]
+        $this->seedUser('admin@gestgo.com.br', [
+            'organization_id' => null,
+            'name' => 'Admin Plataforma',
+            'password' => '12345678',
+            'role' => Role::PlatformAdmin->value,
+            'active' => true,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function seedUser(string $email, array $attributes): User
+    {
+        $user = User::withoutGlobalScopes()->firstOrCreate(
+            ['email' => $email],
+            [...$attributes, 'email_verified_at' => now()],
         );
+
+        if ($user->email_verified_at === null) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        return $user;
     }
 
     private function applyTrialBilling(Organization $organization, \DateTimeInterface $trialEndsAt): void
