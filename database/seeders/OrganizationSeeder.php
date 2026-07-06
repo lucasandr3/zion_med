@@ -137,20 +137,23 @@ class OrganizationSeeder extends Seeder
     }
 
     /**
+     * Contas de QA/demonstração/plataforma: e-mail sempre verificado (ambiente de teste).
+     *
      * @param  array<string, mixed>  $attributes
      */
     private function seedUser(string $email, array $attributes): User
     {
         $user = User::withoutGlobalScopes()->firstOrCreate(
             ['email' => $email],
-            [...$attributes, 'email_verified_at' => now()],
+            $attributes,
         );
 
-        if ($user->email_verified_at === null) {
-            $user->forceFill(['email_verified_at' => now()])->save();
-        }
+        $user->forceFill([
+            ...$attributes,
+            'email_verified_at' => now(),
+        ])->save();
 
-        return $user;
+        return $user->fresh();
     }
 
     private function applyTrialBilling(Organization $organization, \DateTimeInterface $trialEndsAt): void

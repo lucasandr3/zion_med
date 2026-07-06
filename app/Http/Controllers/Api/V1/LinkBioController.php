@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ClinicLinkResource;
 use App\Http\Resources\Api\V1\ClinicResource;
+use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\ClinicLink;
 use App\Models\FormSubmission;
@@ -640,7 +641,7 @@ class LinkBioController extends Controller
      */
     private function resolveClinicByPublicSlug(string $slug): ?Clinic
     {
-        $clinic = Organization::withoutGlobalScopes()
+        $clinic = Clinic::withoutGlobalScopes()
             ->where('slug', $slug)
             ->first();
         if ($clinic) {
@@ -652,7 +653,7 @@ class LinkBioController extends Controller
             return null;
         }
 
-        return Organization::withoutGlobalScopes()->find($alias->organization_id);
+        return Clinic::withoutGlobalScopes()->find($alias->organization_id);
     }
 
     /**
