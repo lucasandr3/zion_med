@@ -14,6 +14,16 @@ class ProtocolDetailResource extends JsonResource
 
         return array_merge($base, [
             'staff_fields' => EsteticaStaffFieldRegistry::definitions($this->template?->name ?? null),
+            'template_version' => $this->whenLoaded('templateVersion', function () {
+                return [
+                    'id' => $this->templateVersion->id,
+                    'version' => $this->templateVersion->version,
+                    'name' => $this->templateVersion->name,
+                    'description' => $this->templateVersion->description,
+                    'fields_snapshot' => $this->templateVersion->fields_snapshot,
+                ];
+            }),
+            'document_snapshot' => $this->document_snapshot,
             'values' => $this->whenLoaded('values', function () {
                 return $this->values->mapWithKeys(function ($v) {
                     $value = $v->value_json ?? $v->value_text;

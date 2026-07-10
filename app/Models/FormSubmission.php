@@ -27,15 +27,20 @@ class FormSubmission extends Model
         'submitted_at',
         'approved_by_user_id',
         'approved_at',
+        'consent_valid_until',
         'review_comment',
         'protocol_number',
         'document_hash',
         'document_snapshot_hash',
+        'document_snapshot',
         'signing_channel',
         'signing_status',
         'locale',
         'timezone',
         'accepted_text_at',
+        'revoked_at',
+        'revoked_by_user_id',
+        'revoke_reason',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -54,8 +59,31 @@ class FormSubmission extends Model
             'status' => SubmissionStatus::class,
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
+            'consent_valid_until' => 'datetime',
             'accepted_text_at' => 'datetime',
+            'revoked_at' => 'datetime',
+            'document_snapshot' => 'array',
         ];
+    }
+
+    public function isConsentExpired(): bool
+    {
+        return $this->status === SubmissionStatus::Approved
+            && $this->consent_valid_until !== null
+            && $this->consent_valid_until->isPast();
+    }
+
+    public function isConsentCurrentlyValid(): bool
+    {
+        if ($this->status !== SubmissionStatus::Approved) {
+            return false;
+        }
+
+        if ($this->consent_valid_until === null) {
+            return true;
+        }
+
+        return ! $this->consent_valid_until->isPast();
     }
 
     public function person(): BelongsTo

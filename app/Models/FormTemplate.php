@@ -20,9 +20,13 @@ class FormTemplate extends Model
         'name',
         'description',
         'category',
+        'document_kind',
+        'consent_validity_days',
+        'comprehension_quiz',
         'is_active',
         'public_enabled',
         'public_require_person_link',
+        'public_person_link_mode',
         'public_token',
         'public_token_expires_at',
         'created_by',
@@ -113,6 +117,7 @@ class FormTemplate extends Model
             'public_enabled' => 'boolean',
             'public_require_person_link' => 'boolean',
             'public_token_expires_at' => 'datetime',
+            'comprehension_quiz' => 'array',
         ];
     }
 

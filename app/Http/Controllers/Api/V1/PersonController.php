@@ -139,6 +139,7 @@ class PersonController extends Controller
             'submissions as pending_submissions_count' => fn ($q) => $q->where('status', SubmissionStatus::Pending),
             'submissions as approved_submissions_count' => fn ($q) => $q->where('status', SubmissionStatus::Approved),
             'submissions as rejected_submissions_count' => fn ($q) => $q->where('status', SubmissionStatus::Rejected),
+            'submissions as revoked_submissions_count' => fn ($q) => $q->where('status', SubmissionStatus::Revoked),
         ]);
 
         $recent = $pessoa->submissions()
@@ -146,6 +147,36 @@ class PersonController extends Controller
             ->latest('submitted_at')
             ->limit(15)
             ->get();
+
+        $consentProtocols = $pessoa->submissions()
+            ->with('template')
+            ->whereHas('template', function ($q) {
+                $q->where('document_kind', 'consentimento')
+                    ->orWhere('category', 'consentimento');
+            })
+            ->latest('submitted_at')
+            ->limit(20)
+            ->get();
+
+        $activeConsent = $consentProtocols->first(fn ($s) => $s->isConsentCurrentlyValid());
+        $pendingConsent = $consentProtocols->first(fn ($s) => $s->status === SubmissionStatus::Pending);
+        $expiredConsent = $consentProtocols->first(fn ($s) => $s->isConsentExpired());
+        $revokedConsent = $consentProtocols->first(fn ($s) => $s->status === SubmissionStatus::Revoked);
+
+        $consentStatus = 'none';
+        if ($activeConsent) {
+            $consentStatus = 'valid';
+        } elseif ($pendingConsent) {
+            $consentStatus = 'pending';
+        } elseif ($expiredConsent) {
+            $consentStatus = 'expired';
+        } elseif ($revokedConsent) {
+            $consentStatus = 'revoked';
+        } elseif ($consentProtocols->isNotEmpty()) {
+            $consentStatus = 'inactive';
+        }
+
+        $summaryProtocol = $activeConsent ?? $pendingConsent ?? $expiredConsent;
 
         $pessoa->loadMax('submissions', 'submitted_at');
         $base = (new PersonResource($pessoa))->exposePii()->toArray($request);
@@ -157,6 +188,23 @@ class PersonController extends Controller
                     'pending_protocols' => (int) $pessoa->pending_submissions_count,
                     'approved_protocols' => (int) $pessoa->approved_submissions_count,
                     'rejected_protocols' => (int) $pessoa->rejected_submissions_count,
+                    'revoked_protocols' => (int) $pessoa->revoked_submissions_count,
+                ],
+                'consent_summary' => [
+                    'status' => $consentStatus,
+                    'label' => match ($consentStatus) {
+                        'valid' => 'Consentimento válido',
+                        'pending' => 'Consentimento pendente de revisão',
+                        'expired' => 'Consentimento vencido',
+                        'revoked' => 'Consentimento revogado',
+                        'inactive' => 'Sem consentimento vigente',
+                        default => 'Nenhum consentimento registrado',
+                    },
+                    'active_protocol_id' => $summaryProtocol?->id,
+                    'active_protocol_number' => $summaryProtocol?->protocol_number,
+                    'active_submitted_at' => $summaryProtocol?->submitted_at?->toIso8601String(),
+                    'valid_until' => $summaryProtocol?->consent_valid_until?->toIso8601String(),
+                    'consents_count' => $consentProtocols->count(),
                 ],
                 'recent_protocols' => ProtocolResource::collection($recent),
             ]),

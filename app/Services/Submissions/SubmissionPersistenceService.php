@@ -52,13 +52,15 @@ class SubmissionPersistenceService
         $documentSnapshot = [
             'protocol_number' => $submission->protocol_number,
             'template_version_id' => $templateVersion->id,
-            'template_name' => $template->name,
-            'template_description' => $template->description,
+            'template_version' => $templateVersion->version,
+            'template_name' => $templateVersion->name ?: $template->name,
+            'template_description' => $templateVersion->description ?? $template->description,
+            'document_kind' => $template->document_kind ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha'),
             'fields_snapshot' => $templateVersion->fields_snapshot,
             'values' => $valuesKeyed,
             'submitted_at' => $submission->submitted_at->toIso8601String(),
         ];
-        $documentSnapshotHash = hash('sha256', json_encode($documentSnapshot));
+        $documentSnapshotHash = hash('sha256', json_encode($documentSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $documentHash = hash('sha256', implode('|', [
             $submission->protocol_number,
             (string) $templateVersion->id,
@@ -68,6 +70,7 @@ class SubmissionPersistenceService
         $submission->update([
             'document_hash' => $documentHash,
             'document_snapshot_hash' => $documentSnapshotHash,
+            'document_snapshot' => $documentSnapshot,
         ]);
 
         return $documentHash;

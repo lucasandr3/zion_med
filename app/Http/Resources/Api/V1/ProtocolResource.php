@@ -12,6 +12,9 @@ class ProtocolResource extends JsonResource
         return [
             'id' => $this->id,
             'protocol_number' => $this->protocol_number,
+            'document_hash' => $this->document_hash,
+            'document_snapshot_hash' => $this->document_snapshot_hash,
+            'template_version_id' => $this->template_version_id,
             'status' => $this->status->value,
             'template_id' => $this->template_id,
             'template_name' => $this->whenLoaded('template', fn () => $this->template->name),
@@ -25,7 +28,11 @@ class ProtocolResource extends JsonResource
             'submitter_email' => $this->submitter_email,
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'approved_at' => $this->approved_at?->toIso8601String(),
+            'consent_valid_until' => $this->consent_valid_until?->toIso8601String(),
+            'consent_expired' => $this->isConsentExpired(),
             'review_comment' => $this->review_comment,
+            'revoked_at' => $this->revoked_at?->toIso8601String(),
+            'revoke_reason' => $this->revoke_reason,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

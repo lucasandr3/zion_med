@@ -36,12 +36,15 @@ class FormFieldRequest extends FormRequest
         ];
 
         $rules = [
-            'type' => ['required', 'string', 'in:text,textarea,number,date,select,checkbox,radio,file,signature'],
-            'label' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'string', 'in:text,textarea,number,date,select,checkbox,radio,file,signature,heading,notice,section_break'],
+            'label' => ['required', 'string', 'max:2000'],
             'name_key' => $nameKeyRules,
             'required' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
+        if (in_array($this->input('type'), ['heading', 'notice', 'section_break'], true)) {
+            $rules['required'] = ['nullable', 'boolean'];
+        }
         if (in_array($this->input('type'), ['select', 'radio'], true)) {
             $rules['options_text'] = ['nullable', 'string'];
             $rules['options'] = ['required', 'array', 'min:1'];

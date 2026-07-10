@@ -42,6 +42,8 @@ class SubmissionEvent extends Model
             'comment' => 'Comentário',
             'approved' => 'Aprovado',
             'rejected' => 'Reprovado',
+            'revoked' => 'Consentimento revogado',
+            'professional_explained' => 'Profissional declarou ter explicado',
             default => $this->type,
         };
     }

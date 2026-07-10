@@ -15,6 +15,7 @@ use App\Models\FormField;
 use App\Models\FormTemplate;
 use App\Models\Organization;
 use App\Models\TemplateCategory;
+use App\Services\ComprehensionQuizService;
 use App\Services\DocumentSendService;
 use App\Services\PublicLinkService;
 use App\Services\TemplateVersionService;
@@ -188,7 +189,7 @@ class TemplateController extends Controller
             'public_require_person_link' => ['boolean'],
             'new_category' => ['nullable', 'string', 'max:120'],
             'fields' => ['nullable', 'array'],
-            'fields.*.type' => ['required', 'string', Rule::in(['text', 'textarea', 'select', 'checkbox', 'radio', 'date', 'number', 'file', 'signature'])],
+            'fields.*.type' => ['required', 'string', Rule::in(['text', 'textarea', 'select', 'checkbox', 'radio', 'date', 'number', 'file', 'signature', 'heading', 'notice', 'section_break'])],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.name_key' => ['required', 'string', 'max:80'],
             'fields.*.required' => ['boolean'],
@@ -289,7 +290,26 @@ class TemplateController extends Controller
         }
 
         unset($validated['new_category']);
+
+        if (($validated['category'] ?? null) === 'consentimento' && empty($validated['document_kind'])) {
+            $validated['document_kind'] = 'consentimento';
+        }
+
+        $kind = $validated['document_kind'] ?? $template->document_kind;
+        if ($kind !== 'consentimento') {
+            $validated['consent_validity_days'] = null;
+            $validated['comprehension_quiz'] = null;
+        } else {
+            if (array_key_exists('comprehension_quiz', $validated)) {
+                $validated['comprehension_quiz'] = app(ComprehensionQuizService::class)->normalize($validated['comprehension_quiz']);
+                if ($validated['comprehension_quiz'] === []) {
+                    $validated['comprehension_quiz'] = null;
+                }
+            }
+        }
+
         $template->update($validated);
+        $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
         Event::dispatch(new AuditEvent('template.updated', FormTemplate::class, $template->id, null, $template->organization_id ?? $template->clinic_id, $request->user()->id));
 
         return response()->json([
@@ -374,8 +394,8 @@ class TemplateController extends Controller
     {
         $this->authorize('update-template', $template);
         $data = $request->validate([
-            'type' => ['required', 'string', 'in:text,textarea,number,date,select,checkbox,radio,file,signature'],
-            'label' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'string', 'in:text,textarea,number,date,select,checkbox,radio,file,signature,heading,notice,section_break'],
+            'label' => ['required', 'string', 'max:2000'],
             'name_key' => [
                 'required',
                 'string',
@@ -392,13 +412,15 @@ class TemplateController extends Controller
             'name_key.unique' => 'Já existe um campo com esta chave neste template.',
         ]);
         $data['template_id'] = $template->id;
-        $data['required'] = (bool) ($data['required'] ?? $request->input('required', false));
+        $structural = in_array($data['type'], ['heading', 'notice', 'section_break'], true);
+        $data['required'] = $structural ? false : (bool) ($data['required'] ?? $request->input('required', false));
         if (! empty($data['options'])) {
             $data['options_json'] = ['options' => array_values($data['options'])];
         }
         unset($data['options']);
         $data['sort_order'] = $data['sort_order'] ?? $template->fields()->max('sort_order') + 1;
         $campo = FormField::create($data);
+        $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
 
         return response()->json([
             'data' => new FormFieldResource($campo),
@@ -417,11 +439,42 @@ class TemplateController extends Controller
             $data['options_json'] = ['options' => array_values($data['options'])];
             unset($data['options']);
         }
+        if (isset($data['type']) && in_array($data['type'], ['heading', 'notice', 'section_break'], true)) {
+            $data['required'] = false;
+        }
         $campo->update($data);
+        $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
 
         return response()->json([
             'data' => new FormFieldResource($campo->fresh()),
         ]);
+    }
+
+    /**
+     * Reordena campos do template (ids na ordem desejada).
+     */
+    public function reorderCampos(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        $ownedIds = $template->fields()->whereIn('id', $ids)->pluck('id')->all();
+        if (count($ownedIds) !== count(array_unique($ids))) {
+            return response()->json(['message' => 'Um ou mais campos não pertencem a este modelo.'], 422);
+        }
+
+        foreach (array_values($ids) as $order => $id) {
+            FormField::where('id', $id)
+                ->where('template_id', $template->id)
+                ->update(['sort_order' => $order + 1]);
+        }
+
+        $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
+
+        return response()->json(['data' => ['message' => 'Ordem atualizada.']]);
     }
 
     /**
@@ -431,6 +484,7 @@ class TemplateController extends Controller
     {
         $this->authorize('update-template', $template);
         $campo->delete();
+        $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
 
         return response()->json(['data' => ['message' => 'Campo removido.']], 200);
     }
@@ -516,6 +570,10 @@ class TemplateController extends Controller
             'is_active' => true,
             'public_enabled' => false,
             'public_require_person_link' => $template->public_require_person_link ?? false,
+            'public_person_link_mode' => $template->public_person_link_mode ?? 'code',
+            'document_kind' => $template->document_kind ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha'),
+            'consent_validity_days' => $template->consent_validity_days,
+            'comprehension_quiz' => $template->comprehension_quiz,
             'created_by' => $request->user()->id,
         ]);
         foreach ($template->fields as $field) {
@@ -530,6 +588,7 @@ class TemplateController extends Controller
             ]);
         }
         Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $newTemplate->id, null, $newTemplate->organization_id ?? $newTemplate->clinic_id, $request->user()->id));
+        $this->templateVersionService->ensureSyncedVersion($newTemplate->fresh(['fields']));
         $newTemplate->load('fields');
         return response()->json([
             'data' => array_merge(

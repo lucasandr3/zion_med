@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\DemonstrationRequestController;
 use App\Http\Controllers\Api\V1\LandingAnalyticsController;
 use App\Http\Controllers\Api\V1\LandingController;
 use App\Services\LandingAnalyticsService;
+use App\Http\Controllers\Api\V1\DocumentVerificationController;
 use App\Http\Controllers\Api\V1\PublicFormApiController;
 use App\Http\Controllers\Api\V1\PublicFormOtpController;
 use App\Http\Controllers\Api\V1\StatusController;
@@ -93,6 +94,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::post('/organization-presence/leave-beacon', [OrganizationPresenceController::class, 'leaveBeacon'])
         ->middleware('throttle:120,1')
         ->name('api.v1.organization-presence.leave-beacon');
+    Route::get('/verificar/{code}', [DocumentVerificationController::class, 'show'])
+        ->where('code', '[A-Za-z0-9\-]{4,64}')
+        ->middleware('throttle:60,1')
+        ->name('api.v1.verificar');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
     Route::get('/formulario-publico/{token}/feegow/disponibilidade', [PublicFormApiController::class, 'feegowAvailability'])->name('api.v1.formulario-publico.feegow.disponibilidade');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
@@ -207,6 +212,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('api.v1.templates.destroy');
     Route::get('/templates/{template}/campos', [TemplateController::class, 'campos'])->name('api.v1.templates.campos.index');
     Route::post('/templates/{template}/campos', [TemplateController::class, 'storeCampo'])->name('api.v1.templates.campos.store');
+    Route::post('/templates/{template}/campos/reorder', [TemplateController::class, 'reorderCampos'])->name('api.v1.templates.campos.reorder');
     Route::put('/templates/{template}/campos/{campo}', [TemplateController::class, 'updateCampo'])->name('api.v1.templates.campos.update');
     Route::delete('/templates/{template}/campos/{campo}', [TemplateController::class, 'destroyCampo'])->name('api.v1.templates.campos.destroy');
     Route::post('/templates/{template}/link-publico', [TemplateController::class, 'gerarLink'])->name('api.v1.templates.link.gerar');
@@ -228,6 +234,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::get('/protocols/{protocol}/pdf', [ProtocolController::class, 'pdf'])->name('api.v1.protocols.pdf');
     Route::get('/protocols/{protocol}/dossie', [ProtocolController::class, 'exportarDossie'])->name('api.v1.protocols.dossie');
     Route::post('/protocols/{protocol}/revisao', [ProtocolController::class, 'aprovar'])->name('api.v1.protocols.revisao');
+    Route::post('/protocols/{protocol}/revogar', [ProtocolController::class, 'revogar'])->name('api.v1.protocols.revogar');
     Route::post('/protocols/{protocol}/comentario', [ProtocolController::class, 'comentario'])->name('api.v1.protocols.comentario');
     Route::patch('/protocols/{protocol}/staff-values', [ProtocolController::class, 'staffValues'])->name('api.v1.protocols.staff-values');
 

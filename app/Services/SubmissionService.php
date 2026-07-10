@@ -103,6 +103,8 @@ class SubmissionService
                 $request,
             );
 
+            $this->attachClinicalDefensibilityMeta($submission, $template, $data);
+
             Event::dispatch(new AuditEvent('submission.created', FormSubmission::class, $submission->id, [
                 'protocol' => $submission->protocol_number,
                 'template_id' => $template->id,
@@ -117,6 +119,10 @@ class SubmissionService
                     'channel' => $signingChannel,
                     'locale' => $locale,
                     'timezone' => $timezone,
+                    'comprehension_ack' => ! empty($data['_comprehension_ack']),
+                    'assisted_mode' => ! empty($data['_assisted_mode']),
+                    'comprehension_quiz_passed' => ! empty($data['_comprehension_quiz_passed']),
+                    'actors' => is_array($data['_actors'] ?? null) ? $data['_actors'] : null,
                 ],
             ]);
 
@@ -197,11 +203,23 @@ class SubmissionService
 
     public function approve(FormSubmission $submission, string $status, ?string $comment, int $userId, ?Request $request = null): void
     {
+        $professionalExplained = (bool) ($request?->boolean('professional_explained') ?? false);
+
+        $consentValidUntil = null;
+        if ($status === 'approved') {
+            $submission->loadMissing('template');
+            $days = (int) ($submission->template?->consent_validity_days ?? 0);
+            if ($days > 0) {
+                $consentValidUntil = now()->addDays($days);
+            }
+        }
+
         $submission->update([
             'status' => $status === 'approved' ? SubmissionStatus::Approved : SubmissionStatus::Rejected,
             'approved_by_user_id' => $userId,
             'approved_at' => now(),
             'review_comment' => $comment,
+            'consent_valid_until' => $consentValidUntil,
         ]);
 
         $reviewer = User::find($userId);
@@ -222,15 +240,50 @@ class SubmissionService
             }
         }
 
+        if ($status === 'approved' && $consentValidUntil) {
+            $snapshot = $submission->document_snapshot ?? [];
+            $snapshot['clinical'] = array_merge($snapshot['clinical'] ?? [], [
+                'consent_validity_days' => (int) ($submission->template?->consent_validity_days ?? 0),
+                'consent_valid_until' => $consentValidUntil->toIso8601String(),
+            ]);
+            $submission->update(['document_snapshot' => $snapshot]);
+        }
+
+        if ($professionalExplained) {
+            SubmissionEvent::create([
+                'form_submission_id' => $submission->id,
+                'type' => 'professional_explained',
+                'user_id' => $userId,
+                'body' => 'Profissional declarou ter explicado riscos, benefícios e alternativas ao paciente.',
+                'meta_json' => [
+                    'at' => now()->toIso8601String(),
+                ],
+            ]);
+
+            $snapshot = $submission->document_snapshot ?? [];
+            $snapshot['clinical'] = array_merge($snapshot['clinical'] ?? [], [
+                'professional_explained' => true,
+                'professional_explained_by' => $reviewer?->name,
+                'professional_explained_at' => now()->toIso8601String(),
+            ]);
+            $submission->update(['document_snapshot' => $snapshot]);
+        }
+
         SubmissionEvent::create([
             'form_submission_id' => $submission->id,
             'type' => $status === 'approved' ? 'approved' : 'rejected',
             'user_id' => $userId,
             'body' => $comment,
+            'meta_json' => [
+                'professional_explained' => $professionalExplained,
+                'consent_valid_until' => $consentValidUntil?->toIso8601String(),
+            ],
         ]);
         Event::dispatch(new AuditEvent('submission.reviewed', FormSubmission::class, $submission->id, [
             'status' => $status,
             'comment' => $comment,
+            'professional_explained' => $professionalExplained,
+            'consent_valid_until' => $consentValidUntil?->toIso8601String(),
         ], $submission->organization_id ?? $submission->clinic_id, $userId));
 
         $event = $status === 'approved' ? 'submission.approved' : 'submission.rejected';
@@ -247,6 +300,82 @@ class SubmissionService
                 Notification::send($recipients, new ProtocoloReprovado($submission, $reviewer));
             }
         }
+    }
+
+    /**
+     * Revoga um consentimento/protocolo já registrado (ciclo de vida clínico).
+     */
+    public function revoke(FormSubmission $submission, int $userId, string $reason): void
+    {
+        if ($submission->status === SubmissionStatus::Revoked) {
+            throw ValidationException::withMessages([
+                'status' => ['Este protocolo já está revogado.'],
+            ]);
+        }
+
+        $submission->update([
+            'status' => SubmissionStatus::Revoked,
+            'revoked_at' => now(),
+            'revoked_by_user_id' => $userId,
+            'revoke_reason' => $reason,
+        ]);
+
+        $snapshot = $submission->document_snapshot ?? [];
+        $snapshot['clinical'] = array_merge($snapshot['clinical'] ?? [], [
+            'revoked' => true,
+            'revoked_at' => now()->toIso8601String(),
+            'revoke_reason' => $reason,
+        ]);
+        $submission->update(['document_snapshot' => $snapshot]);
+
+        SubmissionEvent::create([
+            'form_submission_id' => $submission->id,
+            'type' => 'revoked',
+            'user_id' => $userId,
+            'body' => $reason,
+            'meta_json' => [
+                'revoked_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        Event::dispatch(new AuditEvent('submission.revoked', FormSubmission::class, $submission->id, [
+            'reason' => $reason,
+        ], $submission->organization_id ?? $submission->clinic_id, $userId));
+
+        $this->webhookService->dispatch(
+            $submission->organization_id ?? $submission->clinic_id,
+            'submission.revoked',
+            $this->webhookPayload($submission->fresh())
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function attachClinicalDefensibilityMeta(FormSubmission $submission, FormTemplate $template, array $data): void
+    {
+        $kind = $template->document_kind ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
+        $actors = is_array($data['_actors'] ?? null) ? $data['_actors'] : [];
+        $clinical = [
+            'document_kind' => $kind,
+            'comprehension_ack' => ! empty($data['_comprehension_ack']),
+            'comprehension_ack_at' => $data['_comprehension_ack_at'] ?? null,
+            'privacy_ack' => ! empty($data['_accept_terms']) || ! empty($data['_accepted_text_at']),
+            'assisted_mode' => ! empty($data['_assisted_mode']),
+            'professional_explained_at_submit' => ! empty($data['_professional_explained']),
+            'comprehension_quiz_passed' => ! empty($data['_comprehension_quiz_passed']),
+            'comprehension_quiz_answers' => is_array($data['_comprehension_quiz'] ?? null) ? $data['_comprehension_quiz'] : null,
+            'comprehension_quiz_detail' => is_array($data['_comprehension_quiz_detail'] ?? null) ? $data['_comprehension_quiz_detail'] : null,
+            'actors' => [
+                'guardian_name' => isset($actors['guardian_name']) ? trim((string) $actors['guardian_name']) : null,
+                'guardian_relation' => isset($actors['guardian_relation']) ? trim((string) $actors['guardian_relation']) : null,
+                'witness_name' => isset($actors['witness_name']) ? trim((string) $actors['witness_name']) : null,
+            ],
+        ];
+
+        $snapshot = $submission->fresh()->document_snapshot ?? [];
+        $snapshot['clinical'] = $clinical;
+        $submission->update(['document_snapshot' => $snapshot]);
     }
 
     /**

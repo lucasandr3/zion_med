@@ -81,7 +81,7 @@ class ProtocolController extends Controller
     public function show(FormSubmission $protocol): JsonResponse
     {
         $this->authorize('view-submission', $protocol);
-        $protocol->load(['template.fields', 'values', 'template', 'person', 'events.user', 'attachments', 'signatures']);
+        $protocol->load(['template.fields', 'values', 'template', 'templateVersion', 'person', 'events.user', 'attachments', 'signatures']);
 
         return response()->json([
             'data' => new ProtocolDetailResource($protocol),
@@ -222,6 +222,7 @@ class ProtocolController extends Controller
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:approved,rejected'],
             'review_comment' => ['nullable', 'string', 'max:2000'],
+            'professional_explained' => ['nullable', 'boolean'],
         ]);
 
         $this->submissionService->approve(
@@ -235,8 +236,37 @@ class ProtocolController extends Controller
         return response()->json([
             'data' => new ProtocolDetailResource($protocol->fresh([
                 'template.fields',
+                'templateVersion',
                 'values',
                 'signatures',
+                'events.user',
+            ])),
+        ]);
+    }
+
+    /**
+     * Revoga o consentimento/protocolo (ciclo de vida clínico).
+     */
+    public function revogar(Request $request, FormSubmission $protocol): JsonResponse
+    {
+        $this->authorize('approve-submission', $protocol);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+
+        $this->submissionService->revoke(
+            $protocol,
+            $request->user()->id,
+            $validated['reason'],
+        );
+
+        return response()->json([
+            'data' => new ProtocolDetailResource($protocol->fresh([
+                'template.fields',
+                'templateVersion',
+                'values',
+                'signatures',
+                'events.user',
             ])),
         ]);
     }

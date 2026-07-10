@@ -34,7 +34,7 @@
         @if($clinic->address)
             <p class="header-address">{{ $clinic->address }}</p>
         @endif
-        <p>{{ $submission->template->name }}</p>
+        <p>{{ $templateName ?? $submission->template->name }}@if(!empty($templateVersionLabel)) · {{ $templateVersionLabel }}@endif</p>
         <p>Protocolo: {{ $submission->protocol_number ?? $submission->id }} | Data: {{ $submission->submitted_at?->format('d/m/Y H:i') ?? $submission->created_at->format('d/m/Y H:i') }}</p>
     </div>
 
@@ -47,11 +47,24 @@
         </thead>
         <tbody>
             @foreach($fields as $field)
-                @if($field->type !== 'signature' && $field->type !== 'file')
+                @php $type = strtolower((string) ($field->type ?? '')); @endphp
+                @if(in_array($type, ['heading', 'notice', 'section_break'], true))
+                    <tr>
+                        <td colspan="2" style="background:#f8fafc;font-weight:{{ $type === 'heading' ? 'bold' : 'normal' }};">
+                            {{ $field->label }}
+                        </td>
+                    </tr>
+                @elseif($type !== 'signature' && $type !== 'file')
                     @php $val = $valuesKeyed->get($field->name_key); @endphp
                     <tr>
                         <td><strong>{{ $field->label }}</strong></td>
-                        <td>{{ $val ? ($val->value_json ?? $val->value_text) : '—' }}</td>
+                        <td>
+                            @if(is_array($val?->value_json ?? null))
+                                {{ implode(', ', $val->value_json) }}
+                            @else
+                                {{ $val ? ($val->value_json ?? $val->value_text) : '—' }}
+                            @endif
+                        </td>
                     </tr>
                 @endif
             @endforeach

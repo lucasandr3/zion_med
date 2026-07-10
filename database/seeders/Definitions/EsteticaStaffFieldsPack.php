@@ -68,6 +68,7 @@ final class EsteticaStaffFieldsPack
 
         return [
             $f('text', 'Procedimento(s) a ser(em) realizado(s)', 'procedimentos', false),
+            $f('checkbox', 'Profissional declarou ter explicado riscos, benefícios e alternativas', 'profissional_explicou', false),
             $f('text', 'Profissional responsável', 'profissional_responsavel', false),
             $f('date', 'Data do procedimento', 'data_procedimento', false),
             $f('textarea', 'Descrição específica do procedimento e técnica utilizada', 'descricao_procedimento_tecnica', false),

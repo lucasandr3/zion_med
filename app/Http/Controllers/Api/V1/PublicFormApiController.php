@@ -8,6 +8,7 @@ use App\Models\FormTemplate;
 use App\Models\Organization;
 use App\Models\Person;
 use App\Rules\Cpf;
+use App\Services\ComprehensionQuizService;
 use App\Services\EvolutionGoClient;
 use App\Services\FeegowClient;
 use App\Services\OtpService;
@@ -32,6 +33,7 @@ class PublicFormApiController extends Controller
         private OtpService $otpService,
         private EvolutionGoClient $evolutionGoClient,
         private ThemeService $themeService,
+        private ComprehensionQuizService $comprehensionQuizService,
     ) {}
 
     /**
@@ -70,12 +72,22 @@ class PublicFormApiController extends Controller
             $organization?->form_accent_hex,
         );
 
+        $personLinkEnabled = (bool) $template->public_require_person_link;
+        $personLinkMode = $personLinkEnabled
+            ? (($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code')
+            : 'none';
+
+        $quiz = $this->comprehensionQuizService->normalize($template->comprehension_quiz ?? []);
+
         return response()->json([
             'data' => [
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
                     'description' => $template->description,
+                    'document_kind' => $template->document_kind
+                        ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha'),
+                    'category' => $template->category,
                 ],
                 'clinic_name' => $clinic?->name,
                 'clinic_slug' => $organization?->slug,
@@ -88,11 +100,14 @@ class PublicFormApiController extends Controller
                 'signing_security_level' => $signingLevel,
                 'otp_whatsapp_available' => $waOtp,
                 'person_link' => [
-                    'enabled' => (bool) $template->public_require_person_link,
-                    'mode' => $template->public_require_person_link ? 'cpf' : 'none',
+                    'enabled' => $personLinkEnabled,
+                    'mode' => $personLinkMode,
                     'title' => 'Identifique-se para continuar',
-                    'description' => 'Informe seu CPF para autorizar o acesso a este formulário.',
+                    'description' => $personLinkMode === 'cpf'
+                        ? 'Informe seu CPF para autorizar o acesso a este formulário.'
+                        : 'Informe o código e a data de nascimento cadastrados na clínica.',
                 ],
+                'comprehension_quiz' => $this->comprehensionQuizService->forPublic($quiz),
                 'feegow' => $feegow,
                 'fields' => $template->fields->map(fn ($f) => [
                     'id' => $f->id,
@@ -139,8 +154,14 @@ class PublicFormApiController extends Controller
         ]);
 
         $cpfDigits = isset($validated['cpf']) ? preg_replace('/\D+/', '', (string) $validated['cpf']) : '';
+        $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
 
-        if ($cpfDigits !== '' && strlen($cpfDigits) === 11) {
+        if ($mode === 'cpf') {
+            if ($cpfDigits === '' || strlen($cpfDigits) !== 11) {
+                throw ValidationException::withMessages([
+                    'cpf' => ['Informe um CPF válido para continuar.'],
+                ]);
+            }
             $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
             if (! $person) {
                 throw ValidationException::withMessages([
@@ -160,7 +181,7 @@ class PublicFormApiController extends Controller
 
         if (empty($validated['code']) || empty($validated['birth_date'])) {
             throw ValidationException::withMessages([
-                'cpf' => ['Informe um CPF válido ou o código com data de nascimento.'],
+                'code' => ['Informe o código e a data de nascimento cadastrados na clínica.'],
             ]);
         }
 
@@ -302,12 +323,37 @@ class PublicFormApiController extends Controller
             '_person_code' => ['nullable', 'string', 'max:32'],
             '_person_birth_date' => ['nullable', 'date'],
             '_person_cpf' => ['nullable', 'string', 'max:20'],
+            '_comprehension_ack' => ['nullable', 'boolean'],
+            '_comprehension_ack_at' => ['nullable', 'date'],
+            '_assisted_mode' => ['nullable', 'boolean'],
+            '_professional_explained' => ['nullable', 'boolean'],
+            '_actors' => ['nullable', 'array'],
+            '_actors.guardian_name' => ['nullable', 'string', 'max:255'],
+            '_actors.guardian_relation' => ['nullable', 'string', 'max:120'],
+            '_actors.witness_name' => ['nullable', 'string', 'max:255'],
+            '_comprehension_quiz' => ['nullable', 'array'],
+            '_accepted_text_at' => ['nullable', 'date'],
+            '_signing_channel' => ['nullable', 'string', 'max:40'],
+            '_locale' => ['nullable', 'string', 'max:20'],
+            '_timezone' => ['nullable', 'string', 'max:64'],
         ];
+        $documentKind = $template->document_kind
+            ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
+        if ($documentKind === 'consentimento') {
+            $rules['_comprehension_ack'] = ['accepted'];
+        }
         if ($template->public_require_person_link) {
-            $rules['_person_cpf'] = ['required', 'string', new Cpf];
+            $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
+            if ($mode === 'cpf') {
+                $rules['_person_cpf'] = ['required', 'string', new Cpf];
+            } else {
+                $rules['_person_code'] = ['required', 'string', 'max:32'];
+                $rules['_person_birth_date'] = ['required', 'date'];
+            }
         }
         foreach ($template->fields as $field) {
-            if ($field->required && $field->type !== 'file' && $field->type !== 'signature') {
+            $structural = in_array($field->type, ['heading', 'notice', 'section_break'], true);
+            if ($field->required && ! $structural && $field->type !== 'file' && $field->type !== 'signature') {
                 $rules[$field->name_key] = ['required'];
             } else {
                 $rules[$field->name_key] = ['nullable'];
@@ -333,6 +379,14 @@ class PublicFormApiController extends Controller
         $validated = $request->validate($rules);
         $data = $validated;
 
+        $quiz = $this->comprehensionQuizService->normalize($template->comprehension_quiz ?? []);
+        if ($quiz !== []) {
+            $quizResult = $this->comprehensionQuizService->assertPassed($quiz, $request->input('_comprehension_quiz'));
+            $data['_comprehension_quiz'] = $quizResult['answers'];
+            $data['_comprehension_quiz_passed'] = true;
+            $data['_comprehension_quiz_detail'] = $quizResult['detail'];
+        }
+
         foreach ($template->fields as $field) {
             if ($field->type === 'file' && $field->required && ! $request->hasFile($field->name_key)) {
                 throw ValidationException::withMessages([
@@ -343,14 +397,29 @@ class PublicFormApiController extends Controller
 
         $personId = null;
         if ($template->public_require_person_link) {
-            $cpfDigits = preg_replace('/\D+/', '', (string) ($data['_person_cpf'] ?? '')) ?? '';
-            $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
-            if (! $person || $person->status !== 'active') {
-                throw ValidationException::withMessages([
-                    '_person_cpf' => ['CPF não autorizado para este formulário.'],
-                ]);
+            $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
+            if ($mode === 'cpf') {
+                $cpfDigits = preg_replace('/\D+/', '', (string) ($data['_person_cpf'] ?? '')) ?? '';
+                $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
+                if (! $person || $person->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        '_person_cpf' => ['CPF não autorizado para este formulário.'],
+                    ]);
+                }
+                $personId = $person->id;
+            } else {
+                $person = $this->findPersonForTemplate(
+                    $template,
+                    (string) ($data['_person_code'] ?? ''),
+                    (string) ($data['_person_birth_date'] ?? ''),
+                );
+                if (! $person || $person->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        '_person_code' => ['Código ou data de nascimento não conferem.'],
+                    ]);
+                }
+                $personId = $person->id;
             }
-            $personId = $person->id;
         }
 
         $signatures = $request->input('_signature', []);
@@ -384,7 +453,25 @@ class PublicFormApiController extends Controller
             }
         }
 
-        unset($data['_person_code'], $data['_person_birth_date'], $data['_person_cpf'], $data['_accept_terms'], $data['_otp_channel'], $data['_otp_recipient']);
+        // Mantém meta clínica (_comprehension_*, _actors, _assisted_mode) para o snapshot.
+        unset($data['_otp_channel'], $data['_otp_recipient']);
+        if ($request->boolean('_accept_terms') || $request->filled('_accepted_text_at')) {
+            $data['_accept_terms'] = true;
+            $data['_accepted_text_at'] = $request->input('_accepted_text_at') ?: now()->toIso8601String();
+        }
+        if ($request->boolean('_comprehension_ack')) {
+            $data['_comprehension_ack'] = true;
+            $data['_comprehension_ack_at'] = $request->input('_comprehension_ack_at') ?: now()->toIso8601String();
+        }
+        if ($request->boolean('_assisted_mode')) {
+            $data['_assisted_mode'] = true;
+        }
+        if ($request->boolean('_professional_explained')) {
+            $data['_professional_explained'] = true;
+        }
+        if (is_array($request->input('_actors'))) {
+            $data['_actors'] = $request->input('_actors');
+        }
 
         $files = [];
         foreach ($template->fields as $field) {

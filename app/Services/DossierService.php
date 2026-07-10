@@ -45,9 +45,19 @@ class DossierService
             'submission_id' => $submission->id,
             'template_id' => $submission->template_id,
             'template_version_id' => $submission->template_version_id,
-            'template_name' => $submission->template?->name,
+            'template_version' => $submission->templateVersion?->version,
+            'template_name' => $submission->templateVersion?->name ?? $submission->template?->name,
+            'document_kind' => $submission->document_snapshot['document_kind']
+                ?? $submission->template?->document_kind
+                ?? null,
             'document_hash' => $submission->document_hash,
             'document_snapshot_hash' => $submission->document_snapshot_hash,
+            'fields_snapshot' => $submission->document_snapshot['fields_snapshot']
+                ?? $submission->templateVersion?->fields_snapshot
+                ?? [],
+            'values' => $submission->values
+                ->mapWithKeys(fn ($v) => [$v->key => $v->value_json ?? $v->value_text])
+                ->all(),
             'signing_channel' => $submission->signing_channel,
             'signing_status' => $submission->signing_status,
             'locale' => $submission->locale,
