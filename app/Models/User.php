@@ -75,6 +75,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(FormTemplate::class, 'created_by');
     }
 
+    public function goAssistantEvents(): HasMany
+    {
+        return $this->hasMany(GoAssistantEvent::class);
+    }
+
     public function formSubmissions(): HasMany
     {
         return $this->hasMany(FormSubmission::class, 'submitted_by_user_id');

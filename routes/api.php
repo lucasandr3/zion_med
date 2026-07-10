@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
 use App\Http\Controllers\Api\V1\PermissionCatalogController;
+use App\Http\Controllers\Api\V1\GoAssistantController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OnboardingController;
 use App\Http\Controllers\Api\V1\PersonController;
@@ -138,6 +139,11 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
     Route::delete('/notificacoes/{id}', [NotificationController::class, 'destroy'])->name('api.v1.notificacoes.destroy');
     Route::get('/release-notes', [ReleaseNotesController::class, 'index'])->name('api.v1.release-notes.index');
     Route::get('/release-notes/latest', [ReleaseNotesController::class, 'latest'])->name('api.v1.release-notes.latest');
+
+    Route::get('/assistant/history', [GoAssistantController::class, 'history'])->name('api.v1.assistant.history');
+    Route::get('/assistant/popular', [GoAssistantController::class, 'popular'])->name('api.v1.assistant.popular');
+    Route::post('/assistant/events', [GoAssistantController::class, 'store'])->name('api.v1.assistant.events.store');
+    Route::delete('/assistant/history', [GoAssistantController::class, 'destroyHistory'])->name('api.v1.assistant.history.destroy');
 
     // Área da plataforma: apenas platform_admin
     Route::prefix('platform')->middleware('platform')->group(function () {
