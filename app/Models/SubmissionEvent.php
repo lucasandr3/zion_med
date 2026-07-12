@@ -43,6 +43,7 @@ class SubmissionEvent extends Model
             'approved' => 'Aprovado',
             'rejected' => 'Reprovado',
             'revoked' => 'Consentimento revogado',
+            'reconsent_requested' => 'Reconsentimento solicitado',
             'professional_explained' => 'Profissional declarou ter explicado',
             default => $this->type,
         };

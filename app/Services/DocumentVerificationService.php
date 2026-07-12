@@ -73,7 +73,46 @@ class DocumentVerificationService
                 'signed_at' => $hasSignature
                     ? $submission->signatures->sortByDesc('signed_at')->first()?->signed_at?->toIso8601String()
                     : null,
+                'evidence' => $this->buildPublicEvidence($submission),
             ],
+        ];
+    }
+
+    /**
+     * Evidências públicas de defensabilidade clínica (sem PII).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildPublicEvidence(FormSubmission $submission): ?array
+    {
+        $snapshot = is_array($submission->document_snapshot) ? $submission->document_snapshot : [];
+        $clinical = is_array($snapshot['clinical'] ?? null) ? $snapshot['clinical'] : [];
+        $actors = is_array($clinical['actors'] ?? null) ? $clinical['actors'] : [];
+        $documentKind = $snapshot['document_kind'] ?? $clinical['document_kind'] ?? null;
+
+        $hasClinicalMeta = $clinical !== [] || $documentKind !== null;
+        if (! $hasClinicalMeta && $submission->approved_at === null && $submission->retention_anonymized_at === null) {
+            return null;
+        }
+
+        return [
+            'document_kind' => $documentKind,
+            'template_version' => $snapshot['template_version'] ?? null,
+            'comprehension_ack' => (bool) ($clinical['comprehension_ack'] ?? false),
+            'comprehension_ack_at' => $clinical['comprehension_ack_at'] ?? null,
+            'term_scrolled_at' => $clinical['term_scrolled_at'] ?? null,
+            'privacy_ack' => (bool) ($clinical['privacy_ack'] ?? false),
+            'comprehension_quiz_passed' => (bool) ($clinical['comprehension_quiz_passed'] ?? false),
+            'assisted_mode' => (bool) ($clinical['assisted_mode'] ?? false),
+            'professional_explained' => (bool) ($clinical['professional_explained_at_submit'] ?? false),
+            'has_guardian' => trim((string) ($actors['guardian_name'] ?? '')) !== '',
+            'has_witness' => trim((string) ($actors['witness_name'] ?? '')) !== '',
+            'clinical_steps_completed' => is_array($clinical['clinical_steps_completed'] ?? null)
+                ? count($clinical['clinical_steps_completed'])
+                : 0,
+            'approved_at' => $submission->approved_at?->toIso8601String(),
+            'revoked_at' => $submission->revoked_at?->toIso8601String(),
+            'retention_anonymized_at' => $submission->retention_anonymized_at?->toIso8601String(),
         ];
     }
 

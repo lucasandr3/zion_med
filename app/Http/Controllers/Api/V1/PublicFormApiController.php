@@ -9,9 +9,12 @@ use App\Models\Organization;
 use App\Models\Person;
 use App\Rules\Cpf;
 use App\Services\ComprehensionQuizService;
+use App\Services\FieldVisibilityService;
 use App\Services\EvolutionGoClient;
 use App\Services\FeegowClient;
 use App\Services\OtpService;
+use App\Services\PersonConsentService;
+use App\Services\SignatureFieldResolver;
 use App\Services\SubmissionService;
 use App\Services\ThemeService;
 use App\Support\PersonPiiHasher;
@@ -34,6 +37,9 @@ class PublicFormApiController extends Controller
         private EvolutionGoClient $evolutionGoClient,
         private ThemeService $themeService,
         private ComprehensionQuizService $comprehensionQuizService,
+        private FieldVisibilityService $fieldVisibilityService,
+        private PersonConsentService $personConsentService,
+        private SignatureFieldResolver $signatureFieldResolver,
     ) {}
 
     /**
@@ -116,8 +122,12 @@ class PublicFormApiController extends Controller
                     'type' => $f->type,
                     'required' => $f->required,
                     'options' => $f->options_json ?? [],
-                    'sort_order' => $f->sort_order,
-                ])->values()->all(),
+                'visibility_rules' => $f->visibility_rules,
+                'clinical_step_kind' => $f->clinical_step_kind,
+                'sort_order' => $f->sort_order,
+            ])->values()->all(),
+                'uses_clinical_steps' => (bool) $template->uses_clinical_steps,
+                'actors_visibility_rules' => $template->actors_visibility_rules,
             ],
         ]);
     }
@@ -170,12 +180,7 @@ class PublicFormApiController extends Controller
             }
 
             return response()->json([
-                'data' => [
-                    'person_id' => $person->id,
-                    'code' => $person->code,
-                    'name' => $person->name,
-                    'prefill' => $this->buildPersonPrefillData($person),
-                ],
+                'data' => $this->buildValidatePersonPayload($template, $person),
             ]);
         }
 
@@ -193,13 +198,27 @@ class PublicFormApiController extends Controller
         }
 
         return response()->json([
-            'data' => [
-                'person_id' => $person->id,
-                'code' => $person->code,
-                'name' => $person->name,
-                'prefill' => $this->buildPersonPrefillData($person),
-            ],
+            'data' => $this->buildValidatePersonPayload($template, $person),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildValidatePersonPayload(FormTemplate $template, Person $person): array
+    {
+        $organization = $this->resolveTemplateOrganization($template);
+        $consentSummary = $this->personConsentService->resolveSummary($person);
+        $feegowActive = $organization && $organization->feegow_enabled && $organization->feegow_token;
+
+        return [
+            'person_id' => $person->id,
+            'code' => $person->code,
+            'name' => $person->name,
+            'prefill' => $this->buildPersonPrefillData($person),
+            'consent_summary' => $consentSummary,
+            'procedure_scheduling_allowed' => ! $feegowActive || $this->personConsentService->canScheduleProcedure($person),
+        ];
     }
 
     /**
@@ -277,6 +296,17 @@ class PublicFormApiController extends Controller
             return response()->json(['message' => 'Informe procedimento_id quando tipo=P.'], 422);
         }
 
+        $personId = $request->integer('person_id');
+        if ($personId > 0) {
+            $person = Person::withoutGlobalScopes()->find($personId);
+            if ($person && (int) $person->organization_id === (int) $organization->id) {
+                $block = $this->consentSchedulingBlockResponse($person);
+                if ($block !== null) {
+                    return $block;
+                }
+            }
+        }
+
         $tokenValue = trim((string) $organization->feegow_token);
         $baseUrl = trim((string) ($organization->feegow_base_url ?: config('feegow.base_url')));
 
@@ -327,20 +357,48 @@ class PublicFormApiController extends Controller
             '_comprehension_ack_at' => ['nullable', 'date'],
             '_assisted_mode' => ['nullable', 'boolean'],
             '_professional_explained' => ['nullable', 'boolean'],
+            '_professional_name' => ['nullable', 'string', 'max:255'],
             '_actors' => ['nullable', 'array'],
             '_actors.guardian_name' => ['nullable', 'string', 'max:255'],
             '_actors.guardian_relation' => ['nullable', 'string', 'max:120'],
             '_actors.witness_name' => ['nullable', 'string', 'max:255'],
             '_comprehension_quiz' => ['nullable', 'array'],
             '_accepted_text_at' => ['nullable', 'date'],
+            '_term_scrolled_at' => ['nullable', 'date'],
+            '_clinical_steps_completed' => ['nullable', 'array'],
+            '_clinical_steps_completed.*.kind' => ['required_with:_clinical_steps_completed', 'string', 'max:40'],
+            '_clinical_steps_completed.*.completed_at' => ['required_with:_clinical_steps_completed', 'date'],
             '_signing_channel' => ['nullable', 'string', 'max:40'],
             '_locale' => ['nullable', 'string', 'max:20'],
             '_timezone' => ['nullable', 'string', 'max:64'],
+            'feegow_paciente_id' => ['nullable'],
+            'feegow_profissional_id' => ['nullable'],
+            'feegow_procedimento_id' => ['nullable'],
+            'feegow_especialidade_id' => ['nullable'],
+            'feegow_local_id' => ['nullable'],
+            'feegow_data' => ['nullable', 'string'],
+            'feegow_horario' => ['nullable', 'string'],
+            'feegow_valor' => ['nullable'],
+            'feegow_plano' => ['nullable'],
+            'feegow_convenio_id' => ['nullable'],
+            'feegow_convenio_plano_id' => ['nullable'],
+            'feegow_canal_id' => ['nullable'],
+            'feegow_tabela_id' => ['nullable'],
+            'feegow_notas' => ['nullable', 'string'],
+            'feegow_celular' => ['nullable', 'string'],
+            'feegow_telefone' => ['nullable', 'string'],
+            'feegow_email' => ['nullable', 'string'],
+            'feegow_retorno' => ['nullable', 'boolean'],
+            'feegow_sys_user' => ['nullable'],
+            'feegow_external_reference' => ['nullable', 'string', 'max:120'],
         ];
         $documentKind = $template->document_kind
             ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
         if ($documentKind === 'consentimento') {
             $rules['_comprehension_ack'] = ['accepted'];
+        }
+        if ($documentKind === 'consentimento' && $this->templateHasNoticeFields($template)) {
+            $rules['_term_scrolled_at'] = ['required', 'date'];
         }
         if ($template->public_require_person_link) {
             $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
@@ -351,9 +409,12 @@ class PublicFormApiController extends Controller
                 $rules['_person_birth_date'] = ['required', 'date'];
             }
         }
+        $submitValues = $this->fieldVisibilityService->buildSubmitValues($request->all());
+
         foreach ($template->fields as $field) {
             $structural = in_array($field->type, ['heading', 'notice', 'section_break'], true);
-            if ($field->required && ! $structural && $field->type !== 'file' && $field->type !== 'signature') {
+            $visible = $this->fieldVisibilityService->isVisible($field->visibility_rules, $submitValues);
+            if ($field->required && ! $structural && $visible && $field->type !== 'file' && $field->type !== 'signature') {
                 $rules[$field->name_key] = ['required'];
             } else {
                 $rules[$field->name_key] = ['nullable'];
@@ -388,9 +449,19 @@ class PublicFormApiController extends Controller
         }
 
         foreach ($template->fields as $field) {
-            if ($field->type === 'file' && $field->required && ! $request->hasFile($field->name_key)) {
+            $visible = $this->fieldVisibilityService->isVisible($field->visibility_rules, $submitValues);
+            if ($field->type === 'file' && $field->required && $visible && ! $request->hasFile($field->name_key)) {
                 throw ValidationException::withMessages([
                     $field->name_key => ['O campo '.$field->label.' é obrigatório.'],
+                ]);
+            }
+        }
+
+        if ($this->fieldVisibilityService->requiresGuardian($template, $submitValues)) {
+            $guardianName = trim((string) data_get($request->input('_actors'), 'guardian_name', ''));
+            if ($guardianName === '') {
+                throw ValidationException::withMessages([
+                    '_actors.guardian_name' => ['Informe o nome do responsável legal.'],
                 ]);
             }
         }
@@ -426,6 +497,28 @@ class PublicFormApiController extends Controller
         if (! is_array($signatures)) {
             $signatures = $signatures ? ['signature' => $signatures] : [];
         }
+
+        if ($request->boolean('_assisted_mode')) {
+            if (! $request->boolean('_professional_explained')) {
+                throw ValidationException::withMessages([
+                    '_professional_explained' => ['Confirme que explicou o termo ao paciente no modo assistido.'],
+                ]);
+            }
+
+            $professionalName = trim((string) ($data['_professional_name'] ?? ''));
+            if ($professionalName === '') {
+                throw ValidationException::withMessages([
+                    '_professional_name' => ['Informe o nome do profissional que assina no modo assistido.'],
+                ]);
+            }
+
+            if (! $this->signatureFieldResolver->hasProfessionalCosignSignature($template, $signatures)) {
+                throw ValidationException::withMessages([
+                    '_signature' => ['Assinatura do profissional é obrigatória no modo assistido.'],
+                ]);
+            }
+        }
+
         $organization = $this->resolveTemplateOrganization($template);
         if ($organization && $organization->signing_security_level === 'reinforced'
             && $this->templateHasSignatureFields($template)
@@ -463,11 +556,20 @@ class PublicFormApiController extends Controller
             $data['_comprehension_ack'] = true;
             $data['_comprehension_ack_at'] = $request->input('_comprehension_ack_at') ?: now()->toIso8601String();
         }
+        if ($request->filled('_term_scrolled_at')) {
+            $data['_term_scrolled_at'] = $request->input('_term_scrolled_at');
+        }
+        if (is_array($request->input('_clinical_steps_completed'))) {
+            $data['_clinical_steps_completed'] = $request->input('_clinical_steps_completed');
+        }
         if ($request->boolean('_assisted_mode')) {
             $data['_assisted_mode'] = true;
         }
         if ($request->boolean('_professional_explained')) {
             $data['_professional_explained'] = true;
+        }
+        if ($request->filled('_professional_name')) {
+            $data['_professional_name'] = trim((string) $request->input('_professional_name'));
         }
         if (is_array($request->input('_actors'))) {
             $data['_actors'] = $request->input('_actors');
@@ -484,7 +586,8 @@ class PublicFormApiController extends Controller
         $feegowResult = $this->tryCreateFeegowAppointmentFromPublicForm(
             $organization,
             $personId ? Person::withoutGlobalScopes()->find($personId) : null,
-            $data
+            $data,
+            $submission->id,
         );
 
         return response()->json([
@@ -648,6 +751,17 @@ class PublicFormApiController extends Controller
         return false;
     }
 
+    private function templateHasNoticeFields(FormTemplate $template): bool
+    {
+        foreach ($template->fields as $field) {
+            if ($field->type === 'notice') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @param  array<string, mixed>  $signatures
      */
@@ -730,10 +844,14 @@ class PublicFormApiController extends Controller
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{enabled: bool, attempted: bool, created: bool, feegow_appointment_id?: int|null, message?: string}
+     * @return array{enabled: bool, attempted: bool, created: bool, feegow_appointment_id?: int|null, message?: string, code?: string, consent_summary?: array<string, mixed>}
      */
-    private function tryCreateFeegowAppointmentFromPublicForm(?Organization $organization, ?Person $person, array $data): array
-    {
+    private function tryCreateFeegowAppointmentFromPublicForm(
+        ?Organization $organization,
+        ?Person $person,
+        array $data,
+        ?int $excludeSubmissionId = null,
+    ): array {
         if (! $organization || ! $organization->feegow_enabled || ! $organization->feegow_token) {
             return ['enabled' => false, 'attempted' => false, 'created' => false];
         }
@@ -746,6 +864,20 @@ class PublicFormApiController extends Controller
                 'created' => false,
                 'message' => 'Campos Feegow não informados; envio local concluído sem criar agendamento externo.',
             ];
+        }
+
+        if ($person instanceof Person) {
+            $summary = $this->personConsentService->resolveSummary($person, $excludeSubmissionId);
+            if (! $this->personConsentService->canScheduleProcedure($person, $excludeSubmissionId)) {
+                return [
+                    'enabled' => true,
+                    'attempted' => false,
+                    'created' => false,
+                    'code' => 'consent_blocks_procedure',
+                    'message' => $this->personConsentService->schedulingBlockMessage($summary),
+                    'consent_summary' => $summary,
+                ];
+            }
         }
 
         $token = trim((string) $organization->feegow_token);
@@ -790,6 +922,21 @@ class PublicFormApiController extends Controller
                 'message' => $e->getMessage(),
             ];
         }
+    }
+
+    private function consentSchedulingBlockResponse(Person $person, ?int $excludeSubmissionId = null): ?JsonResponse
+    {
+        if ($this->personConsentService->canScheduleProcedure($person, $excludeSubmissionId)) {
+            return null;
+        }
+
+        $summary = $this->personConsentService->resolveSummary($person, $excludeSubmissionId);
+
+        return response()->json([
+            'message' => $this->personConsentService->schedulingBlockMessage($summary),
+            'code' => 'consent_blocks_procedure',
+            'consent_summary' => $summary,
+        ], 422);
     }
 
     /**

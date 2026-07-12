@@ -10,6 +10,7 @@ use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Models\Organization;
 use App\Models\OrganizationSlugAlias;
 use App\Services\AsaasService;
+use App\Services\ProtocolRetentionService;
 use App\Services\ThemeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class ClinicSettingsController extends Controller
     public function __construct(
         private ThemeService $themeService,
         private AsaasService $asaasService,
+        private ProtocolRetentionService $protocolRetentionService,
     ) {}
 
     /**
@@ -192,6 +194,26 @@ class ClinicSettingsController extends Controller
             $data['data_retention_years'] = $raw === null || $raw === '' ? null : (int) $raw;
         }
 
+        if ($request->has('protocol_retention_years')) {
+            $raw = $request->input('protocol_retention_years');
+            $data['protocol_retention_years'] = $raw === null || $raw === '' ? null : (int) $raw;
+        }
+
+        if ($request->has('protocol_retention_mode')) {
+            $mode = (string) $request->input('protocol_retention_mode', 'anonymize');
+            $data['protocol_retention_mode'] = in_array($mode, ['anonymize', 'delete'], true) ? $mode : 'anonymize';
+        }
+
+        if ($request->has('protocol_retention_years')) {
+            $raw = $request->input('protocol_retention_years');
+            $data['protocol_retention_years'] = $raw === null || $raw === '' ? null : (int) $raw;
+        }
+
+        if ($request->has('protocol_retention_mode')) {
+            $mode = (string) $request->input('protocol_retention_mode', 'anonymize');
+            $data['protocol_retention_mode'] = in_array($mode, ['anonymize', 'delete'], true) ? $mode : 'anonymize';
+        }
+
         $slugAntes = (string) $organization->slug;
         $slugPublicoMudou = false;
         if (array_key_exists('name', $data)) {
@@ -295,4 +317,15 @@ class ClinicSettingsController extends Controller
         return $final !== '' ? $final : null;
     }
 
+
+    public function previewProtocolRetention(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organizationId = $this->currentOrganizationId($request);
+        $organization = Organization::query()->findOrFail($organizationId);
+
+        return response()->json([
+            'data' => $this->protocolRetentionService->preview($organization),
+        ]);
+    }
 }

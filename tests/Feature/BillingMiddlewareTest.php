@@ -158,6 +158,25 @@ class BillingMiddlewareTest extends TestCase
             ->assertJson(['code' => 'billing_blocked']);
     }
 
+    public function test_api_clinica_logs_still_allowed_when_trial_expired(): void
+    {
+        $user = $this->qaClinicOwnerUser();
+        $user->clinic->update([
+            'trial_ends_at' => now()->subDay(),
+            'subscription_status' => 'active',
+            'billing_status' => 'ok',
+        ]);
+        Sanctum::actingAs($user);
+        session([
+            'current_organization_id' => $user->organization_id,
+            'current_clinic_id' => $user->organization_id,
+        ]);
+
+        $this->getJson('/api/v1/clinica/logs')
+            ->assertOk()
+            ->assertJsonStructure(['data', 'meta']);
+    }
+
     public function test_api_me_still_allowed_when_trial_expired(): void
     {
         $user = $this->qaClinicOwnerUser();

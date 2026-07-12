@@ -7,7 +7,7 @@ namespace Database\Seeders\Definitions;
 /**
  * Modelos padrão do nicho Estética (pastas: Cadastro e Documentação, Anamneses, Acompanhamento e Controle).
  *
- * @phpstan-type FieldDef array{type: string, label: string, name_key: string, sort_order: int, required?: bool, options?: array<int, string>}
+ * @phpstan-type FieldDef array{type: string, label: string, name_key: string, sort_order: int, required?: bool, options?: array<int, string>, clinical_step_kind?: string}
  */
 final class EsteticaFormTemplatePack
 {
@@ -96,29 +96,11 @@ final class EsteticaFormTemplatePack
      */
     private static function tcleConsentimento(): array
     {
-        $o = 0;
-        $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
-
         return [
             'name' => 'TCLE — Termo de Consentimento Livre e Esclarecido',
-            'description' => 'Identificação, procedimento, riscos, fotos, declarações e orientações pós-procedimento.',
-            'category' => 'cadastro_documentacao',
-            'fields' => [
-                $f('text', 'Nome do paciente', 'nome_paciente'),
-                $f('date', 'Data de nascimento', 'data_nascimento', false),
-                $f('text', 'CPF', 'cpf', false),
-                $f('checkbox', 'Autorizo registro fotográfico exclusivamente para documentação clínica', 'foto_doc_clinica', false),
-                $f('checkbox', 'Autorizo uso de imagens sem identificação (educação/marketing)', 'foto_sem_id', false),
-                $f('checkbox', 'Não autorizo uso de imagens além da documentação clínica', 'foto_nao_autorizo', false),
-                $f('checkbox', 'Declaro que li e compreendi as informações e minhas dúvidas foram respondidas', 'decl_leitura', false),
-                $f('checkbox', 'Declaro que as informações da anamnese/cadastro são verdadeiras', 'decl_verdade', false),
-                $f('checkbox', 'Estou ciente de que posso revogar o consentimento a qualquer momento', 'decl_revogacao', false),
-                $f('checkbox', 'Autorizo a realização do(s) procedimento(s) de forma livre e esclarecida', 'decl_autorizo_proc', false),
-                $f('checkbox', 'Declaro ciência dos cuidados pós-procedimento e compromisso de seguí-los', 'decl_pos', false),
-                $f('signature', 'Assinatura do paciente', 'assinatura_paciente', false),
-                $f('signature', 'Responsável legal (se menor de 18 anos)', 'assinatura_responsavel', false),
-                $f('text', 'Data e local', 'data_local', false),
-            ],
+            'description' => 'TCLE alinhado à Recomendação CFM nº 1/2016: identificação, justificativa, procedimento, riscos, benefícios, alternativas, cuidados, recusa, LGPD clínica e assinaturas. Personalize os campos ao procedimento. Autorização de imagem/marketing fica em documento separado.',
+            'category' => 'consentimento',
+            'fields' => TcleConsentFieldsBuilder::medicalProcedureFields(),
         ];
     }
 

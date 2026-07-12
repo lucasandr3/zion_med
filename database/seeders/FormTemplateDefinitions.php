@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\FormTemplate;
 use Database\Seeders\Definitions\EsteticaFormTemplatePack;
+use Database\Seeders\Definitions\TcleConsentFieldsBuilder;
 use Database\Seeders\Definitions\VeterinariaFormTemplatePack;
 
 class FormTemplateDefinitions
@@ -146,16 +147,9 @@ class FormTemplateDefinitions
             ],
             [
                 'name' => 'Termo de Consentimento (Atendimento/Procedimento)',
-                'description' => 'Termo de consentimento livre e esclarecido para procedimentos.',
+                'description' => 'TCLE alinhado à Recomendação CFM nº 1/2016: justificativa, procedimento, riscos, benefícios, alternativas, cuidados, recusa, LGPD clínica e assinaturas. Personalize ao caso.',
                 'category' => 'consentimento',
-                'fields' => [
-                    self::field('text', 'Nome do paciente', 'nome_paciente', 1),
-                    self::field('date', 'Data', 'data', 2),
-                    self::field('textarea', 'Procedimento a ser realizado', 'procedimento', 3),
-                    self::field('radio', 'Declaro ter sido informado sobre os riscos e benefícios', 'declaracao_informado', 4, true, ['Concordo', 'Discordo']),
-                    self::field('checkbox', 'Autorizo a realização do procedimento', 'autorizacao', 5),
-                    self::field('signature', 'Assinatura', 'assinatura', 6),
-                ],
+                'fields' => TcleConsentFieldsBuilder::medicalProcedureFields(),
             ],
             [
                 'name' => 'Triagem (Sinais Vitais)',
@@ -354,26 +348,37 @@ class FormTemplateDefinitions
                 ],
             ],
             [
+                'name' => 'TCLE — Tratamentos Odontológicos',
+                'description' => 'TCLE odontológico com procedimento, riscos, alternativas, cuidados, custos (CDC), LGPD clínica e assinaturas (paciente, responsável e CRO). Personalize ao plano de tratamento.',
+                'category' => 'consentimento',
+                'fields' => TcleConsentFieldsBuilder::odontologicFields(),
+            ],
+            [
                 'name' => 'Termo de Clareamento',
-                'description' => 'Termo de clareamento: orientações e riscos.',
+                'description' => 'Complemento específico de clareamento: use junto ao TCLE odontológico e detalhe riscos/orientações do clareamento.',
                 'category' => 'odontologia',
                 'fields' => [
                     self::field('text', 'Nome do paciente', 'nome_paciente', 1),
                     self::field('date', 'Data', 'data', 2),
-                    self::field('checkbox', 'Li e entendi as orientações e riscos', 'ciencia', 3),
-                    self::field('signature', 'Assinatura', 'assinatura', 4),
+                    self::field('textarea', 'Técnica de clareamento e materiais', 'tecnica_clareamento', 3),
+                    self::field('textarea', 'Riscos e sensibilidade esperados', 'riscos_clareamento', 4),
+                    self::field('textarea', 'Cuidados e orientações pós-clareamento', 'cuidados_clareamento', 5),
+                    self::field('checkbox', 'Li e entendi as orientações e riscos do clareamento', 'ciencia', 6),
+                    self::field('signature', 'Assinatura', 'assinatura', 7),
                 ],
             ],
             [
                 'name' => 'Termo de Cirurgia/Extração',
-                'description' => 'Termo de cirurgia ou extração: riscos e cuidados.',
+                'description' => 'Complemento específico de cirurgia/extração: detalhe riscos e cuidados do ato cirúrgico (preferencialmente além do TCLE odontológico geral).',
                 'category' => 'odontologia',
                 'fields' => [
                     self::field('text', 'Nome do paciente', 'nome_paciente', 1),
                     self::field('date', 'Data', 'data', 2),
-                    self::field('textarea', 'Procedimento', 'procedimento', 3),
-                    self::field('checkbox', 'Li e entendi os riscos e cuidados', 'ciencia', 4),
-                    self::field('signature', 'Assinatura', 'assinatura', 5),
+                    self::field('textarea', 'Procedimento cirúrgico / elementos envolvidos', 'procedimento', 3),
+                    self::field('textarea', 'Riscos e intercorrências cirúrgicas', 'riscos_cirurgia', 4),
+                    self::field('textarea', 'Cuidados pré e pós-operatórios', 'cuidados_cirurgia', 5),
+                    self::field('checkbox', 'Li e entendi os riscos e cuidados da cirurgia/extração', 'ciencia', 6),
+                    self::field('signature', 'Assinatura', 'assinatura', 7),
                 ],
             ],
             [
@@ -1192,6 +1197,16 @@ class FormTemplateDefinitions
             $skip = [
                 'Cadastro do Paciente (Básico)',
                 'Anamnese (Básica)',
+                'Termo de Consentimento (Atendimento/Procedimento)',
+            ];
+            $geral = array_values(array_filter(
+                $geral,
+                static fn (array $t): bool => ! in_array($t['name'] ?? '', $skip, true)
+            ));
+        }
+
+        if ($niche === 'odontologia') {
+            $skip = [
                 'Termo de Consentimento (Atendimento/Procedimento)',
             ];
             $geral = array_values(array_filter(

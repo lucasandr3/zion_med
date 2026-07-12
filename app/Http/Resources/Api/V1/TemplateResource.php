@@ -19,6 +19,8 @@ class TemplateResource extends JsonResource
             ),
             'consent_validity_days' => $this->consent_validity_days,
             'comprehension_quiz' => $this->comprehension_quiz ?? [],
+            'actors_visibility_rules' => $this->actors_visibility_rules,
+            'uses_clinical_steps' => (bool) $this->uses_clinical_steps,
             'is_active' => $this->is_active,
             'public_enabled' => $this->public_enabled,
             'public_require_person_link' => (bool) $this->public_require_person_link,
@@ -27,6 +29,11 @@ class TemplateResource extends JsonResource
                 : null,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
+            'library_key' => $this->library_key,
+            'library_content_version' => $this->library_content_version,
+            'legal_review_status' => $this->legal_review_status,
+            'clinical_review_status' => $this->clinical_review_status,
+            'library_reviewed_at' => $this->library_reviewed_at?->toIso8601String(),
             'fields' => $this->whenLoaded(
                 'fields',
                 fn () => FormFieldResource::collection($this->fields)

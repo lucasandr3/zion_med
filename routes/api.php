@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\BillingController;
 use App\Http\Controllers\Api\V1\ChooseClinicController;
 use App\Http\Controllers\Api\V1\DocumentSendController;
 use App\Http\Controllers\Api\V1\ClinicSettingsController;
+use App\Http\Controllers\Api\V1\ComplianceReportController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\IntegrationsController;
 use App\Http\Controllers\Api\V1\LinkBioController;
@@ -192,6 +193,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->gro
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
 Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
+    Route::get('/compliance/relatorio', ComplianceReportController::class)->name('api.v1.compliance.relatorio');
     Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');
     Route::get('/organization-roles', [OrganizationRoleController::class, 'index'])->name('api.v1.organization-roles.index');
     Route::post('/organization-roles', [OrganizationRoleController::class, 'store'])->name('api.v1.organization-roles.store');
@@ -205,6 +207,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::get('/templates', [TemplateController::class, 'index'])->name('api.v1.templates.index');
     Route::get('/templates/categories', [TemplateController::class, 'categories'])->name('api.v1.templates.categories');
     Route::get('/templates/biblioteca', [TemplateController::class, 'biblioteca'])->name('api.v1.templates.biblioteca');
+    Route::get('/templates/biblioteca/{libraryKey}', [TemplateController::class, 'bibliotecaShow'])->name('api.v1.templates.biblioteca.show');
+    Route::post('/templates/biblioteca/{libraryKey}/instalar', [TemplateController::class, 'installFromLibrary'])->name('api.v1.templates.biblioteca.install');
     Route::post('/templates', [TemplateController::class, 'store'])->name('api.v1.templates.store');
     Route::post('/templates/a-partir-de/{template}', [TemplateController::class, 'storeFromTemplate'])->name('api.v1.templates.storeFromTemplate');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show');
@@ -215,11 +219,16 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::post('/templates/{template}/campos/reorder', [TemplateController::class, 'reorderCampos'])->name('api.v1.templates.campos.reorder');
     Route::put('/templates/{template}/campos/{campo}', [TemplateController::class, 'updateCampo'])->name('api.v1.templates.campos.update');
     Route::delete('/templates/{template}/campos/{campo}', [TemplateController::class, 'destroyCampo'])->name('api.v1.templates.campos.destroy');
+    Route::get('/templates/{template}/versoes', [TemplateController::class, 'listVersoes'])->name('api.v1.templates.versoes.index');
+    Route::get('/templates/{template}/versoes/comparar', [TemplateController::class, 'compararVersoes'])->name('api.v1.templates.versoes.compare');
+    Route::get('/templates/{template}/etapas-clinicas/validar', [TemplateController::class, 'validarEtapasClinicas'])->name('api.v1.templates.clinical.validate');
+    Route::post('/templates/{template}/etapas-clinicas/aplicar-tcle', [TemplateController::class, 'aplicarEstruturaTcle'])->name('api.v1.templates.clinical.apply-tcle');
     Route::post('/templates/{template}/link-publico', [TemplateController::class, 'gerarLink'])->name('api.v1.templates.link.gerar');
     Route::delete('/templates/{template}/link-publico', [TemplateController::class, 'desativarLink'])->name('api.v1.templates.link.desativar');
     Route::post('/templates/{template}/enviar', [TemplateController::class, 'enviarDocumento'])->name('api.v1.templates.enviar');
     Route::post('/templates/{template}/duplicar', [TemplateController::class, 'duplicar'])->name('api.v1.templates.duplicar');
 
+    Route::post('/pessoas/{pessoa}/reconsentimento', [PersonController::class, 'solicitarReconsentimento'])->name('api.v1.pessoas.reconsentimento');
     Route::apiResource('pessoas', PersonController::class)->parameters(['pessoas' => 'pessoa'])->names('api.v1.pessoas');
 
     Route::get('/document-sends', [DocumentSendController::class, 'index'])->name('api.v1.document-sends.index');
@@ -234,6 +243,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::get('/protocols/{protocol}/pdf', [ProtocolController::class, 'pdf'])->name('api.v1.protocols.pdf');
     Route::get('/protocols/{protocol}/dossie', [ProtocolController::class, 'exportarDossie'])->name('api.v1.protocols.dossie');
     Route::post('/protocols/{protocol}/revisao', [ProtocolController::class, 'aprovar'])->name('api.v1.protocols.revisao');
+    Route::post('/protocols/{protocol}/reconsentimento', [ProtocolController::class, 'solicitarReconsentimento'])->name('api.v1.protocols.reconsentimento');
     Route::post('/protocols/{protocol}/revogar', [ProtocolController::class, 'revogar'])->name('api.v1.protocols.revogar');
     Route::post('/protocols/{protocol}/comentario', [ProtocolController::class, 'comentario'])->name('api.v1.protocols.comentario');
     Route::patch('/protocols/{protocol}/staff-values', [ProtocolController::class, 'staffValues'])->name('api.v1.protocols.staff-values');
@@ -251,6 +261,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.b
     Route::get('/clinica/escolher', [ChooseClinicController::class, 'index'])->name('api.v1.clinica.escolher.index');
     Route::post('/clinica/escolher', [ChooseClinicController::class, 'store'])->name('api.v1.clinica.escolher.store');
     Route::get('/clinica/configuracoes', [ClinicSettingsController::class, 'show'])->name('api.v1.clinica.configuracoes.show');
+    Route::get('/clinica/retencao-protocolos/preview', [ClinicSettingsController::class, 'previewProtocolRetention'])->name('api.v1.clinica.retencao-protocolos.preview');
     Route::put('/clinica/configuracoes', [ClinicSettingsController::class, 'update'])->name('api.v1.clinica.configuracoes.update');
     Route::get('/clinica/logs', [AuditLogController::class, 'index'])->name('api.v1.clinica.logs.index');
     Route::get('/clinica/integracoes', [IntegrationsController::class, 'index'])->name('api.v1.clinica.integracoes.index');

@@ -6,12 +6,17 @@ use App\Models\FormSubmission;
 use App\Models\FormTemplate;
 use App\Models\FormTemplateVersion;
 use App\Models\SubmissionSignature;
+use App\Services\SignatureFieldResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SubmissionSignatureService
 {
+    public function __construct(
+        private SignatureFieldResolver $signatureFieldResolver,
+    ) {}
+
     /**
      * @param  array<string, string>  $signatures
      */
@@ -26,8 +31,12 @@ class SubmissionSignatureService
         string $timezone,
         \Carbon\CarbonInterface $acceptedTextAt,
         ?Request $request = null,
+        ?FormTemplate $template = null,
     ): void {
         $orgId = $submission->organization_id ?? $submission->clinic_id;
+        $template ??= $submission->relationLoaded('template')
+            ? $submission->template
+            : $submission->load('template')->template;
 
         foreach ($signatures as $fieldKey => $signatureBase64) {
             if (! is_string($signatureBase64) || $signatureBase64 === '') {
@@ -36,7 +45,18 @@ class SubmissionSignatureService
 
             $imagePath = $this->storeImage((int) $orgId, $submission->id, $signatureBase64);
             $signedAt = now();
-            $signedName = $data['_submitter_name'] ?? null;
+            $isProfessionalCosign = ! empty($data['_assisted_mode'])
+                && $template instanceof FormTemplate
+                && $this->signatureFieldResolver->isProfessionalCosignField((string) $fieldKey, $template);
+
+            if ($isProfessionalCosign) {
+                $signedName = trim((string) ($data['_professional_name'] ?? ''));
+                $channel = 'assisted_cosign';
+            } else {
+                $signedName = $data['_submitter_name'] ?? null;
+                $channel = $signingChannel;
+            }
+
             $evidencePayload = implode('|', [
                 (string) $submission->id,
                 $fieldKey,
@@ -54,7 +74,7 @@ class SubmissionSignatureService
                 'signed_at' => $signedAt->toIso8601String(),
                 'signed_hash' => $signatureHash,
                 'document_hash' => $documentHash,
-                'channel' => $signingChannel,
+                'channel' => $channel,
                 'locale' => $locale,
                 'timezone' => $timezone,
                 'accepted_text_at' => $acceptedTextAt->toIso8601String(),
@@ -68,12 +88,12 @@ class SubmissionSignatureService
                 'field_key' => $fieldKey,
                 'document_hash' => $documentHash,
                 'evidence_hash' => $evidenceHash,
-                'channel' => $signingChannel,
+                'channel' => $channel,
                 'status' => 'completed',
                 'accepted_text_at' => $acceptedTextAt,
                 'locale' => $locale,
                 'timezone' => $timezone,
-                'signed_name' => $signedName,
+                'signed_name' => $signedName !== '' ? $signedName : null,
                 'signed_ip' => $request?->ip(),
                 'signed_user_agent' => $request ? Str::limit($request->userAgent(), 512) : null,
                 'signed_hash' => $signatureHash,

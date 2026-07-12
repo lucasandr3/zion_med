@@ -32,6 +32,7 @@ class ProtocolResource extends JsonResource
             'consent_expired' => $this->isConsentExpired(),
             'review_comment' => $this->review_comment,
             'revoked_at' => $this->revoked_at?->toIso8601String(),
+            'retention_anonymized_at' => $this->retention_anonymized_at?->toIso8601String(),
             'revoke_reason' => $this->revoke_reason,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),

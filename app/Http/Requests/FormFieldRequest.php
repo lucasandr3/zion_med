@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ClinicalStepKind;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -41,6 +42,13 @@ class FormFieldRequest extends FormRequest
             'name_key' => $nameKeyRules,
             'required' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'visibility_rules' => ['nullable', 'array'],
+            'visibility_rules.show_when' => ['nullable', 'array'],
+            'visibility_rules.show_when.*.field' => ['required_with:visibility_rules.show_when', 'string', 'max:80', 'regex:/^[a-z0-9_]+$/'],
+            'visibility_rules.show_when.*.operator' => ['required_with:visibility_rules.show_when', 'string', 'in:equals,not_equals,filled,empty'],
+            'visibility_rules.show_when.*.value' => ['nullable', 'string', 'max:255'],
+            'clinical_step_kind' => ['nullable', 'string', 'max:40', Rule::in(ClinicalStepKind::all())],
+
         ];
         if (in_array($this->input('type'), ['heading', 'notice', 'section_break'], true)) {
             $rules['required'] = ['nullable', 'boolean'];

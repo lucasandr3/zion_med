@@ -10,6 +10,7 @@ use App\Http\Requests\PersonStoreRequest;
 use App\Http\Requests\PersonUpdateRequest;
 use App\Http\Resources\Api\V1\PersonResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
+use App\Services\PersonConsentService;
 use App\Models\Person;
 use App\Support\ApiPagination;
 use App\Support\ApiErrorResponse;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\DB;
 class PersonController extends Controller
 {
     use ResolvesOrganizationContext;
+
+    public function __construct(
+        private readonly PersonConsentService $personConsentService,
+    ) {}
 
     public function index(PersonIndexRequest $request): JsonResponse
     {
@@ -148,35 +153,7 @@ class PersonController extends Controller
             ->limit(15)
             ->get();
 
-        $consentProtocols = $pessoa->submissions()
-            ->with('template')
-            ->whereHas('template', function ($q) {
-                $q->where('document_kind', 'consentimento')
-                    ->orWhere('category', 'consentimento');
-            })
-            ->latest('submitted_at')
-            ->limit(20)
-            ->get();
-
-        $activeConsent = $consentProtocols->first(fn ($s) => $s->isConsentCurrentlyValid());
-        $pendingConsent = $consentProtocols->first(fn ($s) => $s->status === SubmissionStatus::Pending);
-        $expiredConsent = $consentProtocols->first(fn ($s) => $s->isConsentExpired());
-        $revokedConsent = $consentProtocols->first(fn ($s) => $s->status === SubmissionStatus::Revoked);
-
-        $consentStatus = 'none';
-        if ($activeConsent) {
-            $consentStatus = 'valid';
-        } elseif ($pendingConsent) {
-            $consentStatus = 'pending';
-        } elseif ($expiredConsent) {
-            $consentStatus = 'expired';
-        } elseif ($revokedConsent) {
-            $consentStatus = 'revoked';
-        } elseif ($consentProtocols->isNotEmpty()) {
-            $consentStatus = 'inactive';
-        }
-
-        $summaryProtocol = $activeConsent ?? $pendingConsent ?? $expiredConsent;
+        $consentSummary = $this->personConsentService->resolveSummary($pessoa);
 
         $pessoa->loadMax('submissions', 'submitted_at');
         $base = (new PersonResource($pessoa))->exposePii()->toArray($request);
@@ -190,22 +167,8 @@ class PersonController extends Controller
                     'rejected_protocols' => (int) $pessoa->rejected_submissions_count,
                     'revoked_protocols' => (int) $pessoa->revoked_submissions_count,
                 ],
-                'consent_summary' => [
-                    'status' => $consentStatus,
-                    'label' => match ($consentStatus) {
-                        'valid' => 'Consentimento válido',
-                        'pending' => 'Consentimento pendente de revisão',
-                        'expired' => 'Consentimento vencido',
-                        'revoked' => 'Consentimento revogado',
-                        'inactive' => 'Sem consentimento vigente',
-                        default => 'Nenhum consentimento registrado',
-                    },
-                    'active_protocol_id' => $summaryProtocol?->id,
-                    'active_protocol_number' => $summaryProtocol?->protocol_number,
-                    'active_submitted_at' => $summaryProtocol?->submitted_at?->toIso8601String(),
-                    'valid_until' => $summaryProtocol?->consent_valid_until?->toIso8601String(),
-                    'consents_count' => $consentProtocols->count(),
-                ],
+                'consent_summary' => $consentSummary,
+                'procedure_scheduling_allowed' => $this->personConsentService->canScheduleProcedure($pessoa),
                 'recent_protocols' => ProtocolResource::collection($recent),
             ]),
         ]);
@@ -232,4 +195,24 @@ class PersonController extends Controller
             'data' => ['message' => 'Pessoa inativada.'],
         ]);
     }
+
+    /**
+     * Envia link de reconsentimento para pessoa com consentimento vencido.
+     */
+    public function solicitarReconsentimento(Request $request, Person $pessoa, ReconsentService $reconsentService): JsonResponse
+    {
+        $this->authorize('view-submissions');
+        $validated = $request->validate([
+            'channel' => ['nullable', 'string', 'in:email,whatsapp'],
+        ]);
+
+        $result = $reconsentService->solicitFromPerson(
+            $pessoa,
+            $request->user(),
+            $validated['channel'] ?? null,
+        );
+
+        return response()->json(['data' => $result], 201);
+    }
+
 }

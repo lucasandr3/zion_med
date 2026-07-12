@@ -103,7 +103,7 @@ class SubmissionPersonSyncService
 
         $fields = $this->extractPersonFieldsFromSubmission($template, $data, $submission);
         $nome = trim((string) ($fields['name'] ?? ''));
-        if ($nome === '') {
+        if ($nome === '' || mb_strlen($nome) > 200) {
             return null;
         }
 
@@ -166,55 +166,118 @@ class SubmissionPersonSyncService
     public function extractPersonFieldsFromSubmission(FormTemplate $template, array $data, FormSubmission $submission): array
     {
         $groups = [
-            'name' => ['nome', 'nome_completo', 'name', 'fullname', 'full_name', 'paciente', 'cliente'],
-            'cpf' => ['cpf', 'documento', 'doc'],
+            'name' => ['nome', 'nome_completo', 'nome_paciente', 'name', 'fullname', 'full_name', 'patient_name', 'titular'],
+            'cpf' => ['cpf', 'documento', 'doc_cpf'],
             'email' => ['email', 'e_mail', 'e-mail', 'correio_eletronico'],
             'phone' => ['telefone', 'celular', 'whatsapp', 'wa', 'phone', 'mobile', 'contato_telefone'],
             'birth_date' => ['data_nascimento', 'dt_nascimento', 'nascimento', 'birth_date', 'birthdate', 'data_de_nascimento'],
         ];
 
-        $findValueByKey = function (string $needle) use ($data): ?string {
-            $needleNorm = strtolower($needle);
-            foreach ($data as $k => $v) {
-                if (! is_string($k)) {
-                    continue;
-                }
-                if (strtolower($k) === $needleNorm && is_scalar($v) && trim((string) $v) !== '') {
-                    return (string) $v;
-                }
-            }
+        $skipTypes = ['signature', 'file', 'heading', 'notice', 'section_break', 'page_break', 'step_break'];
 
-            return null;
+        $findValueByKey = function (string $key) use ($data): ?string {
+            if (! array_key_exists($key, $data)) {
+                return null;
+            }
+            $v = $data[$key];
+            if (! is_scalar($v)) {
+                return null;
+            }
+            $s = trim((string) $v);
+
+            return $s !== '' ? $s : null;
         };
 
         $result = ['name' => null, 'cpf' => null, 'email' => null, 'phone' => null, 'birth_date' => null];
 
         foreach ($template->fields as $field) {
+            $type = strtolower((string) $field->type);
+            if (in_array($type, $skipTypes, true)) {
+                continue;
+            }
+
             $keyNorm = strtolower((string) $field->name_key);
             foreach ($groups as $target => $candidates) {
                 if ($result[$target] !== null) {
                     continue;
                 }
                 foreach ($candidates as $cand) {
-                    if ($keyNorm === $cand || str_contains($keyNorm, $cand)) {
-                        $val = $findValueByKey($field->name_key);
-                        if ($val !== null) {
-                            $result[$target] = $val;
-                            break 2;
-                        }
+                    if (! $this->fieldNameKeyMatchesPersonCandidate($keyNorm, $cand)) {
+                        continue;
+                    }
+                    $val = $findValueByKey($field->name_key);
+                    if ($val === null) {
+                        continue;
+                    }
+                    $sanitized = $this->sanitizePersonFieldValue($target, $val);
+                    if ($sanitized !== null) {
+                        $result[$target] = $sanitized;
+                        break 2;
                     }
                 }
             }
         }
 
         if (! $result['name'] && ! empty($submission->submitter_name)) {
-            $result['name'] = $submission->submitter_name;
+            $result['name'] = $this->sanitizePersonFieldValue('name', (string) $submission->submitter_name);
         }
         if (! $result['email'] && ! empty($submission->submitter_email)) {
-            $result['email'] = $submission->submitter_email;
+            $result['email'] = $this->sanitizePersonFieldValue('email', (string) $submission->submitter_email);
         }
 
         return $result;
+    }
+
+    private function fieldNameKeyMatchesPersonCandidate(string $keyNorm, string $candidate): bool
+    {
+        $candidate = strtolower($candidate);
+        if ($keyNorm === $candidate) {
+            return true;
+        }
+
+        return str_starts_with($keyNorm, $candidate.'_')
+            || str_ends_with($keyNorm, '_'.$candidate)
+            || str_contains($keyNorm, '_'.$candidate.'_');
+    }
+
+    private function sanitizePersonFieldValue(string $target, string $raw): ?string
+    {
+        $value = trim($raw);
+        if ($value === '') {
+            return null;
+        }
+
+        if ($target === 'name') {
+            if (str_starts_with(strtolower($value), 'data:image')) {
+                return null;
+            }
+            if (str_starts_with($value, 'typed:')) {
+                $value = trim(substr($value, 6));
+            }
+            if ($value === '' || mb_strlen($value) > 200) {
+                return null;
+            }
+
+            return $value;
+        }
+
+        if ($target === 'email') {
+            return $this->normalizeEmail($value);
+        }
+
+        if ($target === 'cpf') {
+            return $this->normalizeCpf($value);
+        }
+
+        if ($target === 'phone') {
+            return $this->normalizePhone($value);
+        }
+
+        if ($target === 'birth_date') {
+            return $this->normalizeBirthDate($value);
+        }
+
+        return null;
     }
 
     protected function normalizeCpf(?string $raw): ?string

@@ -54,11 +54,21 @@ class FormTemplateSeeder extends Seeder
             $category = $t['category'];
             unset($t['fields'], $t['category']);
 
+            $niche = (string) ($organization->niche ?? 'estetica');
+            $libraryKey = \App\Services\TemplateLibraryCatalog::makeLibraryKey($niche, $t['name']);
+            $libraryMeta = app(\App\Services\TemplateLibraryCatalog::class)->findByKey($libraryKey);
+
             $template = FormTemplate::withoutGlobalScopes()->create([
                 'organization_id' => $organization->id,
                 'name' => $t['name'],
                 'description' => $t['description'],
                 'category' => $category,
+                'document_kind' => $libraryMeta['document_kind'] ?? null,
+                'library_key' => $libraryMeta['library_key'] ?? $libraryKey,
+                'library_content_version' => $libraryMeta['content_version'] ?? null,
+                'legal_review_status' => $libraryMeta['legal_review_status'] ?? null,
+                'clinical_review_status' => $libraryMeta['clinical_review_status'] ?? null,
+                'library_reviewed_at' => $libraryMeta['reviewed_at'] ?? null,
                 'is_active' => true,
                 'public_enabled' => false,
                 'created_by' => $owner?->id,

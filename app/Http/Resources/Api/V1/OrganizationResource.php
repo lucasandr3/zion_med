@@ -52,6 +52,8 @@ class OrganizationResource extends JsonResource
             'whatsapp_notify_avisos' => $this->whatsapp_notify_avisos,
             'signing_security_level' => $this->signing_security_level ?? 'basic',
             'data_retention_years' => $this->data_retention_years !== null ? (int) $this->data_retention_years : null,
+            'protocol_retention_years' => $this->protocol_retention_years !== null ? (int) $this->protocol_retention_years : null,
+            'protocol_retention_mode' => $this->protocol_retention_mode ?: 'anonymize',
             'short_description' => $this->short_description,
             'specialties' => $this->specialties,
             'specialties_list' => $this->getSpecialtiesList(),

@@ -20,9 +20,16 @@ class FormTemplate extends Model
         'name',
         'description',
         'category',
+        'library_key',
+        'library_content_version',
+        'legal_review_status',
+        'clinical_review_status',
+        'library_reviewed_at',
         'document_kind',
         'consent_validity_days',
         'comprehension_quiz',
+        'actors_visibility_rules',
+        'uses_clinical_steps',
         'is_active',
         'public_enabled',
         'public_require_person_link',
@@ -118,6 +125,9 @@ class FormTemplate extends Model
             'public_require_person_link' => 'boolean',
             'public_token_expires_at' => 'datetime',
             'comprehension_quiz' => 'array',
+            'actors_visibility_rules' => 'array',
+            'uses_clinical_steps' => 'boolean',
+            'library_reviewed_at' => 'datetime',
         ];
     }
 

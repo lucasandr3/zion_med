@@ -15,6 +15,8 @@ class FormField extends Model
         'name_key',
         'required',
         'options_json',
+        'visibility_rules',
+        'clinical_step_kind',
         'sort_order',
     ];
 
@@ -23,6 +25,7 @@ class FormField extends Model
         return [
             'required' => 'boolean',
             'options_json' => 'array',
+            'visibility_rules' => 'array',
         ];
     }
 

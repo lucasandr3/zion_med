@@ -63,8 +63,6 @@ class ConsentLifecyclePhase2Test extends TestCase
                 'guardian_relation' => 'mãe',
                 'witness_name' => 'João Testemunha',
             ],
-            '_assisted_mode' => true,
-            '_professional_explained' => true,
         ])->assertCreated();
 
         $submission = FormSubmission::withoutGlobalScopes()
@@ -75,7 +73,6 @@ class ConsentLifecyclePhase2Test extends TestCase
         $this->assertNotNull($submission);
         $clinical = $submission->document_snapshot['clinical'] ?? [];
         $this->assertTrue((bool) ($clinical['comprehension_ack'] ?? false));
-        $this->assertTrue((bool) ($clinical['assisted_mode'] ?? false));
         $this->assertSame('Maria Responsável', $clinical['actors']['guardian_name'] ?? null);
     }
 

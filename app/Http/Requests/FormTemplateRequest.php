@@ -30,6 +30,14 @@ class FormTemplateRequest extends FormRequest
             'public_enabled' => ['boolean'],
             'public_require_person_link' => ['boolean'],
             'public_person_link_mode' => ['nullable', 'string', 'in:code,cpf'],
+            'actors_visibility_rules' => ['nullable', 'array'],
+            'actors_visibility_rules.show_when' => ['nullable', 'array'],
+            'actors_visibility_rules.show_when.*.field' => ['required_with:actors_visibility_rules.show_when', 'string', 'max:80', 'regex:/^[a-z0-9_]+$/'],
+            'actors_visibility_rules.show_when.*.operator' => ['required_with:actors_visibility_rules.show_when', 'string', 'in:equals,not_equals,filled,empty'],
+            'actors_visibility_rules.show_when.*.value' => ['nullable', 'string', 'max:255'],
+            'actors_visibility_rules.require_guardian' => ['nullable', 'boolean'],
+            'uses_clinical_steps' => ['nullable', 'boolean'],
+
         ];
     }
 
@@ -47,6 +55,7 @@ class FormTemplateRequest extends FormRequest
             'public_enabled' => 'formulário público',
             'public_require_person_link' => 'exigir código e data de nascimento no formulário público',
             'public_person_link_mode' => 'modo de identificação no formulário público',
+            'actors_visibility_rules' => 'visibilidade do bloco responsável',
         ];
     }
 }

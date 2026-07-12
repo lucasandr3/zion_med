@@ -43,6 +43,7 @@ class SubmissionService
         protected SubmissionPersistenceService $persistenceService,
         protected SubmissionSignatureService $signatureService,
         protected SubmissionPersonSyncService $personSyncService,
+        protected SignatureFieldResolver $signatureFieldResolver,
     ) {}
 
     /**
@@ -90,6 +91,10 @@ class SubmissionService
 
             $this->persistenceService->storeAttachments((int) $orgId, $submission, $files);
 
+            if ($signatures !== []) {
+                $data['_signature'] = $signatures;
+            }
+
             $this->signatureService->persistForSubmission(
                 $submission,
                 $templateVersion,
@@ -101,6 +106,7 @@ class SubmissionService
                 $timezone,
                 $acceptedTextAt,
                 $request,
+                $template,
             );
 
             $this->attachClinicalDefensibilityMeta($submission, $template, $data);
@@ -360,9 +366,15 @@ class SubmissionService
             'document_kind' => $kind,
             'comprehension_ack' => ! empty($data['_comprehension_ack']),
             'comprehension_ack_at' => $data['_comprehension_ack_at'] ?? null,
+            'term_scrolled_at' => $data['_term_scrolled_at'] ?? null,
             'privacy_ack' => ! empty($data['_accept_terms']) || ! empty($data['_accepted_text_at']),
             'assisted_mode' => ! empty($data['_assisted_mode']),
             'professional_explained_at_submit' => ! empty($data['_professional_explained']),
+            'professional_cosigned_at_submit' => ! empty($data['_assisted_mode'])
+                && $this->hasProfessionalCosignInData($template, $data),
+            'professional_name_at_submit' => ! empty($data['_assisted_mode'])
+                ? (trim((string) ($data['_professional_name'] ?? '')) ?: null)
+                : null,
             'comprehension_quiz_passed' => ! empty($data['_comprehension_quiz_passed']),
             'comprehension_quiz_answers' => is_array($data['_comprehension_quiz'] ?? null) ? $data['_comprehension_quiz'] : null,
             'comprehension_quiz_detail' => is_array($data['_comprehension_quiz_detail'] ?? null) ? $data['_comprehension_quiz_detail'] : null,
@@ -371,6 +383,9 @@ class SubmissionService
                 'guardian_relation' => isset($actors['guardian_relation']) ? trim((string) $actors['guardian_relation']) : null,
                 'witness_name' => isset($actors['witness_name']) ? trim((string) $actors['witness_name']) : null,
             ],
+            'clinical_steps_completed' => is_array($data['_clinical_steps_completed'] ?? null)
+                ? $data['_clinical_steps_completed']
+                : null,
         ];
 
         $snapshot = $submission->fresh()->document_snapshot ?? [];
@@ -429,7 +444,7 @@ class SubmissionService
             return;
         }
 
-        $chosen = $this->pickProfessionalSignatureSlot($empty);
+        $chosen = $this->signatureFieldResolver->pickProfessionalSlot($empty);
         if (! $chosen instanceof FormField) {
             return;
         }
@@ -501,45 +516,13 @@ class SubmissionService
     }
 
     /**
-     * @param  Collection<int, FormField>  $emptyFields
+     * @param  array<string, mixed>  $data
      */
-    private function pickProfessionalSignatureSlot(Collection $emptyFields): ?FormField
+    private function hasProfessionalCosignInData(FormTemplate $template, array $data): bool
     {
-        if ($emptyFields->isEmpty()) {
-            return null;
-        }
+        $signatures = is_array($data['_signature'] ?? null) ? $data['_signature'] : [];
 
-        $positive = ['profissional', 'responsável', 'responsavel', 'clínica', 'clinica', 'equipe', 'médico', 'medico', 'dr.', 'dra.', 'doctor', 'prestador', 'cirurgião', 'cirurgiao'];
-        $negativePhrases = ['paciente', 'cliente', 'titular', 'genitor', 'genitora', 'acompanhante', 'assistido', 'responsável legal', 'responsavel legal'];
-
-        $best = null;
-        $bestScore = PHP_INT_MIN;
-        foreach ($emptyFields as $field) {
-            $haystack = mb_strtolower((string) $field->name_key . ' ' . (string) $field->label);
-            $score = 0;
-            foreach ($positive as $word) {
-                if (str_contains($haystack, $word)) {
-                    $score += 3;
-                }
-            }
-            foreach ($negativePhrases as $word) {
-                if (str_contains($haystack, $word)) {
-                    $score -= 5;
-                }
-            }
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $best = $field;
-            }
-        }
-
-        if ($bestScore > 0 && $best instanceof FormField) {
-            return $best;
-        }
-
-        /** @var FormField|null */
-        return $emptyFields->last();
+        return $this->signatureFieldResolver->hasProfessionalCosignSignature($template, $signatures);
     }
 
     protected function webhookPayload(FormSubmission $submission): array

@@ -72,6 +72,39 @@ class DocumentVerificationTest extends TestCase
             ->assertOk();
     }
 
+    public function test_verify_exposes_clinical_evidence_without_pii(): void
+    {
+        $submission = $this->createSubmissionWithHash('abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789');
+        $submission->update([
+            'document_snapshot' => [
+                'document_kind' => 'consentimento',
+                'template_version' => 3,
+                'clinical' => [
+                    'comprehension_ack' => true,
+                    'comprehension_ack_at' => '2026-07-10T12:00:00+00:00',
+                    'term_scrolled_at' => '2026-07-10T11:59:00+00:00',
+                    'privacy_ack' => true,
+                    'comprehension_quiz_passed' => true,
+                    'actors' => [
+                        'guardian_name' => 'Maria Secreta',
+                        'witness_name' => 'João Testemunha',
+                    ],
+                ],
+            ],
+            'approved_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/verificar/'.$submission->document_hash);
+
+        $response->assertOk()
+            ->assertJsonPath('data.evidence.comprehension_ack', true)
+            ->assertJsonPath('data.evidence.term_scrolled_at', '2026-07-10T11:59:00+00:00')
+            ->assertJsonPath('data.evidence.has_guardian', true)
+            ->assertJsonPath('data.evidence.has_witness', true)
+            ->assertJsonMissingPath('data.evidence.actors')
+            ->assertJsonMissingPath('data.evidence.guardian_name');
+    }
+
     private function createSubmissionWithHash(string $hash): FormSubmission
     {
         $template = FormTemplate::withoutGlobalScopes()->firstOrFail();

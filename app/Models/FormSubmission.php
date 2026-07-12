@@ -41,6 +41,7 @@ class FormSubmission extends Model
         'revoked_at',
         'revoked_by_user_id',
         'revoke_reason',
+        'retention_anonymized_at',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -62,6 +63,7 @@ class FormSubmission extends Model
             'consent_valid_until' => 'datetime',
             'accepted_text_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'retention_anonymized_at' => 'datetime',
             'document_snapshot' => 'array',
         ];
     }
@@ -71,6 +73,11 @@ class FormSubmission extends Model
         return $this->status === SubmissionStatus::Approved
             && $this->consent_valid_until !== null
             && $this->consent_valid_until->isPast();
+    }
+
+    public function isRetentionAnonymized(): bool
+    {
+        return $this->retention_anonymized_at !== null;
     }
 
     public function isConsentCurrentlyValid(): bool

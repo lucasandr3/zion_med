@@ -11,6 +11,7 @@ use App\Models\Organization;
 use App\Models\Person;
 use App\Models\WebhookDelivery;
 use App\Services\FeegowClient;
+use App\Services\PersonConsentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,8 @@ class IntegrationsController extends Controller
     use ResolvesOrganizationContext;
 
     public function __construct(
-        private readonly FeegowClient $feegow
+        private readonly FeegowClient $feegow,
+        private readonly PersonConsentService $personConsentService,
     ) {}
 
     /**
@@ -504,6 +506,15 @@ class IntegrationsController extends Controller
             $person = Person::withoutGlobalScopes()->find($validated['person_id']);
             if (! $person || (int) $person->organization_id !== (int) $organization->id) {
                 return response()->json(['message' => 'Pessoa não pertence à empresa atual.'], 422);
+            }
+            if (! $this->personConsentService->canScheduleProcedure($person)) {
+                $summary = $this->personConsentService->resolveSummary($person);
+
+                return response()->json([
+                    'message' => $this->personConsentService->schedulingBlockMessage($summary),
+                    'code' => 'consent_blocks_procedure',
+                    'consent_summary' => $summary,
+                ], 422);
             }
         }
 

@@ -54,6 +54,7 @@ class EnsureTenantBillingActive
         $prefixes = [
             'api/v1/billing',
             'api/v1/clinica/escolher',
+            'api/v1/clinica/logs',
             'api/v1/me',
             'api/v1/clinica/configuracoes',
             'api/v1/auth/logout',

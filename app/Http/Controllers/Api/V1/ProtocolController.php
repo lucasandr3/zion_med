@@ -11,6 +11,7 @@ use App\Services\DossierService;
 use App\Support\ApiPagination;
 use App\Support\PersonPiiHasher;
 use App\Services\PdfService;
+use App\Services\ReconsentService;
 use App\Services\SubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,8 @@ class ProtocolController extends Controller
     public function __construct(
         private PdfService $pdfService,
         private SubmissionService $submissionService,
-        private DossierService $dossierService
+        private DossierService $dossierService,
+        private ReconsentService $reconsentService
     ) {}
     /**
      * Lista protocolos da clínica com filtros e paginação.
@@ -242,6 +244,26 @@ class ProtocolController extends Controller
                 'events.user',
             ])),
         ]);
+    }
+
+
+    /**
+     * Envia link para novo consentimento quando o protocolo anterior venceu.
+     */
+    public function solicitarReconsentimento(Request $request, FormSubmission $protocol): JsonResponse
+    {
+        $this->authorize('approve-submission', $protocol);
+        $validated = $request->validate([
+            'channel' => ['nullable', 'string', 'in:email,whatsapp'],
+        ]);
+
+        $result = $this->reconsentService->solicitFromProtocol(
+            $protocol,
+            $request->user(),
+            $validated['channel'] ?? null,
+        );
+
+        return response()->json(['data' => $result], 201);
     }
 
     /**

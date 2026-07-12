@@ -13,17 +13,22 @@ use App\Http\Resources\Api\V1\FormFieldResource;
 use App\Http\Resources\Api\V1\TemplateResource;
 use App\Models\FormField;
 use App\Models\FormTemplate;
+use App\Models\FormTemplateVersion;
 use App\Models\Organization;
 use App\Models\TemplateCategory;
+use App\Services\ClinicalStepStructureService;
+use App\Services\ClinicalStepValidationService;
 use App\Services\ComprehensionQuizService;
 use App\Services\DocumentSendService;
 use App\Services\PublicLinkService;
+use App\Services\TemplateLibraryCatalog;
 use App\Services\TemplateVersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Support\ClinicalStepKind;
 
 class TemplateController extends Controller
 {
@@ -32,7 +37,10 @@ class TemplateController extends Controller
     public function __construct(
         private PublicLinkService $publicLinkService,
         private TemplateVersionService $templateVersionService,
-        private DocumentSendService $documentSendService
+        private DocumentSendService $documentSendService,
+        private TemplateLibraryCatalog $libraryCatalog,
+        private ClinicalStepValidationService $clinicalStepValidationService,
+        private ClinicalStepStructureService $clinicalStepStructureService,
     ) {}
     /**
      * Lista categorias de templates da organização atual.
@@ -86,42 +94,84 @@ class TemplateController extends Controller
     }
 
     /**
-     * Lista sugestões da biblioteca por categoria (estética, odontologia, etc.) para criar templates.
+     * Catálogo curado da biblioteca por especialidade, com metadados de revisão jurídica/clínica.
      */
     public function biblioteca(TemplateBibliotecaRequest $request): JsonResponse
     {
-        $categories = FormTemplate::categoryLabels();
-        $biblioteca = [
-            'estetica' => [
-                'label' => $categories['estetica'] ?? 'Estética / Harmonização',
-                'templates' => [
-                    ['key' => 'consentimento_estetica', 'name' => 'Termo de Consentimento - Procedimento Estético', 'description' => 'Consentimento informado para procedimentos estéticos.'],
-                    ['key' => 'anamnese_estetica', 'name' => 'Anamnese - Clínica de Estética', 'description' => 'Ficha de anamnese para avaliação inicial.'],
-                    ['key' => 'uso_imagem_estetica', 'name' => 'Autorização de Uso de Imagem', 'description' => 'Termo de autorização para uso de imagens em divulgação.'],
-                ],
-            ],
-            'odontologia' => [
-                'label' => $categories['odontologia'] ?? 'Odontologia',
-                'templates' => [
-                    ['key' => 'consentimento_odontologia', 'name' => 'Termo de Consentimento - Procedimento Odontológico', 'description' => 'Consentimento informado para procedimentos odontológicos.'],
-                    ['key' => 'anamnese_odontologia', 'name' => 'Anamnese Odontológica', 'description' => 'Ficha de anamnese odontológica.'],
-                    ['key' => 'plano_tratamento', 'name' => 'Acordo de Plano de Tratamento', 'description' => 'Acordo e aceite do plano de tratamento proposto.'],
-                ],
-            ],
-            'veterinaria' => [
-                'label' => $categories['veterinaria'] ?? 'Veterinária',
-                'templates' => [
-                    ['key' => 'internacao_veterinaria', 'name' => 'Termo de Autorização para Internação e Tratamento Clínico', 'description' => 'Contrato de internação, consentimentos, honorários e assinatura do tutor.'],
-                    ['key' => 'cadastro_pet_veterinaria', 'name' => 'Ficha de Cadastro do Tutor e do Animal', 'description' => 'Cadastro do responsável e identificação do animal.'],
-                    ['key' => 'cirurgia_veterinaria', 'name' => 'Termo de Consentimento para Cirurgia Veterinária', 'description' => 'Autorização para procedimento cirúrgico e anestesia.'],
-                ],
-            ],
-        ];
-        if ($request->filled('category')) {
-            $cat = $request->validated('category');
-            $biblioteca = isset($biblioteca[$cat]) ? [$cat => $biblioteca[$cat]] : $biblioteca;
+        $validated = $request->validated();
+        $orgId = (int) ($this->currentOrganizationId($request) ?? 0);
+        $niche = 'estetica';
+        if ($orgId > 0) {
+            $niche = (string) (Organization::query()->whereKey($orgId)->value('niche') ?: 'estetica');
         }
-        return response()->json(['data' => $biblioteca]);
+        if (! empty($validated['niche'])) {
+            $niche = (string) $validated['niche'];
+        }
+
+        $payload = $this->libraryCatalog->catalog(
+            $niche,
+            $validated['category'] ?? null,
+            $orgId > 0 ? $orgId : null,
+        );
+
+        return response()->json(['data' => $payload]);
+    }
+
+    /**
+     * Detalhe de um item da biblioteca (inclui campos para pré-visualização).
+     */
+    public function bibliotecaShow(Request $request, string $libraryKey): JsonResponse
+    {
+        $this->authorize('manage-templates');
+        $item = $this->libraryCatalog->findByKey($libraryKey);
+        if ($item === null) {
+            return response()->json(['message' => 'Modelo da biblioteca não encontrado.'], 404);
+        }
+
+        $orgId = (int) ($this->currentOrganizationId($request) ?? 0);
+        if ($orgId > 0) {
+            $installed = FormTemplate::withoutGlobalScopes()
+                ->where('organization_id', $orgId)
+                ->where('library_key', $item['library_key'])
+                ->value('id');
+            $item['installed_template_id'] = $installed;
+        }
+
+        return response()->json(['data' => $item]);
+    }
+
+    /**
+     * Instala um modelo da biblioteca na organização atual.
+     */
+    public function installFromLibrary(Request $request, string $libraryKey): JsonResponse
+    {
+        $this->authorize('manage-templates');
+        $orgId = (int) ($this->currentOrganizationId($request) ?? 0);
+        if ($orgId <= 0) {
+            return response()->json(['message' => 'Organização não encontrada.'], 422);
+        }
+
+        $organization = Organization::query()->findOrFail($orgId);
+
+        try {
+            $template = $this->libraryCatalog->install($organization, $libraryKey, $request->user()?->id);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $template->id, [
+            'source' => 'library',
+            'library_key' => $libraryKey,
+        ], $template->organization_id ?? $template->clinic_id, $request->user()?->id));
+
+        $this->templateVersionService->ensureSyncedVersion($template);
+
+        return response()->json([
+            'data' => array_merge(
+                (new TemplateResource($template))->toArray($request),
+                ['fields' => FormFieldResource::collection($template->fields)->resolve()]
+            ),
+        ], 201);
     }
 
     /**
@@ -344,7 +394,13 @@ class TemplateController extends Controller
             'organization_id' => $clinicId,
             'name' => $template->name,
             'description' => $template->description,
-            'category' => null,
+            'category' => $template->category,
+            'document_kind' => $template->document_kind,
+            'library_key' => $template->library_key,
+            'library_content_version' => $template->library_content_version,
+            'legal_review_status' => $template->legal_review_status,
+            'clinical_review_status' => $template->clinical_review_status,
+            'library_reviewed_at' => $template->library_reviewed_at,
             'is_active' => true,
             'public_enabled' => false,
             'public_require_person_link' => false,
@@ -407,6 +463,12 @@ class TemplateController extends Controller
             'options' => ['nullable', 'array'],
             'options.*' => ['string', 'max:255'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'visibility_rules' => ['nullable', 'array'],
+            'visibility_rules.show_when' => ['nullable', 'array'],
+            'visibility_rules.show_when.*.field' => ['required_with:visibility_rules.show_when', 'string', 'max:80', 'regex:/^[a-z0-9_]+$/'],
+            'visibility_rules.show_when.*.operator' => ['required_with:visibility_rules.show_when', 'string', 'in:equals,not_equals,filled,empty'],
+            'visibility_rules.show_when.*.value' => ['nullable', 'string', 'max:255'],
+            'clinical_step_kind' => ['nullable', 'string', 'max:40', Rule::in(ClinicalStepKind::all())],
         ], [
             'name_key.regex' => 'A chave deve conter apenas letras minúsculas, números e underscore (ex: nome_completo).',
             'name_key.unique' => 'Já existe um campo com esta chave neste template.',
@@ -490,11 +552,111 @@ class TemplateController extends Controller
     }
 
     /**
+     * Lista versões persistidas do template (metadados, sem snapshot completo).
+     */
+    public function listVersoes(FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+
+        $versions = FormTemplateVersion::query()
+            ->where('form_template_id', $template->id)
+            ->orderByDesc('version')
+            ->get(['id', 'version', 'name', 'created_at']);
+
+        return response()->json([
+            'data' => $versions->map(fn (FormTemplateVersion $v) => [
+                'id' => $v->id,
+                'version' => (int) $v->version,
+                'name' => $v->name,
+                'created_at' => $v->created_at?->toIso8601String(),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Compara duas versões do template (default: penúltima vs última).
+     */
+    public function compararVersoes(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+
+        $validated = $request->validate([
+            'from' => ['nullable', 'integer'],
+            'to' => ['nullable', 'integer'],
+        ]);
+
+        $this->templateVersionService->getOrCreateCurrentVersion($template);
+
+        $versions = FormTemplateVersion::query()
+            ->where('form_template_id', $template->id)
+            ->orderByDesc('version')
+            ->get();
+
+        if ($versions->count() < 2) {
+            $only = $versions->first();
+
+            return response()->json([
+                'data' => [
+                    'from' => null,
+                    'to' => $only ? [
+                        'id' => $only->id,
+                        'version' => (int) $only->version,
+                        'created_at' => $only->created_at?->toIso8601String(),
+                    ] : null,
+                    'meta' => ['name_changed' => false, 'description_changed' => false],
+                    'fields' => ['added' => [], 'removed' => [], 'changed' => [], 'reordered' => []],
+                    'has_changes' => false,
+                ],
+            ]);
+        }
+
+        $toVersion = isset($validated['to'])
+            ? $versions->firstWhere('id', (int) $validated['to'])
+            : $versions->first();
+        $fromVersion = isset($validated['from'])
+            ? $versions->firstWhere('id', (int) $validated['from'])
+            : $versions->skip(1)->first();
+
+        if (! $fromVersion instanceof FormTemplateVersion || ! $toVersion instanceof FormTemplateVersion) {
+            return response()->json(['message' => 'Versão não encontrada para este template.'], 404);
+        }
+
+        $diff = $this->templateVersionService->compareVersions($fromVersion, $toVersion);
+
+        return response()->json([
+            'data' => [
+                'from' => [
+                    'id' => $fromVersion->id,
+                    'version' => (int) $fromVersion->version,
+                    'created_at' => $fromVersion->created_at?->toIso8601String(),
+                ],
+                'to' => [
+                    'id' => $toVersion->id,
+                    'version' => (int) $toVersion->version,
+                    'created_at' => $toVersion->created_at?->toIso8601String(),
+                ],
+                ...$diff,
+            ],
+        ]);
+    }
+
+    /**
      * Gera link público do template e cria versão do template para evidência.
      */
     public function gerarLink(Request $request, FormTemplate $template): JsonResponse
     {
         $this->authorize('update-template', $template);
+        $issues = $this->clinicalStepValidationService->validateForPublish($template);
+        $blocking = array_values(array_filter(
+            $issues,
+            fn ($i) => in_array($i['code'], $this->clinicalStepValidationService->blockingCodes(), true)
+        ));
+        if ($blocking !== []) {
+            return response()->json([
+                'message' => $blocking[0]['message'],
+                'clinical_validation' => $issues,
+            ], 422);
+        }
         $this->templateVersionService->getOrCreateCurrentVersion($template);
         $this->publicLinkService->generateToken($template);
         $url = $this->publicLinkService->getPublicUrl($template);
@@ -503,10 +665,46 @@ class TemplateController extends Controller
             'data' => [
                 'message' => 'Link público gerado.',
                 'public_url' => $url,
+                'clinical_validation' => $issues,
             ],
         ], 200);
     }
 
+    /**
+     * Valida estrutura de etapas clínicas antes de publicar.
+     */
+    public function validarEtapasClinicas(FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $issues = $this->clinicalStepValidationService->validateForPublish($template);
+
+        return response()->json([
+            'data' => [
+                'issues' => $issues,
+                'has_blocking' => array_filter(
+                    $issues,
+                    fn ($i) => in_array($i['code'], $this->clinicalStepValidationService->blockingCodes(), true)
+                ) !== [],
+            ],
+        ]);
+    }
+
+    /**
+     * Aplica estrutura TCLE (etapas clínicas) nos campos existentes.
+     */
+    public function aplicarEstruturaTcle(FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+        $updated = $this->clinicalStepStructureService->applyTcleStructure($template);
+        $this->templateVersionService->ensureSyncedVersion($updated->fresh(['fields']));
+
+        return response()->json([
+            'data' => [
+                'message' => 'Estrutura de etapas clínicas aplicada.',
+                'template' => new TemplateResource($updated->load('fields')),
+            ],
+        ]);
+    }
     /**
      * Envia o link do documento por e-mail ou WhatsApp (body: channel opcional, recipient_email ou recipient_phone).
      */

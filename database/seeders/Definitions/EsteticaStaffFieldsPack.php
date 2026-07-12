@@ -66,20 +66,16 @@ final class EsteticaStaffFieldsPack
         $o = 0;
         $f = static fn (string $type, string $label, string $key, bool $req = false, ?array $opt = null) => self::field($type, $label, $key, ++$o, $req, $opt);
 
+        // Campos internos de conferência clínica — NÃO substituem o esclarecimento
+        // já apresentado ao paciente nos notices/textareas do TCLE público.
         return [
-            $f('text', 'Procedimento(s) a ser(em) realizado(s)', 'procedimentos', false),
-            $f('checkbox', 'Profissional declarou ter explicado riscos, benefícios e alternativas', 'profissional_explicou', false),
-            $f('text', 'Profissional responsável', 'profissional_responsavel', false),
-            $f('date', 'Data do procedimento', 'data_procedimento', false),
-            $f('textarea', 'Descrição específica do procedimento e técnica utilizada', 'descricao_procedimento_tecnica', false),
-            $f('textarea', 'Benefícios esperados', 'beneficios_esperados', false),
-            $f('textarea', 'Riscos e efeitos colaterais possíveis', 'riscos_efeitos_colaterais', false),
+            $f('checkbox', 'Profissional confirmou ter explicado riscos, benefícios, alternativas e direito de recusa ao paciente', 'profissional_explicou', false),
+            $f('date', 'Data prevista do procedimento', 'data_procedimento', false),
             $f('text', 'Número de sessões previstas', 'numero_sessoes_previstas', false),
             $f('text', 'Intervalo entre sessões', 'intervalo_sessoes', false),
-            $f('text', 'Valor do procedimento / pacote', 'valor_procedimento', false),
-            $f('textarea', 'Orientações pós-procedimento', 'orientacoes_pos', false),
-            $f('text', 'Registro do profissional (nome e conselho)', 'assinatura_profissional', false),
-            $f('text', 'Data e local (conferência clínica)', 'data_conferencia_clinica', false),
+            $f('textarea', 'Observações clínicas adicionais (não exibidas no termo assinado pelo paciente)', 'obs_clinicas_internas', false),
+            $f('text', 'Conferência — registro do profissional (nome e conselho)', 'conferencia_profissional', false),
+            $f('text', 'Data e local da conferência clínica', 'data_conferencia_clinica', false),
         ];
     }
 

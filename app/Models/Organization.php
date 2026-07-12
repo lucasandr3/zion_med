@@ -102,6 +102,8 @@ class Organization extends Model
         'whatsapp_notify_avisos',
         'signing_security_level',
         'data_retention_years',
+        'protocol_retention_years',
+        'protocol_retention_mode',
         'evolution_go_instance_name',
         'evolution_go_remote_id',
         'evolution_go_instance_token',

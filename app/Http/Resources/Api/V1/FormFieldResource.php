@@ -19,6 +19,8 @@ class FormFieldResource extends JsonResource
             'required' => $this->required,
             'options' => $options,
             'sort_order' => $this->sort_order,
+            'visibility_rules' => $this->visibility_rules,
+            'clinical_step_kind' => $this->clinical_step_kind,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
