@@ -121,18 +121,14 @@ class ResendConfigService
     {
         $this->ensureDefaults();
 
-        $value = PlatformSetting::get(self::KEY_LOGO_PATH);
-
-        return is_string($value) && $value !== '' ? $value : null;
+        return $this->normalizeStoragePath(PlatformSetting::get(self::KEY_LOGO_PATH));
     }
 
     public function getSignaturePhotoPath(): ?string
     {
         $this->ensureDefaults();
 
-        $value = PlatformSetting::get(self::KEY_SIGNATURE_PHOTO_PATH);
-
-        return is_string($value) && $value !== '' ? $value : null;
+        return $this->normalizeStoragePath(PlatformSetting::get(self::KEY_SIGNATURE_PHOTO_PATH));
     }
 
     public function getSenderName(): ?string
@@ -307,18 +303,18 @@ class ResendConfigService
             return;
         }
 
-        $branding = app(PlatformEmailBrandingService::class);
-
+        // Não resolver logo/assinatura no MinIO aqui: isso roda no boot de toda request
+        // e no local (credencial inválida) o AWS SDK tenta 169.254.169.254 ~5s.
+        // URLs assinadas são resolvidas sob demanda em MailBrand / PlatformEmailBrandingService.
         Config::set('services.resend.key', $this->getApiKey() ?? '');
         Config::set('mail.default', $this->getMailer());
         Config::set('mail.from.address', $this->getFromAddress());
         Config::set('mail.from.name', $this->getFromName());
         Config::set('mail.branding', array_merge(Config::get('mail.branding', []), array_filter([
             'product_name' => $this->getProductName(),
-            'logo_url' => $branding->getEffectiveLogoUrl(10080),
+            'logo_url' => $this->getLogoUrl(),
             'primary_color' => $this->getPrimaryColor(),
             'support_email' => $this->getSupportEmail(),
-            'signature_photo_url' => $branding->getSignaturePhotoUrl(10080),
             'sender_name' => $this->getSenderName() ?: $this->getFromName(),
             'sender_role' => $this->getSenderRole(),
             'sender_email' => $this->getSupportEmail() ?: $this->getFromAddress(),
@@ -376,6 +372,29 @@ class ResendConfigService
         $trimmed = trim($value);
 
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    /**
+     * Paths persistidos inválidos (ex.: string "false" de cast JSON/bool) não devem
+     * disparar checagem no MinIO/S3.
+     */
+    private function normalizeStoragePath(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $invalid = ['false', 'true', 'null', 'undefined', '1', '0'];
+        if (in_array(strtolower($trimmed), $invalid, true)) {
+            return null;
+        }
+
+        return $trimmed;
     }
 
     private function secretPreview(?string $secret): ?string

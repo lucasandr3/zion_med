@@ -344,10 +344,27 @@ class PlatformEmailBrandingService
             return null;
         }
 
+        $invalid = ['false', 'true', 'null', 'undefined', '1', '0'];
+        if (in_array(strtolower(trim($path)), $invalid, true)) {
+            return null;
+        }
+
         $this->minioConfig->applyFilesystemConfig();
 
-        if (Storage::disk('minio_assets')->exists($path)) {
-            return Storage::disk('minio_assets')->temporaryUrl($path, now()->addMinutes($minutes));
+        if (! $this->minioConfig->isConfigured()) {
+            if (Storage::disk('public')->exists($path)) {
+                return rtrim((string) config('app.url'), '/').'/storage/'.ltrim($path, '/');
+            }
+
+            return null;
+        }
+
+        try {
+            if (Storage::disk('minio_assets')->exists($path)) {
+                return Storage::disk('minio_assets')->temporaryUrl($path, now()->addMinutes($minutes));
+            }
+        } catch (\Throwable) {
+            // Credencial/rede MinIO indisponível: não derrubar request/e-mail.
         }
 
         if (Storage::disk('public')->exists($path)) {

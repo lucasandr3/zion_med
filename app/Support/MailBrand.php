@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Services\PlatformEmailBrandingService;
+
 final class MailBrand
 {
     /**
@@ -17,12 +19,15 @@ final class MailBrand
             ?: config('asaas.product_name')
             ?: config('app.name'));
 
+        // Logo/assinatura no MinIO só aqui (envio de e-mail), nunca no boot HTTP.
+        $branding = app(PlatformEmailBrandingService::class);
+
         return [
             'brandName' => $name,
-            'brandLogoUrl' => config('mail.branding.logo_url'),
+            'brandLogoUrl' => $branding->getEffectiveLogoUrl(10080) ?: config('mail.branding.logo_url'),
             'brandPrimary' => (string) (config('mail.branding.primary_color') ?: '#1a3fae'),
             'brandSupportEmail' => config('mail.branding.support_email'),
-            'signaturePhotoUrl' => config('mail.branding.signature_photo_url'),
+            'signaturePhotoUrl' => $branding->getSignaturePhotoUrl(10080) ?: config('mail.branding.signature_photo_url'),
             'senderName' => config('mail.branding.sender_name') ?: $name,
             'senderRole' => config('mail.branding.sender_role'),
             'senderEmail' => config('mail.branding.sender_email'),
