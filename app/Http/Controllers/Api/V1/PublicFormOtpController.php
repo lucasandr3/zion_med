@@ -62,6 +62,12 @@ class PublicFormOtpController extends Controller
      */
     public function verify(Request $request, string $token): JsonResponse
     {
+        $key = 'public-form-otp-verify:'.$token.':'.$request->ip();
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
+        }
+        RateLimiter::hit($key, 60);
+
         $validated = $request->validate([
             'channel' => ['required', 'string', Rule::in(['email', 'whatsapp'])],
             'email' => ['required_if:channel,email', 'nullable', 'email'],

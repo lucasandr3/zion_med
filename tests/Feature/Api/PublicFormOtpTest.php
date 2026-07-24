@@ -6,6 +6,7 @@ use App\Models\FormTemplate;
 use App\Models\OtpChallenge;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -62,7 +63,7 @@ class PublicFormOtpTest extends TestCase
             'token' => $token,
             'channel' => 'email',
             'recipient' => 'verify@example.com',
-            'code' => '123456',
+            'code' => Hash::make('123456'),
             'expires_at' => now()->addMinutes(10),
         ]);
 
@@ -86,7 +87,7 @@ class PublicFormOtpTest extends TestCase
             'token' => $token,
             'channel' => 'email',
             'recipient' => 'bad@example.com',
-            'code' => '123456',
+            'code' => Hash::make('123456'),
             'expires_at' => now()->addMinutes(10),
         ]);
 

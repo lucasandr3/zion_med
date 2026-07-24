@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Services\OrganizationAccessService;
 use App\Services\OrganizationPresenceService;
 use App\Services\TenantContextService;
+use App\Support\PresenceLeaveToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -76,6 +77,7 @@ class ChooseClinicController extends Controller
             'data' => [
                 'message' => 'Empresa alterada. O contexto foi salvo no token e nas próximas requisições você pode usar o header X-Organization-Id com o valor '.$organizationId,
                 'current_organization_id' => $organizationId,
+                'presence_leave_token' => PresenceLeaveToken::issue($user, $organizationId),
             ],
         ]);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SafeOutboundUrl;
 use App\Models\ClinicWebhook;
 use App\Models\WebhookDelivery;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +32,18 @@ class WebhookService
      */
     public function send(ClinicWebhook $webhook, string $event, array $payload): WebhookDelivery
     {
+        if (! SafeOutboundUrl::isAllowed((string) $webhook->url)) {
+            $delivery = WebhookDelivery::create([
+                'clinic_webhook_id' => $webhook->id,
+                'event' => $event,
+                'payload' => $payload,
+                'attempt' => 1,
+                'error_message' => 'URL de webhook bloqueada (política SSRF).',
+            ]);
+
+            return $delivery;
+        }
+
         $body = json_encode($payload);
         $headers = [
             'Content-Type' => 'application/json',

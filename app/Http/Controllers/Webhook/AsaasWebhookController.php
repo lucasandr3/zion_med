@@ -17,12 +17,15 @@ class AsaasWebhookController extends Controller
     {
         $secret = config('asaas.webhook_secret');
         if ($secret === '' || $secret === null) {
-            if (app()->environment('production')) {
-                Log::error('Asaas webhook: ASAAS_WEBHOOK_SECRET not configured');
-                return response()->json(['received' => false, 'message' => 'Webhook not configured'], 503);
-            }
-        } elseif ($request->header('asaas-access-token') !== $secret) {
+            Log::error('Asaas webhook: ASAAS_WEBHOOK_SECRET not configured');
+
+            return response()->json(['received' => false, 'message' => 'Webhook not configured'], 503);
+        }
+
+        $provided = (string) $request->header('asaas-access-token', '');
+        if ($provided === '' || ! hash_equals((string) $secret, $provided)) {
             Log::warning('Asaas webhook: invalid or missing token');
+
             return response()->json(['received' => false], 401);
         }
 

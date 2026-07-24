@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
+use App\Support\PresenceLeaveToken;
 use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,13 @@ class AuthController extends Controller
 
         $user = Auth::guard('web')->user();
 
+        if (! $user->active) {
+            Auth::guard('web')->logout();
+            throw ValidationException::withMessages([
+                'email' => ['Esta conta está desativada.'],
+            ]);
+        }
+
         $user->tokens()->where('name', 'spa')->delete();
         $currentOrganizationId = $user->clinic_id ? (int) $user->clinic_id : null;
         $token = $user->createToken('spa', SanctumTenantAbility::tokenAbilitiesForOrganization($currentOrganizationId))->plainTextToken;
@@ -57,14 +65,20 @@ class AuthController extends Controller
             app(OrganizationPresenceService::class)->join((int) $currentOrganizationId);
         }
 
+        $payload = [
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => new UserResource($user),
+            'current_organization_id' => $currentOrganizationId,
+            'organizations' => OrganizationResource::collection($organizations),
+        ];
+
+        if ($user->isTenantUser() && $currentOrganizationId) {
+            $payload['presence_leave_token'] = PresenceLeaveToken::issue($user, (int) $currentOrganizationId);
+        }
+
         return response()->json([
-            'data' => [
-                'token' => $token,
-                'token_type' => 'Bearer',
-                'user' => new UserResource($user),
-                'current_organization_id' => $currentOrganizationId,
-                'organizations' => OrganizationResource::collection($organizations),
-            ],
+            'data' => $payload,
         ]);
     }
 
@@ -92,16 +106,13 @@ class AuthController extends Controller
     {
         $request->validate(['email' => ['required', 'string', 'email']]);
 
-        $status = Password::sendResetLink($request->only('email'));
+        Password::sendResetLink($request->only('email'));
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return response()->json([
-                'data' => ['message' => __($status)],
-            ]);
-        }
-
-        throw ValidationException::withMessages([
-            'email' => [__($status)],
+        // Sempre a mesma resposta para não enumerar e-mails cadastrados.
+        return response()->json([
+            'data' => [
+                'message' => 'Se o e-mail estiver cadastrado, enviaremos um link para redefinir a senha.',
+            ],
         ]);
     }
 
@@ -123,6 +134,7 @@ class AuthController extends Controller
                     'password' => Hash::make($password),
                     'remember_token' => Str::random(60),
                 ])->save();
+                $user->tokens()->delete();
                 event(new PasswordReset($user));
             }
         );

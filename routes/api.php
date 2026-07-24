@@ -67,8 +67,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.v1.auth.forgot-password');
+        Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
     });
-    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
     Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
     Route::get('/landing', LandingController::class)->name('api.v1.landing');
@@ -90,8 +90,12 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->where('channel', 'whatsapp|maps|email|phone|instagram|team_whatsapp')
         ->name('api.v1.link-bio.public-cta');
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
-    Route::post('/comece', [ComeceApiController::class, 'store'])->name('api.v1.comece.store');
-    Route::post('/demonstracao', [DemonstrationRequestController::class, 'store'])->name('api.v1.demonstracao.store');
+    Route::post('/comece', [ComeceApiController::class, 'store'])
+        ->middleware('throttle:auth')
+        ->name('api.v1.comece.store');
+    Route::post('/demonstracao', [DemonstrationRequestController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('api.v1.demonstracao.store');
     Route::post('/organization-presence/leave-beacon', [OrganizationPresenceController::class, 'leaveBeacon'])
         ->middleware('throttle:120,1')
         ->name('api.v1.organization-presence.leave-beacon');
@@ -129,7 +133,7 @@ Route::bind('protocol', fn ($value) => app(OrganizationScopedRouteBinding::class
 Route::bind('documentSend', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(DocumentSend::class, $value));
 
 // Rotas que qualquer usuário autenticado pode acessar (incl. platform_admin): logout, me, notificações
-Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
     Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
@@ -185,13 +189,13 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(functio
 });
 
 // Onboarding pós-cadastro (tenant autenticado; e-mail pode estar pendente de verificação)
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'tenant', 'throttle:api'])->group(function () {
     Route::get('/onboarding/templates', [OnboardingController::class, 'templates'])->name('api.v1.onboarding.templates');
     Route::post('/onboarding/templates/{template}/link-publico', [OnboardingController::class, 'gerarLink'])->name('api.v1.onboarding.link');
 });
 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
-Route::prefix('v1')->middleware(['auth:sanctum', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
     Route::get('/compliance/relatorio', ComplianceReportController::class)->name('api.v1.compliance.relatorio');
     Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');

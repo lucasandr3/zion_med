@@ -20,7 +20,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
+use App\Support\PresenceLeaveToken;
 use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
 
@@ -53,8 +55,8 @@ class ComeceController extends Controller
         $validated = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'responsible_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
@@ -74,12 +76,16 @@ class ComeceController extends Controller
         ], [
             'company_name.required' => 'Informe o nome da empresa.',
             'responsible_name.required' => 'Informe o seu nome (responsável).',
-            'email.unique' => 'Este e-mail já está em uso. Faça login ou use outro e-mail.',
-            'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
             'billing_document.required' => 'Informe CPF ou CNPJ apenas se quiser já configurar faturamento.',
             'phone.required' => 'Informe um WhatsApp válido com DDD.',
             'accepted_terms.accepted' => 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar.',
         ]);
+
+        if (User::query()->where('email', $validated['email'])->exists()) {
+            throw ValidationException::withMessages([
+                'email' => ['Não foi possível concluir o cadastro com estes dados. Faça login ou use outro e-mail.'],
+            ]);
+        }
 
         $validated['phone'] = preg_replace('/\D/', '', (string) $validated['phone']);
 
@@ -205,6 +211,7 @@ class ComeceController extends Controller
                     'user' => new UserResource($user),
                     'current_organization_id' => $organization->id,
                     'organizations' => OrganizationResource::collection($organizations),
+                    'presence_leave_token' => PresenceLeaveToken::issue($user, (int) $organization->id),
                     'message' => $successMessage,
                 ],
             ], 201);

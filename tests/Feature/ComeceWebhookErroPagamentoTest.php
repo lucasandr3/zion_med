@@ -30,8 +30,8 @@ class ComeceWebhookErroPagamentoTest extends TestCase
             'company_name' => 'Clínica Teste',
             'responsible_name' => 'Responsável Teste',
             'email' => 'novo@teste.com',
-            'password' => 'senha12345',
-            'password_confirmation' => 'senha12345',
+            'password' => 'SenhaForte1!',
+            'password_confirmation' => 'SenhaForte1!',
             'plan_key' => 'solo',
             'phone' => '11999998888',
             'niche' => 'estetica',
@@ -56,13 +56,18 @@ class ComeceWebhookErroPagamentoTest extends TestCase
         Http::fake();
 
         $this->mock(AsaasService::class, function ($mock): void {
+            $mock->shouldIgnoreMissing();
             $mock->shouldReceive('isConfigured')->andReturn(true);
+            $mock->shouldReceive('normalizeBillingType')->andReturn('PIX');
+            $mock->shouldReceive('firstChargeDueDateForOrganization')->andReturn(now()->addDays(14)->toDateString());
             $mock->shouldReceive('createSubscription')
                 ->andThrow(new \RuntimeException('Asaas API error'));
         });
 
         $payload = $this->validPayload([
             'email' => 'pagamento-erro@teste.com',
+            'password' => 'SenhaForte1!',
+            'password_confirmation' => 'SenhaForte1!',
             'billing_document' => '12345678901',
         ]);
 
@@ -119,7 +124,10 @@ class ComeceWebhookErroPagamentoTest extends TestCase
         Http::fake();
 
         $this->mock(AsaasService::class, function ($mock): void {
+            $mock->shouldIgnoreMissing();
             $mock->shouldReceive('isConfigured')->andReturn(true);
+            $mock->shouldReceive('normalizeBillingType')->andReturn('PIX');
+            $mock->shouldReceive('firstChargeDueDateForOrganization')->andReturn(now()->addDays(14)->toDateString());
             $mock->shouldReceive('createSubscription')
                 ->andThrow(new \RuntimeException('Asaas API error'));
         });

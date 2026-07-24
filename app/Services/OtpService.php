@@ -6,6 +6,7 @@ use App\Models\FormTemplate;
 use App\Models\OtpChallenge;
 use App\Models\Organization;
 use App\Support\MailBrand;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
@@ -22,12 +23,15 @@ class OtpService
     {
         $code = $this->generateCode();
         $expiresAt = now()->addMinutes(self::EXPIRY_MINUTES);
+        $email = strtolower(trim($email));
+
+        $this->invalidatePending($token, $email);
 
         $challenge = OtpChallenge::create([
             'token' => $token,
             'channel' => 'email',
             'recipient' => $email,
-            'code' => $code,
+            'code' => Hash::make($code),
             'expires_at' => $expiresAt,
         ]);
 
@@ -97,11 +101,13 @@ class OtpService
         $code = $this->generateCode();
         $expiresAt = now()->addMinutes(self::EXPIRY_MINUTES);
 
+        $this->invalidatePending($token, $number);
+
         $challenge = OtpChallenge::create([
             'token' => $token,
             'channel' => 'whatsapp',
             'recipient' => $number,
-            'code' => $code,
+            'code' => Hash::make($code),
             'expires_at' => $expiresAt,
         ]);
 
@@ -138,7 +144,7 @@ class OtpService
 
         $challenge->increment('attempts');
 
-        if (! hash_equals((string) $challenge->code, (string) $code)) {
+        if (! Hash::check((string) $code, (string) $challenge->code)) {
             throw ValidationException::withMessages(['code' => ['Código inválido.']]);
         }
 
@@ -158,12 +164,18 @@ class OtpService
             ->exists();
     }
 
+    private function invalidatePending(string $token, string $recipient): void
+    {
+        OtpChallenge::where('token', $token)
+            ->where('recipient', $recipient)
+            ->whereNull('verified_at')
+            ->delete();
+    }
+
     private function generateCode(): string
     {
-        $digits = '';
-        for ($i = 0; $i < self::CODE_LENGTH; $i++) {
-            $digits .= (string) random_int(0, 9);
-        }
-        return $digits;
+        $max = (10 ** self::CODE_LENGTH) - 1;
+
+        return str_pad((string) random_int(0, $max), self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 }

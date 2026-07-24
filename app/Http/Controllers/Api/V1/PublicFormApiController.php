@@ -48,9 +48,12 @@ class PublicFormApiController extends Controller
     public function show(string $token): JsonResponse
     {
         $key = 'public-form:'.$token;
-        if (RateLimiter::tooManyAttempts($key, 30)) {
+        $ipKey = 'public-form-ip:'.request()->ip();
+        if (RateLimiter::tooManyAttempts($key, 30) || RateLimiter::tooManyAttempts($ipKey, 60)) {
             return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
         }
+        RateLimiter::hit($key, 60);
+        RateLimiter::hit($ipKey, 60);
 
         $template = FormTemplate::withoutGlobalScopes()
             ->where('public_token', $token)
@@ -110,7 +113,7 @@ class PublicFormApiController extends Controller
                     'mode' => $personLinkMode,
                     'title' => 'Identifique-se para continuar',
                     'description' => $personLinkMode === 'cpf'
-                        ? 'Informe seu CPF para autorizar o acesso a este formulário.'
+                        ? 'Informe seu CPF e a data de nascimento cadastrados na clínica.'
                         : 'Informe o código e a data de nascimento cadastrados na clínica.',
                 ],
                 'comprehension_quiz' => $this->comprehensionQuizService->forPublic($quiz),
@@ -172,10 +175,21 @@ class PublicFormApiController extends Controller
                     'cpf' => ['Informe um CPF válido para continuar.'],
                 ]);
             }
+            if (empty($validated['birth_date'])) {
+                throw ValidationException::withMessages([
+                    'birth_date' => ['Informe a data de nascimento cadastrada na clínica.'],
+                ]);
+            }
             $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
             if (! $person) {
                 throw ValidationException::withMessages([
                     'cpf' => ['CPF não encontrado ou não autorizado para este formulário.'],
+                ]);
+            }
+            $expectedBirth = optional($person->birth_date)->format('Y-m-d');
+            if (! $expectedBirth || $expectedBirth !== (string) $validated['birth_date']) {
+                throw ValidationException::withMessages([
+                    'birth_date' => ['CPF ou data de nascimento não conferem.'],
                 ]);
             }
 
@@ -226,12 +240,11 @@ class PublicFormApiController extends Controller
      */
     private function buildPersonPrefillData(Person $person): array
     {
+        // Prefill mínimo no endpoint público: sem CPF/RG/notes/plano (LGPD).
         return [
             'id' => $person->id,
             'code' => $person->code,
             'name' => $person->name,
-            'cpf' => $person->cpf,
-            'rg' => $person->rg,
             'email' => $person->email,
             'phone' => $person->phone,
             'phone_alt' => $person->phone_alt,
@@ -245,10 +258,6 @@ class PublicFormApiController extends Controller
             'city' => $person->city,
             'cep' => $person->cep,
             'referred_by' => $person->referred_by,
-            'notes' => $person->notes,
-            'has_health_plan' => $person->has_health_plan,
-            'health_plan_operator' => $person->health_plan_operator,
-            'health_plan_card_number' => $person->health_plan_card_number,
         ];
     }
 

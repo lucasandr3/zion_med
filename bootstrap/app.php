@@ -25,10 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\SetClinic::class,
             \App\Http\Middleware\EnsureClinicBillingIsActive::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         $middleware->api(append: [
             \App\Http\Middleware\SetClinicForApi::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         $middleware->alias([
@@ -37,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.billing' => \App\Http\Middleware\EnsureTenantBillingActive::class,
             'verified' => \App\Http\Middleware\EnsureEmailIsVerifiedApi::class,
             'business_hub.connector' => \App\Http\Middleware\AuthenticateBusinessHubConnector::class,
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

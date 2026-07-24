@@ -117,6 +117,10 @@ class UserController extends Controller
         }
         $usuario->update($data);
 
+        if ($usuario->fresh()?->active === false) {
+            $usuario->tokens()->delete();
+        }
+
         return response()->json([
             'data' => new UserResource($usuario->fresh()),
         ]);
@@ -134,6 +138,7 @@ class UserController extends Controller
             ], 422);
         }
         $usuario->update(['active' => false]);
+        $usuario->tokens()->delete();
         Event::dispatch(new AuditEvent('user.deactivated', User::class, $usuario->id, null, $usuario->clinic_id, $request->user()->id));
 
         return response()->json([

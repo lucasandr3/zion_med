@@ -153,7 +153,11 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasPermission(Permission::SUBMISSIONS_VIEW);
         });
         Gate::define('viewApiDocs', function (?User $user) {
-            return $user !== null;
+            if ($user === null) {
+                return false;
+            }
+
+            return in_array($user->roleEnum(), [Role::SuperAdmin, Role::PlatformAdmin], true);
         });
 
         Gate::define('viewLogViewer', function (?User $user) {

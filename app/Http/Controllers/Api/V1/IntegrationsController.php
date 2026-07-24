@@ -12,6 +12,7 @@ use App\Models\Person;
 use App\Models\WebhookDelivery;
 use App\Services\FeegowClient;
 use App\Services\PersonConsentService;
+use App\Support\SafeOutboundUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -142,6 +143,8 @@ class IntegrationsController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
         ]);
 
+        SafeOutboundUrl::assertAllowed($validated['url']);
+
         $webhook = ClinicWebhook::create([
             'organization_id' => $clinicId,
             'url' => $validated['url'],
@@ -179,6 +182,8 @@ class IntegrationsController extends Controller
             'is_active' => ['boolean'],
         ]);
 
+        SafeOutboundUrl::assertAllowed($validated['url']);
+
         $webhook->update([
             'url' => $validated['url'],
             'events' => $validated['events'],
@@ -198,7 +203,7 @@ class IntegrationsController extends Controller
         ]);
     }
 
-    public function destroyWebhook(ClinicWebhook $webhook): JsonResponse
+    public function destroyWebhook(Request $request, ClinicWebhook $webhook): JsonResponse
     {
         $this->authorize('manage-clinic');
         if ((string) $webhook->organization_id !== (string) $this->currentOrganizationId($request)) {
