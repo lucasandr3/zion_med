@@ -16,8 +16,7 @@ class OrganizationSeeder extends Seeder
 
     public function run(): void
     {
-        $trialDays = (int) config('asaas.trial_days', 14);
-        $trialEndsAt = now()->addDays($trialDays);
+        $trialEndsAt = now()->setDate(2050, 12, 31)->endOfDay();
 
         $this->seedQaTenant($trialEndsAt);
         $this->seedDemonstracaoMultiTenant($trialEndsAt);

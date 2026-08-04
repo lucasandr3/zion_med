@@ -240,7 +240,7 @@ class TemplateController extends Controller
             'new_category' => ['nullable', 'string', 'max:120'],
             'fields' => ['nullable', 'array'],
             'fields.*.type' => ['required', 'string', Rule::in(['text', 'textarea', 'select', 'checkbox', 'radio', 'date', 'number', 'file', 'signature', 'heading', 'notice', 'section_break'])],
-            'fields.*.label' => ['required', 'string', 'max:255'],
+            'fields.*.label' => ['required', 'string', 'max:2000'],
             'fields.*.name_key' => ['required', 'string', 'max:80'],
             'fields.*.required' => ['boolean'],
             'fields.*.options' => ['nullable', 'array'],

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('template_id')->constrained('form_templates')->cascadeOnDelete();
             $table->string('type', 30); // text, textarea, number, date, select, checkbox, radio, file, signature
-            $table->string('label');
+            $table->text('label');
             $table->string('name_key');
             $table->boolean('required')->default(false);
             $table->json('options_json')->nullable(); // for select/radio options
