@@ -10,10 +10,15 @@ $defaultOrigins = [
     'https://api-homolog.gestgo.com.br'
 ];
 
-$configuredOrigins = array_values(array_filter(array_map(
-    static fn (string $origin): string => rtrim(trim($origin), '/'),
-    explode(',', (string) env('CORS_ALLOWED_ORIGINS', implode(',', $defaultOrigins)))
-)));
+$configuredOrigins = [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200',
+    'http://zion_med.test',
+    'https://app.gestgo.com.br',
+    'https://gestgo.com.br',
+    'https://homolog.gestgo.com.br',
+    'https://api-homolog.gestgo.com.br'
+];
 
 return [
 
