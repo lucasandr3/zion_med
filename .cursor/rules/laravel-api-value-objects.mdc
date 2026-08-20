@@ -1,0 +1,186 @@
+---
+description: Padrão para Value Objects em projetos Laravel API
+globs: app/ValueObjects/**/*.php
+alwaysApply: false
+---
+
+# Value Objects — Encapsulamento de Valores
+
+Use Value Objects para tipos com invariantes próprias: `Money`, `Cpf`, `Cnpj`, `Email`, `Coordinate`, `PhoneNumber`.
+
+## Exemplo: Money
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\ValueObjects;
+
+use App\Exceptions\Domain\InvalidMoneyException;
+
+final class Money
+{
+    private function __construct(
+        private readonly int    $amountInCents,
+        private readonly string $currency,
+    ) {}
+
+    public static function fromCents(int $cents, string $currency = 'BRL'): self
+    {
+        if ($cents < 0) {
+            throw new InvalidMoneyException('O valor monetário não pode ser negativo.');
+        }
+
+        return new self($cents, strtoupper($currency));
+    }
+
+    public static function fromFloat(float $amount, string $currency = 'BRL'): self
+    {
+        return self::fromCents((int) round($amount * 100), $currency);
+    }
+
+    public function add(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        return new self($this->amountInCents + $other->amountInCents, $this->currency);
+    }
+
+    public function subtract(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        return new self($this->amountInCents - $other->amountInCents, $this->currency);
+    }
+
+    public function isGreaterThan(self $other): bool
+    {
+        $this->guardSameCurrency($other);
+
+        return $this->amountInCents > $other->amountInCents;
+    }
+
+    public function toCents(): int { return $this->amountInCents; }
+    public function toFloat(): float { return $this->amountInCents / 100; }
+    public function formatted(): string
+    {
+        return 'R$ ' . number_format($this->toFloat(), 2, ',', '.');
+    }
+
+    public function equals(self $other): bool
+    {
+        return $this->amountInCents === $other->amountInCents
+            && $this->currency === $other->currency;
+    }
+
+    private function guardSameCurrency(self $other): void
+    {
+        if ($this->currency !== $other->currency) {
+            throw new InvalidMoneyException(
+                "Moedas incompatíveis: {$this->currency} e {$other->currency}.",
+            );
+        }
+    }
+}
+```
+
+## Exemplo: CPF
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\ValueObjects;
+
+use App\Exceptions\Domain\InvalidDocumentException;
+
+final class Cpf
+{
+    private readonly string $digits;
+
+    private function __construct(string $value)
+    {
+        $this->digits = preg_replace('/\D/', '', $value);
+
+        if (! $this->isValid()) {
+            throw new InvalidDocumentException("CPF inválido: {$value}");
+        }
+    }
+
+    public static function from(string $value): self
+    {
+        return new self($value);
+    }
+
+    public function formatted(): string
+    {
+        return substr($this->digits, 0, 3) . '.' .
+               substr($this->digits, 3, 3) . '.' .
+               substr($this->digits, 6, 3) . '-' .
+               substr($this->digits, 9, 2);
+    }
+
+    public function raw(): string { return $this->digits; }
+
+    public function equals(self $other): bool
+    {
+        return $this->digits === $other->digits;
+    }
+
+    private function isValid(): bool
+    {
+        if (strlen($this->digits) !== 11 || preg_match('/(\d)\1{10}/', $this->digits)) {
+            return false;
+        }
+
+        for ($t = 9; $t < 11; $t++) {
+            $sum = 0;
+
+            for ($i = 0; $i < $t; $i++) {
+                $sum += (int) $this->digits[$i] * ($t + 1 - $i);
+            }
+
+            if ((int) $this->digits[$t] !== (10 * $sum) % 11 % 10) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+```
+
+## Regras
+
+- Sempre `final` e imutável — construtor `private`, named constructors públicos
+- Toda operação que "muda" o valor retorna **nova instância**
+- Valide no construtor e lance exceção de domínio se inválido
+- Implemente `equals()` para comparação por valor — nunca use `===` entre instâncias
+- Integre ao Eloquent sempre via **Custom Cast** — nunca acesse o VO direto no model sem cast
+- Nunca use arrays ou primitivos onde um VO se aplica
+
+## Anti-Patterns
+
+```php
+// ❌ Value Object mutável
+final class Money {
+    public function addInPlace(self $other): void {
+        $this->amountInCents += $other->amountInCents; // nunca — retorne nova instância
+    }
+}
+
+// ❌ Construtor público sem validação
+final class Cpf {
+    public function __construct(public readonly string $digits) {} // sem validação
+}
+
+// ❌ Comparação por referência
+$money1 === $money2; // sempre use $money1->equals($money2)
+
+// ❌ VO com lógica de negócio
+final class Money {
+    public function applyDiscount(Order $order): self { ... } // pertence ao Service
+}
+```

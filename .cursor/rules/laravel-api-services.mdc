@@ -1,0 +1,134 @@
+---
+description: Padrão para Services em projetos Laravel API
+globs: app/Services/**/*.php
+alwaysApply: false
+---
+
+# Services — Regras de Negócio
+
+Services encapsulam toda a lógica de negócio. São stateless, testáveis e compostos por injeção.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\DTOs\Order\CreateOrderDTO;
+use App\DTOs\Order\UpdateOrderDTO;
+use App\Events\Order\OrderCreated;
+use App\Exceptions\Domain\BusinessException;
+use App\Exceptions\Domain\NotFoundException;
+use App\Models\Order;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+
+final class OrderService
+{
+    public function __construct(
+        private readonly StockService    $stockService,
+        private readonly DiscountService $discountService,
+    ) {}
+
+    public function paginate(int $perPage = 15): LengthAwarePaginator
+    {
+        return Order::with(['customer', 'items'])->paginate($perPage);
+    }
+
+    public function findOrFail(int $id): Order
+    {
+        return Order::with(['customer', 'items'])->find($id)
+            ?? throw new NotFoundException("Pedido #{$id} não encontrado.");
+    }
+
+    public function create(CreateOrderDTO $dto): Order
+    {
+        return DB::transaction(function () use ($dto): Order {
+            $this->stockService->ensureAvailability($dto->items);
+
+            $order = Order::create([
+                'customer_id'    => $dto->customerId,
+                'payment_method' => $dto->paymentMethod,
+                'status'         => OrderStatus::Pending,
+                'total'          => 0,
+            ]);
+
+            $order->items()->createMany($dto->items);
+
+            $total = $this->calculateTotal($order);
+
+            if ($dto->couponCode !== null) {
+                $total = $this->discountService->apply($order, $dto->couponCode, $total);
+            }
+
+            $order->update(['total' => $total->toCents()]);
+
+            OrderCreated::dispatch($order);
+
+            return $order->fresh(['customer', 'items']);
+        });
+    }
+
+    public function update(int $id, UpdateOrderDTO $dto): Order
+    {
+        $order = $this->findOrFail($id);
+
+        if ($order->isFinalized()) {
+            throw new BusinessException('Pedidos finalizados não podem ser alterados.');
+        }
+
+        $order->update($dto->toArray());
+
+        return $order->fresh();
+    }
+
+    public function delete(int $id): void
+    {
+        $order = $this->findOrFail($id);
+
+        if ($order->hasPayment()) {
+            throw new BusinessException('Pedidos com pagamento não podem ser excluídos.');
+        }
+
+        $order->delete();
+    }
+}
+```
+
+## Regras
+
+- Classe `final` e `readonly` nas propriedades injetadas
+- Sempre use **DTOs** como parâmetro — nunca `array $data`
+- Use `DB::transaction()` para operações com múltiplas escritas
+- Dispare **Events** para efeitos colaterais (notificações, webhooks, audit log) — nunca chame serviços de notificação diretamente
+- Lance exceções de domínio (`NotFoundException`, `BusinessException`) — nunca retorne `null` ou `false`
+- Services são **stateless** — nunca armazene dados em propriedades entre chamadas
+- Carregue relacionamentos com `with()` no service — nunca no controller ou resource
+
+## Anti-Patterns
+
+```php
+// ❌ Array cru como parâmetro
+public function create(array $data): Order { ... }
+
+// ❌ Notificação direta no service
+$this->notificationService->orderCreated($order); // use Event::dispatch()
+
+// ❌ Retornar null em vez de lançar exceção
+public function findOrFail(int $id): ?Order {
+    return Order::find($id); // retorna null silenciosamente
+}
+
+// ❌ Service com estado
+final class OrderService {
+    private Order $lastOrder; // nunca — service é stateless
+}
+
+// ❌ Múltiplas escritas sem transação
+$order->update([...]);
+$order->items()->delete();
+$order->items()->createMany([...]); // sem DB::transaction()
+```

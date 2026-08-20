@@ -1,0 +1,139 @@
+---
+description: Princípios globais e arquitetura base para projetos Laravel API
+globs: **/*.php
+alwaysApply: true
+---
+
+# Laravel API — Base e Princípios
+
+## Stack
+
+- **PHP** 8.3+ com `declare(strict_types=1)` obrigatório em todos os arquivos
+- **Laravel** 11.x
+- **PSR-12** como padrão de estilo de código
+
+## Estrutura de Diretórios
+
+```
+app/
+├── Http/
+│   ├── Controllers/        # Thin controllers — orquestram, não processam
+│   ├── Requests/           # Validação e autorização via Form Requests
+│   ├── Resources/          # Transformação de resposta via API Resources
+│   └── Middleware/         # Filtros e modificações de requisição
+├── Services/               # Regras de negócio (organizados por domínio)
+├── Actions/                # Operações atômicas de negócio
+├── DTOs/                   # Data Transfer Objects entre camadas
+├── ValueObjects/           # Encapsulamento de valores com regras próprias
+├── Repositories/           # Abstração de acesso a dados (quando necessário)
+├── Events/                 # Eventos de domínio
+├── Listeners/              # Handlers de eventos
+├── Exceptions/             # Exceções de domínio padronizadas
+├── Casts/                  # Custom Eloquent Casts para Value Objects
+├── Enums/                  # Enumerações PHP 8.1+
+├── Models/                 # Eloquent Models (anêmicos)
+└── Policies/               # Autorização por recurso
+```
+
+## Princípios Fundamentais
+
+- **SOLID** em todas as camadas
+- **Thin Controllers** — controller não valida, não processa, não decide
+- **Fail Fast** — lance exceções de domínio cedo, nunca retorne null silencioso
+- **Imutabilidade** — Value Objects e DTOs são sempre imutáveis
+- **Tipagem explícita** — todo método tem tipo de retorno declarado
+- **Injeção via construtor** — nunca `app()->make()` ou `resolve()` em services/controllers
+- **`final`** em controllers, services, models e actions para evitar herança acidental
+- **`declare(strict_types=1)`** em todos os arquivos PHP sem exceção
+
+## Nomenclatura
+
+- Classes: `PascalCase` | Métodos/variáveis: `camelCase` | Colunas DB: `snake_case`
+- Controllers: singular com sufixo (`OrderController`)
+- Models: singular (`Order`, `Customer`)
+- Booleans: prefixo `is`, `has`, `can`, `should` (`isFinalized`, `hasPayment`)
+- Organize em subpastas por domínio: `Requests/Order/`, `Resources/Order/`, `DTOs/Order/`
+
+## Regras de Qualidade
+
+- Todo método com tipo de retorno explícito — nunca omita
+- Propriedades de classe sempre tipadas
+- Use `match` em vez de `switch` sempre que possível
+- PSR-12 em todo o codebase
+- `declare(strict_types=1)` em todos os arquivos PHP
+
+## Rotas
+
+```php
+// routes/api.php
+Route::prefix('v1')->name('api.v1.')->middleware(['api', 'auth:sanctum'])->group(function (): void {
+    Route::apiResource('orders', OrderController::class);
+
+    Route::prefix('orders')->name('orders.')->group(function (): void {
+        Route::post('{order}/cancel', [OrderController::class, 'cancel'])->name('cancel');
+    });
+});
+```
+
+- Sempre versionado (`v1`, `v2`)
+- Separe em arquivos por domínio: `routes/api/orders.php`
+- Use `apiResource()` com `->only()` ou `->except()` quando necessário
+- Nomeie todas as rotas com `->name()`
+- Autenticação via Sanctum em todas as rotas protegidas
+
+## Formato Padrão de Resposta
+
+### Sucesso — recurso único
+```json
+{ "data": { "id": 1, "status": "pending" } }
+```
+
+### Sucesso — coleção paginada
+```json
+{
+  "data": [...],
+  "meta": { "total": 100, "per_page": 15, "current_page": 1, "last_page": 7 }
+}
+```
+
+### Erro (qualquer tipo)
+```json
+{
+  "error": {
+    "code": "SCREAMING_SNAKE_CASE",
+    "message": "Mensagem legível.",
+    "errors": {}
+  }
+}
+```
+
+`error.code` sempre em `SCREAMING_SNAKE_CASE` para tratamento programático no cliente.
+
+## Performance e Segurança
+
+- Use `with()` para eager loading — nunca deixe N+1 ocorrer
+- Use caching (Redis/Memcached) para dados frequentemente lidos
+- Use filas (`ShouldQueue`) para jobs lentos (e-mail, webhook, relatório)
+- Crie índices nas colunas usadas em `where`, `orderBy`, `join`
+- Nunca logue dados sensíveis (senhas, tokens, CPF, cartão)
+- Use Laravel Telescope em desenvolvimento
+
+## Anti-Patterns Globais
+
+```php
+// ❌ Omitir strict_types
+<?php
+namespace App\...  // faltou declare(strict_types=1)
+
+// ❌ Omitir tipo de retorno
+public function create($data) { ... }
+
+// ❌ Instanciar service com new
+$service = new OrderService();
+
+// ❌ Herança em controllers/models/services
+class AdminOrderController extends OrderController {}
+
+// ❌ app()->make() ou resolve() em services/controllers
+$service = app()->make(OrderService::class);
+```

@@ -1,0 +1,115 @@
+---
+description: Padrão para Controllers em projetos Laravel API
+globs: app/Http/Controllers/**/*.php
+alwaysApply: false
+---
+
+# Controllers — Orquestradores Puros
+
+Controllers **apenas orquestram**: recebem o request validado → chamam o service/action → retornam o resource. Nunca processam, nunca decidem, nunca persistem.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\DTOs\Order\CreateOrderDTO;
+use App\DTOs\Order\UpdateOrderDTO;
+use App\Http\Requests\Order\StoreOrderRequest;
+use App\Http\Requests\Order\UpdateOrderRequest;
+use App\Http\Resources\Order\OrderCollection;
+use App\Http\Resources\Order\OrderResource;
+use App\Services\OrderService;
+use Illuminate\Http\Response;
+
+final class OrderController extends Controller
+{
+    public function __construct(
+        private readonly OrderService $orderService,
+    ) {}
+
+    public function index(): OrderCollection
+    {
+        return new OrderCollection(
+            $this->orderService->paginate(),
+        );
+    }
+
+    public function store(StoreOrderRequest $request): OrderResource
+    {
+        $order = $this->orderService->create(
+            CreateOrderDTO::fromRequest($request),
+        );
+
+        return new OrderResource($order);
+    }
+
+    public function show(int $id): OrderResource
+    {
+        return new OrderResource(
+            $this->orderService->findOrFail($id),
+        );
+    }
+
+    public function update(UpdateOrderRequest $request, int $id): OrderResource
+    {
+        $order = $this->orderService->update(
+            $id,
+            UpdateOrderDTO::fromRequest($request),
+        );
+
+        return new OrderResource($order);
+    }
+
+    public function destroy(int $id): Response
+    {
+        $this->orderService->delete($id);
+
+        return response()->noContent();
+    }
+}
+```
+
+## Regras
+
+- Classe `final` — sem herança de controllers
+- Dependências injetadas via construtor com `readonly`
+- Sempre use `$request->validated()` — nunca `$request->all()` ou `$request->input()`
+- Passe **DTOs** ao service, nunca arrays crus
+- Retorne sempre `Resource`, `ResourceCollection` ou `response()->noContent()`
+- Zero lógica de negócio, zero queries, zero condicionais de domínio
+- Zero try/catch — exceções são tratadas pelo Handler global
+
+## Anti-Patterns
+
+```php
+// ❌ Validação no controller
+public function store(Request $request): JsonResponse {
+    $request->validate([...]);
+}
+
+// ❌ Array cru para o service
+$this->orderService->create($request->validated());
+
+// ❌ Lógica de negócio no controller
+$order = Order::create([...]);
+Mail::send(...);
+$order->total = $order->items->sum('price');
+
+// ❌ Retornar model direto
+return response()->json($order);
+
+// ❌ try/catch no controller
+try {
+    $order = Order::findOrFail($id);
+} catch (ModelNotFoundException $e) {
+    return response()->json(['message' => 'Not found'], 404);
+}
+
+// ❌ Query direta no controller
+$orders = Order::where('status', 'pending')->get();
+```

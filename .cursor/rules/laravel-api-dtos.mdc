@@ -1,0 +1,83 @@
+---
+description: Padrão para DTOs em projetos Laravel API
+globs: app/DTOs/**/*.php
+alwaysApply: false
+---
+
+# DTOs — Data Transfer Objects
+
+DTOs tipam o contrato entre camadas. Eliminam arrays anônimos e tornam o código refatorável com segurança.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\DTOs\Order;
+
+use App\Enums\PaymentMethod;
+use App\Http\Requests\Order\StoreOrderRequest;
+
+final class CreateOrderDTO
+{
+    public function __construct(
+        public readonly int           $customerId,
+        public readonly array         $items,
+        public readonly PaymentMethod $paymentMethod,
+        public readonly ?string       $couponCode = null,
+    ) {}
+
+    public static function fromRequest(StoreOrderRequest $request): self
+    {
+        return new self(
+            customerId:    $request->integer('customer_id'),
+            items:         $request->validated('items'),
+            paymentMethod: PaymentMethod::from($request->string('payment_method')->toString()),
+            couponCode:    $request->string('coupon_code')->toString() ?: null,
+        );
+    }
+
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            customerId:    (int) $data['customer_id'],
+            items:         $data['items'],
+            paymentMethod: PaymentMethod::from($data['payment_method']),
+            couponCode:    $data['coupon_code'] ?? null,
+        );
+    }
+}
+```
+
+## Regras
+
+- DTOs são `final` e totalmente `readonly` — sem setters, sem mutação
+- Named constructor `fromRequest()` para criação a partir de Form Requests
+- Named constructor `fromArray()` para criação via jobs, commands ou imports
+- Use named arguments nos named constructors para clareza e segurança
+- Nunca passe `array $data` entre controller → service — use sempre um DTO
+- Organize em subpastas por domínio: `DTOs/Order/CreateOrderDTO.php`
+- Se o DTO precisar de `toArray()`, implemente explicitamente — nunca use `get_object_vars()`
+
+## Anti-Patterns
+
+```php
+// ❌ Array cru entre camadas
+$this->orderService->create($request->validated());
+
+// ❌ DTO mutável
+class CreateOrderDTO {
+    public int $customerId; // sem readonly
+    public function setCustomerId(int $id): void { ... }
+}
+
+// ❌ DTO com lógica de negócio
+class CreateOrderDTO {
+    public function calculateTotal(): Money { ... } // pertence ao Service
+}
+
+// ❌ DTO sem named constructor — acoplamento direto
+new CreateOrderDTO($request->customer_id, $request->items, ...);
+```

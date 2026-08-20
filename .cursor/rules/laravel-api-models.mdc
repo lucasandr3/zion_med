@@ -1,0 +1,180 @@
+---
+description: Padrão para Models Eloquent em projetos Laravel API
+globs: app/Models/**/*.php
+alwaysApply: false
+---
+
+# Models — Anêmicos
+
+Models Eloquent com responsabilidade única: estrutura, relacionamentos, scopes e casts. Nada mais.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Casts\MoneyCast;
+use App\Enums\OrderStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+final class Order extends Model
+{
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $fillable = [
+        'customer_id',
+        'status',
+        'payment_method',
+        'total',
+    ];
+
+    protected $casts = [
+        'status' => OrderStatus::class,
+        'total'  => MoneyCast::class,
+    ];
+
+    // Relacionamentos
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    // Scopes
+    public function scopePending($query): mixed
+    {
+        return $query->where('status', OrderStatus::Pending);
+    }
+
+    // Helpers de estado (sem lógica de negócio)
+    public function isFinalized(): bool
+    {
+        return $this->status->isFinalized();
+    }
+
+    public function hasPayment(): bool
+    {
+        return $this->payment !== null;
+    }
+}
+```
+
+## Custom Casts — Integração com Value Objects
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Casts;
+
+use App\ValueObjects\Money;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+
+final class MoneyCast implements CastsAttributes
+{
+    public function get(Model $model, string $key, mixed $value, array $attributes): Money
+    {
+        return Money::fromCents((int) $value);
+    }
+
+    public function set(Model $model, string $key, mixed $value, array $attributes): int
+    {
+        return $value instanceof Money
+            ? $value->toCents()
+            : (int) $value;
+    }
+}
+```
+
+## Enums
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enums;
+
+enum OrderStatus: string
+{
+    case Pending   = 'pending';
+    case Confirmed = 'confirmed';
+    case Shipped   = 'shipped';
+    case Delivered = 'delivered';
+    case Cancelled = 'cancelled';
+
+    public function label(): string
+    {
+        return match($this) {
+            self::Pending   => 'Aguardando',
+            self::Confirmed => 'Confirmado',
+            self::Shipped   => 'Enviado',
+            self::Delivered => 'Entregue',
+            self::Cancelled => 'Cancelado',
+        };
+    }
+
+    public function isFinalized(): bool
+    {
+        return in_array($this, [self::Delivered, self::Cancelled], true);
+    }
+}
+```
+
+## Regras
+
+- Classe `final` — sem herança de models
+- Use `$fillable` **ou** `$guarded` — nunca os dois
+- Use `$casts` para enums, datas, booleans, JSON e Value Objects
+- Nunca coloque regras de negócio, queries complexas ou chamadas externas em models
+- Observers separados em `app/Observers/` para eventos de model
+- Sem lógica nos mutators — use Value Objects com Custom Casts
+- Helpers de estado (`isFinalized()`, `hasPayment()`) são permitidos — delegam para o Enum ou checam atributo simples
+- Organize Casts em `app/Casts/` e Enums em `app/Enums/`
+
+## Anti-Patterns
+
+```php
+// ❌ Lógica de negócio no model
+class Order extends Model {
+    public function finalize(): void {
+        Mail::send(...); // nunca — use Event + Listener
+        $this->status = 'finalized';
+        $this->save();
+    }
+}
+
+// ❌ Herança de models
+class PremiumOrder extends Order {} // nunca — use scopes ou polimorfismo
+
+// ❌ Constantes no lugar de Enum
+class Order extends Model {
+    const STATUS_PENDING = 'pending'; // use enum OrderStatus
+}
+
+// ❌ Query complexa no model
+class Order extends Model {
+    public static function getPendingWithExpiredItems(): Collection {
+        return self::where(...)->join(...)->get(); // mova para Repository ou Service
+    }
+}
+
+// ❌ $fillable e $guarded juntos
+protected $fillable = [...];
+protected $guarded = []; // escolha um
+```

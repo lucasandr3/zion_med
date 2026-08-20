@@ -1,0 +1,114 @@
+---
+description: Padrão para API Resources em projetos Laravel API
+globs: app/Http/Resources/**/*.php
+alwaysApply: false
+---
+
+# API Resources — Transformação de Resposta
+
+Nunca exponha o model diretamente. Todo output da API passa por um Resource.
+
+## Resource — Recurso Único
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Order;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+final class OrderResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id'             => $this->id,
+            'status'         => $this->status,
+            'payment_method' => $this->payment_method,
+            'total'          => [
+                'cents'     => $this->total->toCents(),
+                'formatted' => $this->total->formatted(),
+            ],
+            'customer'   => new CustomerResource($this->whenLoaded('customer')),
+            'items'      => OrderItemResource::collection($this->whenLoaded('items')),
+            'created_at' => $this->created_at->toISOString(),
+            'updated_at' => $this->updated_at->toISOString(),
+        ];
+    }
+}
+```
+
+## Collection — Coleção Paginada
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Order;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+
+final class OrderCollection extends ResourceCollection
+{
+    public $collects = OrderResource::class;
+
+    public function toArray(Request $request): array
+    {
+        return [
+            'data' => $this->collection,
+            'meta' => [
+                'total'        => $this->total(),
+                'per_page'     => $this->perPage(),
+                'current_page' => $this->currentPage(),
+                'last_page'    => $this->lastPage(),
+            ],
+        ];
+    }
+}
+```
+
+## Regras
+
+- Classe `final`
+- Use `$this->whenLoaded('relation')` — nunca carregue relações dentro do resource
+- Mapeie campo a campo — nunca use `$this->resource->toArray()` ou `parent::toArray()`
+- Campos sensíveis (senha, tokens internos, dados pessoais brutos) **nunca** no resource
+- Crie `Collection` customizada quando precisar de `meta` na listagem
+- Organize em subpastas por domínio: `Resources/Order/OrderResource.php`
+- Acesse Value Objects pelos seus métodos: `$this->total->formatted()`, não `$this->total / 100`
+
+## Anti-Patterns
+
+```php
+// ❌ Retornar model direto no controller
+return response()->json($order);
+
+// ❌ Carregar relações dentro do resource
+public function toArray(Request $request): array {
+    return [
+        'items' => $this->items()->get(), // N+1 — use whenLoaded()
+    ];
+}
+
+// ❌ Expor todos os atributos
+public function toArray(Request $request): array {
+    return parent::toArray($request); // pode expor campos sensíveis
+}
+
+// ❌ Lógica de negócio no resource
+public function toArray(Request $request): array {
+    $discount = $this->total * 0.1; // pertence ao Service
+}
+
+// ❌ Campo sensível exposto
+return [
+    'password'      => $this->password,
+    'remember_token' => $this->remember_token,
+    'api_token'     => $this->api_token,
+];
+```

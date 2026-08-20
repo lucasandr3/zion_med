@@ -1,0 +1,187 @@
+---
+description: Padrão para Exceptions e Handler em projetos Laravel API
+globs: app/Exceptions/**/*.php
+alwaysApply: false
+---
+
+# Exceptions — Hierarquia e Handler Global
+
+## Hierarquia de Exceções de Domínio
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions\Domain;
+
+// Base abstrata — nunca instancie diretamente
+abstract class ApiException extends \RuntimeException
+{
+    abstract public function httpStatus(): int;
+    abstract public function errorCode(): string;
+
+    public function toApiResponse(): array
+    {
+        return [
+            'error' => [
+                'code'    => $this->errorCode(),
+                'message' => $this->getMessage(),
+            ],
+        ];
+    }
+}
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions\Domain;
+
+final class NotFoundException extends ApiException
+{
+    public function httpStatus(): int { return 404; }
+    public function errorCode(): string { return 'NOT_FOUND'; }
+}
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions\Domain;
+
+final class BusinessException extends ApiException
+{
+    public function httpStatus(): int { return 422; }
+    public function errorCode(): string { return 'BUSINESS_RULE_VIOLATION'; }
+}
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions\Domain;
+
+final class UnauthorizedException extends ApiException
+{
+    public function httpStatus(): int { return 403; }
+    public function errorCode(): string { return 'FORBIDDEN'; }
+}
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions\Domain;
+
+final class InvalidDocumentException extends ApiException
+{
+    public function httpStatus(): int { return 422; }
+    public function errorCode(): string { return 'INVALID_DOCUMENT'; }
+}
+```
+
+## Handler Global — bootstrap/app.php (Laravel 11)
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+
+    // 1. Exceções de domínio (NotFoundException, BusinessException, etc.)
+    $exceptions->render(function (ApiException $e, Request $request): ?JsonResponse {
+        if (! $request->expectsJson()) return null;
+
+        return response()->json($e->toApiResponse(), $e->httpStatus());
+    });
+
+    // 2. Não autenticado
+    $exceptions->render(function (AuthenticationException $e, Request $request): ?JsonResponse {
+        if (! $request->expectsJson()) return null;
+
+        return response()->json([
+            'error' => ['code' => 'UNAUTHENTICATED', 'message' => 'Não autenticado.'],
+        ], 401);
+    });
+
+    // 3. Validação (Form Requests)
+    $exceptions->render(function (ValidationException $e, Request $request): ?JsonResponse {
+        if (! $request->expectsJson()) return null;
+
+        return response()->json([
+            'error' => [
+                'code'    => 'VALIDATION_ERROR',
+                'message' => 'Os dados fornecidos são inválidos.',
+                'errors'  => $e->errors(),
+            ],
+        ], 422);
+    });
+
+    // 4. Model não encontrado (Eloquent findOrFail nativo)
+    $exceptions->render(function (ModelNotFoundException $e, Request $request): ?JsonResponse {
+        if (! $request->expectsJson()) return null;
+
+        return response()->json([
+            'error' => ['code' => 'NOT_FOUND', 'message' => 'Recurso não encontrado.'],
+        ], 404);
+    });
+
+    // 5. Fallback genérico
+    $exceptions->render(function (Throwable $e, Request $request): ?JsonResponse {
+        if (! $request->expectsJson()) return null;
+
+        $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+
+        return response()->json([
+            'error' => [
+                'code'    => 'SERVER_ERROR',
+                'message' => app()->isProduction() ? 'Erro interno do servidor.' : $e->getMessage(),
+            ],
+        ], $status);
+    });
+
+})
+```
+
+## Regras
+
+- Toda exceção de domínio estende `ApiException`
+- Crie novas exceções para cada tipo de erro de negócio com `errorCode()` específico
+- O Handler centraliza **todo** o mapeamento de exceção → resposta HTTP
+- Em produção, **nunca** exponha stack trace ou mensagem técnica
+- `error.code` sempre em `SCREAMING_SNAKE_CASE`
+- Nunca faça try/catch no controller para tratar erros esperados — deixe propagar para o Handler
+- A ordem dos handlers importa — do mais específico para o mais genérico
+
+## Anti-Patterns
+
+```php
+// ❌ try/catch no controller para erros esperados
+try {
+    $order = Order::findOrFail($id);
+} catch (ModelNotFoundException $e) {
+    return response()->json(['message' => 'Not found'], 404);
+}
+
+// ❌ Retornar null em vez de lançar exceção no service
+public function findOrFail(int $id): ?Order {
+    return Order::find($id); // null silencioso
+}
+
+// ❌ Expor detalhes técnicos em produção
+return response()->json([
+    'error' => $e->getMessage(), // pode expor queries, paths, etc.
+], 500);
+
+// ❌ errorCode sem padrão
+public function errorCode(): string { return 'not found'; } // use SCREAMING_SNAKE_CASE
+
+// ❌ Exceção genérica para tudo
+throw new \Exception('Pedido não encontrado.'); // use NotFoundException
+```

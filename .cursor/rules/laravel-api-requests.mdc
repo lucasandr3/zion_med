@@ -1,0 +1,93 @@
+---
+description: Padrão para Form Requests em projetos Laravel API
+globs: app/Http/Requests/**/*.php
+alwaysApply: false
+---
+
+# Form Requests — Validação e Autorização
+
+Toda validação e autorização **obrigatoriamente** em Form Requests. Nunca use `$request->validate()` no controller.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests\Order;
+
+use App\Enums\PaymentMethod;
+use App\Models\Order;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+final class StoreOrderRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()->can('create', Order::class);
+    }
+
+    public function rules(): array
+    {
+        return [
+            'customer_id'        => ['required', 'integer', 'exists:customers,id'],
+            'items'              => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+            'coupon_code'        => ['nullable', 'string', 'max:50'],
+            'payment_method'     => ['required', Rule::enum(PaymentMethod::class)],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.required'     => 'O pedido deve conter ao menos um item.',
+            'items.*.product_id' => 'Produto inválido na posição :index.',
+        ];
+    }
+
+    public function prepareForValidation(): void
+    {
+        $this->merge([
+            'coupon_code' => strtoupper((string) ($this->coupon_code ?? '')),
+        ]);
+    }
+}
+```
+
+## Regras
+
+- Classe `final`
+- Sempre implemente `authorize()` com verificação real via Policy — nunca retorne `true` fixo em produção
+- Use **array syntax** nas rules — nunca pipe string (`'required|string'`)
+- Prefira `Rule::` facade: `Rule::unique`, `Rule::enum`, `Rule::in`, `Rule::exists`
+- `prepareForValidation()` apenas para normalização de entrada (uppercase, trim, cast de tipo)
+- Adicione `messages()` apenas quando a mensagem padrão não tiver contexto de negócio
+- Crie um Request por operação: `StoreOrderRequest`, `UpdateOrderRequest`, `FilterOrderRequest`
+- Organize em subpastas por domínio: `Requests/Order/StoreOrderRequest.php`
+
+## Anti-Patterns
+
+```php
+// ❌ Validação no controller
+$request->validate([...]);
+
+// ❌ authorize() sempre true
+public function authorize(): bool {
+    return true;
+}
+
+// ❌ Pipe syntax nas rules
+'status' => 'required|string|in:active,inactive',
+
+// ❌ Um único Request para criar e atualizar
+class OrderRequest extends FormRequest { ... } // separe em Store e Update
+
+// ❌ Lógica de negócio no prepareForValidation
+public function prepareForValidation(): void {
+    $order = Order::find($this->order_id); // nunca — só normalização
+}
+```

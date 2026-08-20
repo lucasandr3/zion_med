@@ -1,0 +1,105 @@
+---
+description: Padrão para Actions em projetos Laravel API
+globs: app/Actions/**/*.php
+alwaysApply: false
+---
+
+# Actions — Operações Atômicas
+
+Actions encapsulam uma única operação de negócio. Use quando a lógica é reutilizada em múltiplos contextos (API + Console + Jobs) ou quando o Service ficaria grande demais.
+
+## Estrutura Obrigatória
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Order;
+
+use App\DTOs\Order\CreateOrderDTO;
+use App\Events\Order\OrderCreated;
+use App\Exceptions\Domain\BusinessException;
+use App\Models\Order;
+use App\ValueObjects\Money;
+use Illuminate\Support\Facades\DB;
+
+final class CreateOrderAction
+{
+    public function __construct(
+        private readonly StockService    $stockService,
+        private readonly DiscountService $discountService,
+    ) {}
+
+    public function execute(CreateOrderDTO $dto): Order
+    {
+        return DB::transaction(function () use ($dto): Order {
+            $this->stockService->ensureAvailability($dto->items);
+
+            $order = Order::create([
+                'customer_id'    => $dto->customerId,
+                'payment_method' => $dto->paymentMethod,
+                'status'         => OrderStatus::Pending,
+                'total'          => 0,
+            ]);
+
+            $order->items()->createMany($dto->items);
+
+            $total = $this->resolveTotal($order, $dto);
+
+            $order->update(['total' => $total->toCents()]);
+
+            OrderCreated::dispatch($order);
+
+            return $order->fresh(['customer', 'items']);
+        });
+    }
+
+    private function resolveTotal(Order $order, CreateOrderDTO $dto): Money
+    {
+        $total = $this->calculateTotal($order);
+
+        if ($dto->couponCode !== null) {
+            return $this->discountService->apply($order, $dto->couponCode, $total);
+        }
+
+        return $total;
+    }
+}
+```
+
+## Quando usar Action vs Service
+
+| Cenário | Use |
+|---|---|
+| Lógica reutilizada só na API | **Service** |
+| Lógica reutilizada em API + Jobs + Console | **Action** |
+| Operação simples e isolada | **Action** |
+| Conjunto de operações relacionadas (CRUD) | **Service** |
+
+## Regras
+
+- Classe `final`, método público único: `execute()`
+- Recebe **DTO** como parâmetro — nunca array cru
+- Retorna o resultado da operação — nunca `void` exceto quando realmente nada é retornado
+- Use `DB::transaction()` para múltiplas escritas
+- Dispare **Events** para efeitos colaterais
+- Lance exceções de domínio em vez de retornar null/false
+
+## Anti-Patterns
+
+```php
+// ❌ Múltiplos métodos públicos (vira um Service)
+final class OrderAction {
+    public function create(CreateOrderDTO $dto): Order { ... }
+    public function update(UpdateOrderDTO $dto): Order { ... } // crie UpdateOrderAction
+}
+
+// ❌ Array cru como parâmetro
+public function execute(array $data): Order { ... }
+
+// ❌ Action com estado
+final class CreateOrderAction {
+    private Order $order; // nunca
+}
+```
