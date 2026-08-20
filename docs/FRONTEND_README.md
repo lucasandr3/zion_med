@@ -70,3 +70,12 @@ Manter credenciais apenas em arquivos locais ignorados (ex.: `.env.test.local`) 
 
 - OpenAPI/Scramble: ver rota de documentação configurada no backend (`config/scramble.php`).
 - Coleção Postman: `postman/Gestgo_API.postman_collection.json` e ambiente `postman/Gestgo_API.postman_environment.json`.
+
+## Roadmaps (Angular 21 + zoneless)
+
+O SPA usa **Angular 21** com **change detection zoneless**. Isso quase não muda contratos REST, mas muda o consumo no front (signals / `resource`) e pede alinhamento das rules Laravel ao envelope de erro **flat** real.
+
+| Doc | Onde |
+|-----|------|
+| Modernização API + regras | [`ROADMAP_MODERNIZACAO_API.md`](./ROADMAP_MODERNIZACAO_API.md) |
+| Zoneless + signals (front) | no repo Angular: `docs/ROADMAP_ZONELESS_SIGNALS.md` |
