@@ -79,3 +79,4 @@ O SPA usa **Angular 21** com **change detection zoneless**. Isso quase não muda
 |-----|------|
 | Modernização API + regras | [`ROADMAP_MODERNIZACAO_API.md`](./ROADMAP_MODERNIZACAO_API.md) |
 | Zoneless + signals (front) | no repo Angular: `docs/ROADMAP_ZONELESS_SIGNALS.md` |
+| Gap-list fluxo paciente (consentimento/PDF) | [`GAP_FLUXO_PACIENTE_CONSENTIMENTO.md`](./GAP_FLUXO_PACIENTE_CONSENTIMENTO.md) — P0 feito (2026-08-21); resta R1 e-mail clínica |

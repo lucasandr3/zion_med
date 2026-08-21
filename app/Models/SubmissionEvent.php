@@ -44,7 +44,9 @@ class SubmissionEvent extends Model
             'rejected' => 'Reprovado',
             'revoked' => 'Consentimento revogado',
             'reconsent_requested' => 'Reconsentimento solicitado',
-            'professional_explained' => 'Profissional declarou ter explicado',
+            'patient_copy_token_issued' => 'Token de cópia do paciente emitido',
+            'patient_copy_emailed' => 'Cópia enviada por e-mail ao paciente',
+            'patient_copy_downloaded' => 'Paciente baixou a cópia',
             default => $this->type,
         };
     }

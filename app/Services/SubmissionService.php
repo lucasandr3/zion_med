@@ -28,6 +28,9 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Jobs\GenerateSubmissionPdfJob;
+use App\Models\Person;
+use App\Services\PatientCopyService;
 use App\Services\Submissions\SubmissionPersistenceService;
 use App\Services\Submissions\SubmissionPersonSyncService;
 use App\Services\Submissions\SubmissionSignatureService;
@@ -44,7 +47,83 @@ class SubmissionService
         protected SubmissionSignatureService $signatureService,
         protected SubmissionPersonSyncService $personSyncService,
         protected SignatureFieldResolver $signatureFieldResolver,
+        protected PatientCopyService $patientCopyService,
     ) {}
+
+    /**
+     * Emite token de cópia do paciente, persiste PDF, notifica clínica (com anexo) e paciente.
+     *
+     * @return array{patient_download_token: string, patient_download_url: string, patient_download_expires_at: string|null}
+     */
+    public function finalizePublicCopyAndPdf(FormSubmission $submission): array
+    {
+        $submission->loadMissing(['template', 'organization']);
+
+        try {
+            app(PdfService::class)->persistSubmissionPdf($submission);
+        } catch (\Throwable $e) {
+            report($e);
+            GenerateSubmissionPdfJob::dispatch($submission->id, true);
+
+            $copy = $this->patientCopyService->issueAndNotify($submission);
+
+            return $copy;
+        }
+
+        $this->sendClinicNotificationWithPdf($submission->fresh());
+        $copy = $this->patientCopyService->issueAndNotify($submission);
+
+        return $copy;
+    }
+
+    /**
+     * Notifica a clínica com o PDF do protocolo anexado (quando disponível).
+     */
+    public function sendClinicNotificationWithPdf(FormSubmission $submission): void
+    {
+        $this->sendNotificationEmail($submission, attachPdf: true);
+    }
+
+    protected function sendNotificationEmail(FormSubmission $submission, bool $attachPdf = false): void
+    {
+        $clinic = $submission->organization ?? $submission->clinic;
+        $email = $clinic->notification_email ?? null;
+        if (! $email) {
+            return;
+        }
+        try {
+            $brand = (string) (config('mail.branding.product_name') ?: config('asaas.product_name') ?: config('app.name'));
+            $pdfContent = null;
+            if ($attachPdf) {
+                try {
+                    $pdfContent = app(PdfService::class)->getSubmissionPdfContent($submission);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+            Mail::send(
+                'emails.protocol-new',
+                MailBrand::with([
+                    'emailTitle' => 'Novo protocolo',
+                    'protocolNumber' => $submission->protocol_number,
+                    'templateName' => $submission->template->name,
+                    'submitterName' => $submission->submitter_name,
+                    'dashboardUrl' => FrontendUrl::protocoloDetalhe($submission),
+                    'pdfAttached' => $pdfContent !== null,
+                ]),
+                function ($message) use ($email, $submission, $brand, $pdfContent) {
+                    $message->to($email)
+                        ->subject("{$brand} — novo protocolo: {$submission->protocol_number}");
+                    if (is_string($pdfContent) && $pdfContent !== '') {
+                        $filename = 'protocolo-'.($submission->protocol_number ?? $submission->id).'.pdf';
+                        $message->attachData($pdfContent, $filename, ['mime' => 'application/pdf']);
+                    }
+                }
+            );
+        } catch (\Throwable) {
+            // Log e continuar sem falhar o fluxo
+        }
+    }
 
     /**
      * @param  array<string, string>  $signatures  field_key => base64 image
@@ -109,7 +188,7 @@ class SubmissionService
                 $template,
             );
 
-            $this->attachClinicalDefensibilityMeta($submission, $template, $data);
+            $this->attachClinicalDefensibilityMeta($submission, $template, $data, $personId);
 
             Event::dispatch(new AuditEvent('submission.created', FormSubmission::class, $submission->id, [
                 'protocol' => $submission->protocol_number,
@@ -139,7 +218,7 @@ class SubmissionService
                 }
             }
 
-            $this->sendNotificationEmail($submission);
+            // E-mail da clínica com PDF sai em finalizePublicCopyAndPdf (após persistir o artefato).
 
             return $submission;
         });
@@ -177,34 +256,6 @@ class SubmissionService
         }
 
         return $submission;
-    }
-
-    protected function sendNotificationEmail(FormSubmission $submission): void
-    {
-        $clinic = $submission->organization ?? $submission->clinic;
-        $email = $clinic->notification_email;
-        if (! $email) {
-            return;
-        }
-        try {
-            $brand = (string) (config('mail.branding.product_name') ?: config('asaas.product_name') ?: config('app.name'));
-            Mail::send(
-                'emails.protocol-new',
-                MailBrand::with([
-                    'emailTitle' => 'Novo protocolo',
-                    'protocolNumber' => $submission->protocol_number,
-                    'templateName' => $submission->template->name,
-                    'submitterName' => $submission->submitter_name,
-                    'dashboardUrl' => FrontendUrl::protocoloDetalhe($submission),
-                ]),
-                function ($message) use ($email, $submission, $brand) {
-                    $message->to($email)
-                        ->subject("{$brand} — novo protocolo: {$submission->protocol_number}");
-                }
-            );
-        } catch (\Throwable) {
-            // Log e continuar sem falhar o fluxo
-        }
     }
 
     public function approve(FormSubmission $submission, string $status, ?string $comment, int $userId, ?Request $request = null): void
@@ -358,8 +409,12 @@ class SubmissionService
     /**
      * @param  array<string, mixed>  $data
      */
-    private function attachClinicalDefensibilityMeta(FormSubmission $submission, FormTemplate $template, array $data): void
-    {
+    private function attachClinicalDefensibilityMeta(
+        FormSubmission $submission,
+        FormTemplate $template,
+        array $data,
+        ?int $personId = null,
+    ): void {
         $kind = $template->document_kind ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
         $actors = is_array($data['_actors'] ?? null) ? $data['_actors'] : [];
         $clinical = [
@@ -388,9 +443,60 @@ class SubmissionService
                 : null,
         ];
 
+        $identity = $this->buildIdentitySnapshot($submission, $template, $data, $personId);
+
         $snapshot = $submission->fresh()->document_snapshot ?? [];
         $snapshot['clinical'] = $clinical;
+        if ($identity !== null) {
+            $snapshot['identity'] = $identity;
+        }
         $submission->update(['document_snapshot' => $snapshot]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    private function buildIdentitySnapshot(
+        FormSubmission $submission,
+        FormTemplate $template,
+        array $data,
+        ?int $personId,
+    ): ?array {
+        $resolvedPersonId = $personId ?: $submission->person_id;
+        $person = $resolvedPersonId
+            ? Person::withoutGlobalScopes()->find($resolvedPersonId)
+            : null;
+
+        $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
+        $cpfDigits = preg_replace('/\D+/', '', (string) ($data['_person_cpf'] ?? ($person?->cpf ?? ''))) ?: '';
+        $fullName = $person?->name
+            ?: trim((string) ($data['_submitter_name'] ?? ''))
+            ?: null;
+        $birthDate = optional($person?->birth_date)->format('Y-m-d')
+            ?: (isset($data['_person_birth_date']) ? (string) $data['_person_birth_date'] : null);
+
+        if (! $fullName && $cpfDigits === '' && ! $birthDate) {
+            return null;
+        }
+
+        $masked = $cpfDigits !== '' && strlen($cpfDigits) === 11
+            ? substr($cpfDigits, 0, 3).'.***.***-'.substr($cpfDigits, -2)
+            : null;
+
+        return [
+            'full_name' => $fullName,
+            'cpf' => strlen($cpfDigits) === 11 ? $cpfDigits : null,
+            'cpf_masked' => $masked,
+            'birth_date' => $birthDate,
+            'person_id' => $person?->id,
+            'person_code' => $person?->code ?? ($data['_person_code'] ?? null),
+            'name_confirmed' => ! empty($data['_person_name_confirmed']),
+            'verification_mode' => $template->public_require_person_link ? $mode : null,
+            'verified_at' => ! empty($data['_person_name_confirmed'])
+                ? now()->toIso8601String()
+                : null,
+        ];
     }
 
     /**

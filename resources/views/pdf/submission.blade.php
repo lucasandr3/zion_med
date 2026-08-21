@@ -38,6 +38,87 @@
         <p>Protocolo: {{ $submission->protocol_number ?? $submission->id }} | Data: {{ $submission->submitted_at?->format('d/m/Y H:i') ?? $submission->created_at->format('d/m/Y H:i') }}</p>
     </div>
 
+    @php
+        $identity = $submission->document_snapshot['identity'] ?? null;
+        $clinical = $submission->document_snapshot['clinical'] ?? null;
+    @endphp
+
+    @if(is_array($identity) && (!empty($identity['full_name']) || !empty($identity['cpf']) || !empty($identity['birth_date'])))
+        <p style="margin:0 0 8px 0;font-size:12px;font-weight:bold;">Identificação do paciente</p>
+        <table>
+            <tbody>
+                @if(!empty($identity['full_name']))
+                <tr>
+                    <td style="width:35%"><strong>Nome</strong></td>
+                    <td>{{ $identity['full_name'] }}@if(!empty($identity['name_confirmed'])) <span style="color:#64748b;font-size:9px;">(confirmado)</span>@endif</td>
+                </tr>
+                @endif
+                @if(!empty($identity['cpf']))
+                <tr>
+                    <td><strong>CPF</strong></td>
+                    <td>
+                        {{ substr($identity['cpf'], 0, 3) }}.{{ substr($identity['cpf'], 3, 3) }}.{{ substr($identity['cpf'], 6, 3) }}-{{ substr($identity['cpf'], 9, 2) }}
+                    </td>
+                </tr>
+                @elseif(!empty($identity['cpf_masked']))
+                <tr>
+                    <td><strong>CPF</strong></td>
+                    <td>{{ $identity['cpf_masked'] }}</td>
+                </tr>
+                @endif
+                @if(!empty($identity['birth_date']))
+                <tr>
+                    <td><strong>Data de nascimento</strong></td>
+                    <td>{{ \Carbon\Carbon::parse($identity['birth_date'])->format('d/m/Y') }}</td>
+                </tr>
+                @endif
+                @if(!empty($identity['verified_at']))
+                <tr>
+                    <td><strong>Identidade verificada em</strong></td>
+                    <td>{{ \Carbon\Carbon::parse($identity['verified_at'])->format('d/m/Y H:i') }}</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+    @endif
+
+    @if(is_array($clinical) && (!empty($clinical['comprehension_ack']) || !empty($clinical['privacy_ack'])))
+        <p style="margin:16px 0 8px 0;font-size:12px;font-weight:bold;">Confirmações</p>
+        <table>
+            <tbody>
+                @if(!empty($clinical['comprehension_ack']))
+                <tr>
+                    <td style="width:35%"><strong>Entendimento do termo</strong></td>
+                    <td>
+                        Confirmado
+                        @if(!empty($clinical['comprehension_ack_at']))
+                            em {{ \Carbon\Carbon::parse($clinical['comprehension_ack_at'])->format('d/m/Y H:i') }}
+                        @endif
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($clinical['term_scrolled_at']))
+                <tr>
+                    <td><strong>Leitura do termo (scroll)</strong></td>
+                    <td>{{ \Carbon\Carbon::parse($clinical['term_scrolled_at'])->format('d/m/Y H:i') }}</td>
+                </tr>
+                @endif
+                @if(!empty($clinical['privacy_ack']))
+                <tr>
+                    <td><strong>Aceite de privacidade / termos</strong></td>
+                    <td>Confirmado</td>
+                </tr>
+                @endif
+                @if(!empty($clinical['comprehension_quiz_passed']))
+                <tr>
+                    <td><strong>Quiz de compreensão</strong></td>
+                    <td>Aprovado</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+    @endif
+
     <table>
         <thead>
             <tr>

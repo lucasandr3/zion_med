@@ -106,8 +106,29 @@ Front: `src/app/core/utils/api-error.util.ts` (envelope **flat**).
 - `SendTransactionalEmailJob`
 - `DispatchWebhookJob`
 - `SendDemonstrationRequestN8nJob`
+- **`GenerateSubmissionPdfJob`** — após submit público: grava PDF no MinIO (`pdf_disk_path`, `pdf_sha256`)
 
-PDF / dossiê / CSV em geral ainda são **síncronos no request** (stream).
+Download paciente (público, token 72h): `GET /api/v1/formulario-publico/copia/{copyToken}`  
+Serviço: `PatientCopyService` + e-mail `emails/protocol-patient-copy`.
+
+PDF on-demand autenticado continua em `GET /api/v1/protocols/{id}/pdf`.
+
+---
+
+## 3.6 Fluxo paciente / consentimento (P0 fechado)
+
+Ver gap-list: [`GAP_FLUXO_PACIENTE_CONSENTIMENTO.md`](./GAP_FLUXO_PACIENTE_CONSENTIMENTO.md).
+
+| Entrega | Status |
+|---------|--------|
+| Gate Opção B (`_person_name_confirmed`) | Feito |
+| Snapshot `identity` + seções no PDF | Feito |
+| Cópia paciente (token + e-mail) | Feito |
+| Publish consent exige `person_link` + signature | Feito |
+| Job PDF persistido | Feito |
+| Anexo/link PDF no e-mail da clínica | **Pendente (R1)** |
+
+**Ops:** `php artisan migrate` + `queue:work`.
 
 ---
 
@@ -144,9 +165,10 @@ Arquivo base: `.cursor/rules/laravel-api-base.mdc` (e regras irmãs).
 
 ### P2 — Async / trabalho longo
 
-1. Jobs para PDF/dossiê/CSV pesados + endpoint de status (ou signed URL pronta)  
-2. Status WhatsApp/Evolution estável (poll documentado; SSE/WS só se o poll do front crescer)  
-3. Observabilidade de webhooks (retry já existe em parte)  
+1. ~~Jobs para PDF de protocolo público~~ → **feito** (`GenerateSubmissionPdfJob`); falta R1 (e-mail clínica) e opcional status de job  
+2. Jobs para dossiê/CSV pesados + endpoint de status (ou signed URL pronta)  
+3. Status WhatsApp/Evolution estável (poll documentado; SSE/WS só se o poll do front crescer)  
+4. Observabilidade de webhooks (retry já existe em parte)  
 
 ### P3 — Arquitetura interna
 
@@ -177,7 +199,10 @@ Arquivo base: `.cursor/rules/laravel-api-base.mdc` (e regras irmãs).
 
 ### Fase 2 — Async & UX longa (1–2 meses)
 
-- [ ] Job + status (ou URL assinada) para exports pesados  
+- [x] Job PDF após submit público (`GenerateSubmissionPdfJob`)  
+- [ ] R1: anexar PDF ou link no `protocol-new` (clínica)  
+- [ ] R2: download clínica preferindo `pdf_disk_path`  
+- [ ] Job + status (ou URL assinada) para dossiê/CSV pesados  
 - [ ] Melhorar contrato Evolution (status/QR) para poll eficiente  
 - [ ] Avaliar SSE/WebSocket **somente** para badge de notificações + WhatsApp  
 
@@ -203,11 +228,12 @@ Arquivo base: `.cursor/rules/laravel-api-base.mdc` (e regras irmãs).
 | Badges no layout sem listar tudo | Usar / expor `unread_count` | P1 |
 | Listagens com `resource`/`toSignal` | Manter `data`+`meta` estável | — (já ok) |
 | Erros tipados no interceptor | Manter envelope flat; alinhar rules | P0 |
-| Formulário público / OTP | Sem mudança; idempotência ajuda | P1 |
+| Formulário público / OTP | Gate B + cópia paciente feitos; idempotência ainda ajuda | P1 |
 | WhatsApp QR na clínica | Status estável + poll eficiente | P2 |
-| PDF/dossiê sem travar UI | Job + status | P2 |
+| PDF protocolo sem travar submit | Job PDF **feito**; dossiê/CSV pesados ainda síncronos | P2 (resto) |
 | Tempo real de notificações | SSE/WS futuro | P3/Fase 4 |
 | Sessão longa sem 401 duro | Refresh token (opcional) | Fase 4 |
+| E-mail clínica com PDF | R1 no gap-list | P1 produto |
 
 ---
 
@@ -225,8 +251,9 @@ Arquivo base: `.cursor/rules/laravel-api-base.mdc` (e regras irmãs).
 1. Rules Cursor batem com Laravel 12 + erro flat.  
 2. Front usa contagem leve de notificações (sem listar tudo no shell).  
 3. Rotas críticas com idempotência documentada.  
-4. Exports pesados não dependem só de request longo (plano Fase 2 iniciado ou feito).  
-5. `docs/FRONTEND_README.md` e este roadmap apontam um para o outro e para o roadmap zoneless do front.
+4. PDF de protocolo público persistido via job (**feito**); dossiê/CSV pesados com plano async.  
+5. Fluxo paciente P0 (gate B + cópia) documentado e migrado em staging/prod.  
+6. `docs/FRONTEND_README.md` e este roadmap apontam um para o outro e para o roadmap zoneless do front.
 
 ---
 
@@ -236,3 +263,5 @@ Arquivo base: `.cursor/rules/laravel-api-base.mdc` (e regras irmãs).
 |------|--------|
 | 2026-08-20 | Front em Angular 21 + zoneless |
 | 2026-08-20 | Este roadmap criado (API + regras) |
+| 2026-08-21 | P0 fluxo paciente (gate B, identity, cópia PDF, job) — ver gap-list |
+| 2026-08-21 | Roadmap ajustado: job PDF marcado feito; R1/R2 no backlog |

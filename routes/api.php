@@ -103,6 +103,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->where('code', '[A-Za-z0-9\-]{4,64}')
         ->middleware('throttle:60,1')
         ->name('api.v1.verificar');
+    Route::get('/formulario-publico/copia/{copyToken}', [PublicFormApiController::class, 'downloadPatientCopy'])
+        ->where('copyToken', '[A-Za-z0-9]{16,64}')
+        ->middleware('throttle:30,1')
+        ->name('api.v1.formulario-publico.copia');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
     Route::get('/formulario-publico/{token}/feegow/disponibilidade', [PublicFormApiController::class, 'feegowAvailability'])->name('api.v1.formulario-publico.feegow.disponibilidade');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');

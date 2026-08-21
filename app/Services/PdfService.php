@@ -6,21 +6,84 @@ use App\Models\FormSubmission;
 use App\Support\EsteticaStaffFieldRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class PdfService
 {
     public function streamSubmissionPdf(FormSubmission $submission): \Illuminate\Http\Response
     {
-        $pdf = $this->buildPdf($submission);
+        $stored = $this->readStoredPdf($submission);
         $filename = 'protocolo-' . ($submission->protocol_number ?? $submission->id) . '.pdf';
+
+        if ($stored !== null) {
+            return response($stored, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            ]);
+        }
+
+        $pdf = $this->buildPdf($submission);
 
         return $pdf->stream($filename);
     }
 
-    /** Retorna o conteúdo binário do PDF para inclusão em ZIP. */
+    /** Retorna o conteúdo binário do PDF para inclusão em ZIP / e-mail. */
     public function getSubmissionPdfContent(FormSubmission $submission): string
     {
+        $stored = $this->readStoredPdf($submission);
+        if ($stored !== null) {
+            return $stored;
+        }
+
         return $this->buildPdf($submission)->output();
+    }
+
+    /**
+     * Persiste o PDF no storage e atualiza metadados na submission.
+     */
+    public function persistSubmissionPdf(FormSubmission $submission): string
+    {
+        $content = $this->buildPdf($submission)->output();
+        $sha = hash('sha256', $content);
+        $orgId = (int) ($submission->organization_id ?? $submission->clinic_id ?? 0);
+        $path = sprintf(
+            'org-%d/protocols/%s/protocolo-%s.pdf',
+            $orgId,
+            $submission->id,
+            $submission->protocol_number ?? $submission->id
+        );
+
+        Storage::disk('minio_submissions')->put($path, $content);
+
+        $submission->update([
+            'pdf_disk_path' => $path,
+            'pdf_sha256' => $sha,
+            'pdf_generated_at' => now(),
+        ]);
+
+        return $content;
+    }
+
+    private function readStoredPdf(FormSubmission $submission): ?string
+    {
+        $path = $submission->pdf_disk_path;
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('minio_submissions');
+            if (! $disk->exists($path)) {
+                return null;
+            }
+            $bytes = $disk->get($path);
+
+            return is_string($bytes) && $bytes !== '' ? $bytes : null;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
     }
 
     private function buildPdf(FormSubmission $submission)

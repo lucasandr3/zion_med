@@ -156,7 +156,10 @@ class TemplateLibraryCatalog
             'library_reviewed_at' => $review['reviewed_at'],
             'is_active' => true,
             'public_enabled' => false,
-            'public_require_person_link' => false,
+            'public_require_person_link' => (($definition['document_kind'] ?? '') === 'consentimento'
+                || ($definition['category'] ?? '') === 'consentimento'
+                || str_contains(strtolower($definition['name'] ?? ''), 'tcle')),
+            'public_person_link_mode' => 'cpf',
             'created_by' => $userId,
         ]);
 

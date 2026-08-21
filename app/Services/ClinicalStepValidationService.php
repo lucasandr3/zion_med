@@ -75,6 +75,14 @@ class ClinicalStepValidationService
             ];
         }
 
+        if (! $template->public_require_person_link) {
+            $issues[] = [
+                'level' => 'error',
+                'code' => 'consent_requires_person_link',
+                'message' => 'Consentimentos públicos devem exigir identificação do paciente (CPF ou código + data de nascimento) antes do preenchimento.',
+            ];
+        }
+
         $hasAuthorization = $template->fields->contains(function ($f) {
             $blob = mb_strtolower(($f->label ?? '').' '.($f->name_key ?? ''));
 
@@ -124,6 +132,7 @@ class ClinicalStepValidationService
             'missing_clinical_step_'.ClinicalStepKind::ASSINATURAS,
             'consent_missing_patient_disclosure',
             'missing_signature_field',
+            'consent_requires_person_link',
             'missing_authorization_checkbox',
         ];
     }

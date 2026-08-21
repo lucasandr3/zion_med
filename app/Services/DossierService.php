@@ -52,6 +52,15 @@ class DossierService
                 ?? null,
             'document_hash' => $submission->document_hash,
             'document_snapshot_hash' => $submission->document_snapshot_hash,
+            'pdf_sha256' => $submission->pdf_sha256,
+            'pdf_generated_at' => $submission->pdf_generated_at?->toIso8601String(),
+            'identity' => $submission->document_snapshot['identity'] ?? null,
+            'clinical' => $submission->document_snapshot['clinical'] ?? null,
+            'patient_copy' => [
+                'token_expires_at' => $submission->patient_download_token_expires_at?->toIso8601String(),
+                'downloaded_at' => $submission->patient_copy_downloaded_at?->toIso8601String(),
+                'emailed_at' => $submission->patient_copy_emailed_at?->toIso8601String(),
+            ],
             'fields_snapshot' => $submission->document_snapshot['fields_snapshot']
                 ?? $submission->templateVersion?->fields_snapshot
                 ?? [],

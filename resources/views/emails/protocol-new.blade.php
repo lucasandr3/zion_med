@@ -24,4 +24,7 @@
         <a href="{{ $dashboardUrl }}" style="display:inline-block;padding:14px 28px;background:{{ $brandPrimary }};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Abrir no sistema</a>
     </p>
     @endif
+    @if(!empty($pdfAttached))
+    <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;">O PDF do protocolo segue em anexo neste e-mail.</p>
+    @endif
 @endsection

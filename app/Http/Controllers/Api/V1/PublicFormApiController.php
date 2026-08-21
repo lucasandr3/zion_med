@@ -13,6 +13,8 @@ use App\Services\FieldVisibilityService;
 use App\Services\EvolutionGoClient;
 use App\Services\FeegowClient;
 use App\Services\OtpService;
+use App\Services\PatientCopyService;
+use App\Services\PdfService;
 use App\Services\PersonConsentService;
 use App\Services\SignatureFieldResolver;
 use App\Services\SubmissionService;
@@ -21,6 +23,7 @@ use App\Support\PersonPiiHasher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -40,6 +43,8 @@ class PublicFormApiController extends Controller
         private FieldVisibilityService $fieldVisibilityService,
         private PersonConsentService $personConsentService,
         private SignatureFieldResolver $signatureFieldResolver,
+        private PatientCopyService $patientCopyService,
+        private PdfService $pdfService,
     ) {}
 
     /**
@@ -362,6 +367,7 @@ class PublicFormApiController extends Controller
             '_person_code' => ['nullable', 'string', 'max:32'],
             '_person_birth_date' => ['nullable', 'date'],
             '_person_cpf' => ['nullable', 'string', 'max:20'],
+            '_person_name_confirmed' => ['nullable', 'boolean'],
             '_comprehension_ack' => ['nullable', 'boolean'],
             '_comprehension_ack_at' => ['nullable', 'date'],
             '_assisted_mode' => ['nullable', 'boolean'],
@@ -411,11 +417,12 @@ class PublicFormApiController extends Controller
         }
         if ($template->public_require_person_link) {
             $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
+            $rules['_person_name_confirmed'] = ['accepted'];
+            $rules['_person_birth_date'] = ['required', 'date'];
             if ($mode === 'cpf') {
                 $rules['_person_cpf'] = ['required', 'string', new Cpf];
             } else {
                 $rules['_person_code'] = ['required', 'string', 'max:32'];
-                $rules['_person_birth_date'] = ['required', 'date'];
             }
         }
         $submitValues = $this->fieldVisibilityService->buildSubmitValues($request->all());
@@ -477,7 +484,13 @@ class PublicFormApiController extends Controller
 
         $personId = null;
         if ($template->public_require_person_link) {
+            if (! $request->boolean('_person_name_confirmed')) {
+                throw ValidationException::withMessages([
+                    '_person_name_confirmed' => ['Confirme que você é a pessoa identificada para continuar.'],
+                ]);
+            }
             $mode = ($template->public_person_link_mode === 'cpf') ? 'cpf' : 'code';
+            $birthDate = (string) ($data['_person_birth_date'] ?? '');
             if ($mode === 'cpf') {
                 $cpfDigits = preg_replace('/\D+/', '', (string) ($data['_person_cpf'] ?? '')) ?? '';
                 $person = $this->findPersonByCpfForTemplate($template, $cpfDigits);
@@ -486,12 +499,18 @@ class PublicFormApiController extends Controller
                         '_person_cpf' => ['CPF não autorizado para este formulário.'],
                     ]);
                 }
+                $expectedBirth = optional($person->birth_date)->format('Y-m-d');
+                if (! $expectedBirth || $expectedBirth !== $birthDate) {
+                    throw ValidationException::withMessages([
+                        '_person_birth_date' => ['CPF ou data de nascimento não conferem.'],
+                    ]);
+                }
                 $personId = $person->id;
             } else {
                 $person = $this->findPersonForTemplate(
                     $template,
                     (string) ($data['_person_code'] ?? ''),
-                    (string) ($data['_person_birth_date'] ?? ''),
+                    $birthDate,
                 );
                 if (! $person || $person->status !== 'active') {
                     throw ValidationException::withMessages([
@@ -500,6 +519,7 @@ class PublicFormApiController extends Controller
                 }
                 $personId = $person->id;
             }
+            $data['_person_name_confirmed'] = true;
         }
 
         $signatures = $request->input('_signature', []);
@@ -591,6 +611,7 @@ class PublicFormApiController extends Controller
             }
         }
         $submission = $this->submissionService->createFromPublicForm($template, $data, $files, $signatures, $request, $personId);
+        $patientCopy = $this->submissionService->finalizePublicCopyAndPdf($submission);
 
         $feegowResult = $this->tryCreateFeegowAppointmentFromPublicForm(
             $organization,
@@ -603,9 +624,33 @@ class PublicFormApiController extends Controller
             'data' => [
                 'message' => 'Formulário enviado com sucesso.',
                 'protocol_number' => $submission->protocol_number,
+                'patient_download_token' => $patientCopy['patient_download_token'],
+                'patient_download_url' => $patientCopy['patient_download_url'],
+                'patient_download_expires_at' => $patientCopy['patient_download_expires_at'],
                 'feegow' => $feegowResult,
             ],
         ], 201);
+    }
+
+    /**
+     * Download público da cópia do paciente (token de curta duração emitido no submit).
+     */
+    public function downloadPatientCopy(string $copyToken): Response|JsonResponse
+    {
+        $key = 'public-form-copy:'.sha1($copyToken);
+        if (RateLimiter::tooManyAttempts($key, 30)) {
+            return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
+        }
+        RateLimiter::hit($key, 120);
+
+        $submission = $this->patientCopyService->findValidByToken($copyToken);
+        if (! $submission) {
+            return response()->json(['message' => 'Link de download inválido ou expirado.'], 404);
+        }
+
+        $this->patientCopyService->markDownloaded($submission);
+
+        return $this->pdfService->streamSubmissionPdf($submission);
     }
 
     /**
