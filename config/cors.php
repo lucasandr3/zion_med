@@ -1,9 +1,6 @@
 <?php
 
 $defaultOrigins = [
-    'http://localhost:4200',
-    'http://127.0.0.1:4200',
-    'http://zion_med.test',
     'https://app.gestgo.com.br',
     'https://gestgo.com.br',
     'https://homolog.gestgo.com.br',
