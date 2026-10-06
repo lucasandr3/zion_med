@@ -21,6 +21,10 @@ class Organization extends Model
             if ($organization->theme === null || $organization->theme === '') {
                 $organization->theme = ThemeService::DEFAULT_THEME;
             }
+            // R5: OTP reforçado como default recomendado para novas clínicas.
+            if ($organization->signing_security_level === null || $organization->signing_security_level === '') {
+                $organization->signing_security_level = 'reinforced';
+            }
         });
 
         static::created(function (Organization $organization): void {

@@ -3,22 +3,20 @@
 $defaultOrigins = [
     'http://localhost:4200',
     'http://127.0.0.1:4200',
+    'http://localhost:57815',
     'http://zion_med.test',
     'https://app.gestgo.com.br',
     'https://gestgo.com.br',
     'https://homolog.gestgo.com.br',
-    'https://api-homolog.gestgo.com.br'
+    'https://api-homolog.gestgo.com.br',
 ];
 
-$configuredOrigins = [
-    'http://localhost:4200',
-    'http://127.0.0.1:4200',
-    'http://zion_med.test',
-    'https://app.gestgo.com.br',
-    'https://gestgo.com.br',
-    'https://homolog.gestgo.com.br',
-    'https://api-homolog.gestgo.com.br'
-];
+$fromEnv = array_values(array_filter(array_map(
+    'trim',
+    explode(',', (string) env('CORS_ALLOWED_ORIGINS', '')),
+)));
+
+$configuredOrigins = $fromEnv !== [] ? $fromEnv : $defaultOrigins;
 
 return [
 
@@ -28,7 +26,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Origens do SPA Angular (dev e produção). Ajuste CORS_ALLOWED_ORIGINS no .env
-    | (separado por vírgula) ao publicar no Easy Panel ou em novos domínios.
+    | (separado por vírgula) ao publicar em novos domínios.
     |
     */
 

@@ -98,10 +98,12 @@ class PatientCopyService
         return null;
     }
 
-    public function sendPatientCopyEmail(FormSubmission $submission, string $downloadToken): void
+    public function sendPatientCopyEmail(FormSubmission $submission, string $downloadToken, ?string $overrideEmail = null): void
     {
-        $email = $this->resolvePatientEmail($submission);
-        if (! $email) {
+        $email = $overrideEmail
+            ? strtolower(trim($overrideEmail))
+            : $this->resolvePatientEmail($submission);
+        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
@@ -126,7 +128,10 @@ class PatientCopyService
                         ->subject("{$brand} — cópia do protocolo {$submission->protocol_number}");
                 }
             );
-            $submission->update(['patient_copy_emailed_at' => now()]);
+            $submission->update([
+                'patient_copy_emailed_at' => now(),
+                'submitter_email' => $submission->submitter_email ?: $email,
+            ]);
 
             SubmissionEvent::create([
                 'form_submission_id' => $submission->id,
@@ -136,11 +141,43 @@ class PatientCopyService
                 'meta_json' => [
                     'email' => $email,
                     'emailed_at' => now()->toIso8601String(),
+                    'override' => $overrideEmail !== null,
                 ],
             ]);
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    /**
+     * Reenvia a cópia para um e-mail informado na tela de sucesso (R7).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function requestEmailDelivery(string $copyToken, string $email): array
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'message' => 'Informe um e-mail válido.'];
+        }
+
+        $submission = $this->findValidByToken($copyToken);
+        if (! $submission) {
+            return ['ok' => false, 'message' => 'Link de download inválido ou expirado.'];
+        }
+
+        if ($submission->patient_copy_emailed_at && $this->resolvePatientEmail($submission) === $email) {
+            return ['ok' => true, 'message' => 'O link já havia sido enviado para este e-mail.'];
+        }
+
+        $token = (string) $submission->patient_download_token;
+        $this->sendPatientCopyEmail($submission, $token, $email);
+
+        if (! $submission->fresh()?->patient_copy_emailed_at) {
+            return ['ok' => false, 'message' => 'Não foi possível enviar o e-mail. Tente novamente.'];
+        }
+
+        return ['ok' => true, 'message' => 'Enviamos o link da cópia para o e-mail informado.'];
     }
 
     /**

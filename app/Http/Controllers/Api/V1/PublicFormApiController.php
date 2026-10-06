@@ -620,6 +620,8 @@ class PublicFormApiController extends Controller
             $submission->id,
         );
 
+        $submission->refresh();
+
         return response()->json([
             'data' => [
                 'message' => 'Formulário enviado com sucesso.',
@@ -627,9 +629,36 @@ class PublicFormApiController extends Controller
                 'patient_download_token' => $patientCopy['patient_download_token'],
                 'patient_download_url' => $patientCopy['patient_download_url'],
                 'patient_download_expires_at' => $patientCopy['patient_download_expires_at'],
+                'patient_copy_emailed' => (bool) $submission->patient_copy_emailed_at,
                 'feegow' => $feegowResult,
             ],
         ], 201);
+    }
+
+    /**
+     * Envia (ou reenvia) o link da cópia do paciente para um e-mail informado na tela de sucesso.
+     */
+    public function emailPatientCopy(Request $request, string $copyToken): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $result = $this->patientCopyService->requestEmailDelivery($copyToken, (string) $validated['email']);
+
+        if (! $result['ok']) {
+            $status = str_contains($result['message'], 'inválido') || str_contains($result['message'], 'expirado')
+                ? 404
+                : 422;
+
+            return response()->json(['message' => $result['message']], $status);
+        }
+
+        return response()->json([
+            'data' => [
+                'message' => $result['message'],
+            ],
+        ]);
     }
 
     /**

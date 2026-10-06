@@ -62,6 +62,20 @@ class ComplianceReportService
             ? round(($revoked / $revocationDenominator) * 100, 1)
             : 0.0;
 
+        // R6: % de protocolos com cópia baixada pelo paciente (entre os que emitiram token).
+        $withPatientCopyToken = (clone $base)
+            ->whereNotNull('patient_download_token')
+            ->count();
+        $patientCopyDownloaded = (clone $base)
+            ->whereNotNull('patient_copy_downloaded_at')
+            ->count();
+        $patientCopyEmailed = (clone $base)
+            ->whereNotNull('patient_copy_emailed_at')
+            ->count();
+        $patientCopyDownloadRate = $withPatientCopyToken > 0
+            ? round(($patientCopyDownloaded / $withPatientCopyToken) * 100, 1)
+            : 0.0;
+
         return [
             'generated_at' => now()->toIso8601String(),
             'organization_id' => $organizationId,
@@ -75,6 +89,10 @@ class ComplianceReportService
                 'retention_anonymized' => (int) $retentionAnonymized,
                 'revocation_rate_percent' => $revocationRate,
                 'revocation_rate_denominator' => 'approved_rejected_revoked',
+                'patient_copy_token_issued' => (int) $withPatientCopyToken,
+                'patient_copy_downloaded' => (int) $patientCopyDownloaded,
+                'patient_copy_emailed' => (int) $patientCopyEmailed,
+                'patient_copy_download_rate_percent' => $patientCopyDownloadRate,
             ],
             'by_status' => [
                 'pending' => $pending,

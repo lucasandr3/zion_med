@@ -112,6 +112,41 @@ class PublicFormPatientCopyAndGateBTest extends TestCase
         );
     }
 
+    public function test_patient_copy_email_endpoint_sends_to_provided_address(): void
+    {
+        [$template, $person] = $this->makeCpfLinkedTemplate();
+        $person->update(['email' => null]);
+
+        $submit = $this->postJson("/api/v1/formulario-publico/{$template->public_token}/submit", [
+            '_submitter_name' => 'Teste',
+            '_person_cpf' => self::CPF,
+            '_person_birth_date' => '1990-05-10',
+            '_person_name_confirmed' => true,
+            // sem e-mail no submit
+        ]);
+
+        $submit->assertCreated();
+        $token = $submit->json('data.patient_download_token');
+        $this->assertNotEmpty($token);
+        $this->assertFalse((bool) $submit->json('data.patient_copy_emailed'));
+
+        $this->postJson("/api/v1/formulario-publico/copia/{$token}/email", [
+            'email' => 'novo@example.com',
+        ])->assertOk()
+            ->assertJsonPath('data.message', fn ($m) => is_string($m) && $m !== '');
+
+        $submission = FormSubmission::withoutGlobalScopes()
+            ->where('protocol_number', $submit->json('data.protocol_number'))
+            ->firstOrFail();
+
+        $this->assertNotNull($submission->patient_copy_emailed_at);
+        $this->assertSame('novo@example.com', strtolower((string) $submission->submitter_email));
+        $this->assertDatabaseHas('submission_events', [
+            'form_submission_id' => $submission->id,
+            'type' => 'patient_copy_emailed',
+        ]);
+    }
+
     public function test_patient_copy_token_rejects_invalid(): void
     {
         $this->getJson('/api/v1/formulario-publico/copia/'.str_repeat('z', 32))

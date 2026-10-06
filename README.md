@@ -146,20 +146,20 @@ ASAAS_PRODUCT_NAME=Gestgo
 
 Rotas sempre permitidas (mesmo com bloqueio): `/billing`, `/billing/*`, `/logout`, `/webhooks/asaas`, `/f/*` (formulário público).
 
-## Deploy em produção (Easy Panel)
+## Deploy em produção (VPS, sem Docker)
 
-O build usa **Dockerfile** + **Supervisor**. No arranque do container (entrypoint) o seguinte já roda de forma automática:
+A API roda na VPS (PHP-FPM + Nginx/Apache). Fila e agendador ficam no **Supervisor do host**.
+
+Guia: [`docs/SUPERVISOR_VPS.md`](docs/SUPERVISOR_VPS.md)
 
 | O quê | Como |
 |-------|------|
-| **Migrações** | `php artisan migrate --force` no entrypoint (single-instance). |
-| **Queue worker** | Processo `php artisan queue:work` via Supervisor (webhooks, jobs assíncronos). |
-| **Scheduler** | Loop a cada 60s `php artisan schedule:run` via Supervisor (ex.: `platform:notify-billing` diário). |
+| **Migrações** | `php artisan migrate --force` no deploy. |
+| **Queue worker** | `zion-med-queue` → `php artisan queue:work` (PDF, webhooks, e-mails). |
+| **Scheduler** | `zion-med-scheduler` → `php artisan schedule:work` (billing, lembretes, retenção, trials). |
 | **Webhook ASAAS** | Rota `POST /webhooks/asaas` excluída do CSRF em `bootstrap/app.php`. |
 
-No Easy Panel basta configurar as **variáveis de ambiente** de produção (APP_ENV=production, APP_DEBUG=false, APP_URL, DB_*, **REDIS_HOST** (serviço Redis no painel), **QUEUE_CONNECTION=redis**, **CACHE_STORE=redis**, ASAAS_* produção, MinIO, etc.) e fazer o deploy. A imagem Docker já inclui a extensão **phpredis**. Não é necessário rodar queue ou cron manualmente.
-
-Se usar mais de um container (réplicas), rode `migrate` apenas em um job de deploy e desative o `migrate` no entrypoint.
+No `.env` de produção (sem Redis, se for o caso): `QUEUE_CONNECTION=database`, `CACHE_STORE=database`. Depois: `php artisan config:cache` e `sudo supervisorctl restart zion-med-queue zion-med-scheduler`.
 
 ### Schema dump (B22 — squash parcial)
 
@@ -180,21 +180,20 @@ DB_CONNECTION=sqlite DB_DATABASE=storage/app/squash_temp.sqlite php artisan migr
 DB_CONNECTION=sqlite DB_DATABASE=storage/app/squash_temp.sqlite php artisan schema:dump
 ```
 
-### Checklist de deploy manual (EasyPanel)
+### Checklist de deploy manual (VPS)
 
 Antes de abrir tráfego ou após upgrade de versão:
 
-1. **Variáveis de ambiente** — `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `FRONTEND_URL`, `DB_*`, `REDIS_*`, `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`, ASAAS (produção), MinIO, `SANCTUM_EXPIRATION`.
-2. **Deploy / migrate** — o entrypoint roda `php artisan migrate --force`; em multi-réplica, rode migrate uma vez só no job de deploy.
-3. **Scheduler** — Supervisor já executa `schedule:run` a cada 60s (inclui `organizations:sync-expired-trials` de hora em hora).
-4. **Queue** — Supervisor já executa `queue:work`; confirme `QUEUE_CONNECTION=redis` e Redis acessível.
-5. **PII legada (uma vez por ambiente, se houver dados antigos)** — `php artisan people:encrypt-pii --dry-run` e depois `php artisan people:encrypt-pii`.
-6. **Smoke pós-deploy**
-   - `GET /up` ou healthcheck do container
+1. **Variáveis de ambiente** — `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `FRONTEND_URL`, `DB_*`, `QUEUE_CONNECTION=database` (ou redis), `CACHE_STORE=database`, `CORS_ALLOWED_ORIGINS`, ASAAS, storage (MinIO/local), `SANCTUM_EXPIRATION`.
+2. **Deploy / migrate** — `php artisan migrate --force` + `php artisan config:cache`.
+3. **Supervisor** — `supervisorctl status` → `zion-med-queue` e `zion-med-scheduler` RUNNING (ver `docs/SUPERVISOR_VPS.md`).
+4. **PII legada (uma vez por ambiente, se houver dados antigos)** — `php artisan people:encrypt-pii --dry-run` e depois `php artisan people:encrypt-pii`.
+5. **Smoke pós-deploy**
+   - `GET /up`
    - Login SPA + `GET /api/v1/me`
-   - Formulário público `/f/{token}` (envio gera protocolo)
+   - Formulário público `/f/{token}` (envio gera protocolo + PDF na fila)
    - Webhook ASAAS (token configurado; rota excluída do CSRF)
-7. **Landing** — preencher CNPJ/endereço em `gestgo-site/assets/js/legal-entity.js` antes do go-live comercial.
+6. **Landing** — preencher CNPJ/endereço em `gestgo-site/assets/js/legal-entity.js` antes do go-live comercial.
 
 ## Comandos úteis
 

@@ -15,20 +15,19 @@
 | 5b | Cópia clínica no e-mail (anexo PDF) | **FEITO** |
 | 5c | Cópia paciente (token + download + e-mail) | **FEITO** |
 | R1–R4 | Anexo clínica, stream preferindo disk, eventos dossiê, tests | **FEITO** |
+| R5–R9 | OTP recomendado, métrica cópia, e-mail na sucesso, prefill CPF, copy | **FEITO** |
 
-## Ops
+## Ops (VPS, sem Docker)
 
 ```bash
-php artisan migrate
-# queue só necessária se persist sync falhar (fallback GenerateSubmissionPdfJob)
-php artisan queue:work
+php artisan migrate --force
+# fila + agendador no host: docs/SUPERVISOR_VPS.md
+sudo supervisorctl status   # zion-med-queue e zion-med-scheduler RUNNING
 ```
 
-Migration: `2026_08_21_100000_add_patient_copy_and_pdf_to_form_submissions.php`
-
-## Próximos
-
-Ver backlog **P2 (R5–R9)** no doc canônico do front.
+Migrations:
+- `2026_08_21_100000_add_patient_copy_and_pdf_to_form_submissions.php`
+- `2026_08_21_140000_default_signing_security_level_to_reinforced.php`
 
 ## Relacionados
 
