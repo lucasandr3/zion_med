@@ -24,18 +24,19 @@ class ThemeService
      */
     public function getAvailableThemes(): array
     {
+        // Primaries alinhadas ao CSS do front (`styles.css` / shell-theme.config).
         return [
             'gestgo-blue'   => ['label' => 'Azul Gestgo',   'primary' => '#1e40af'],
-            'ocean-blue'    => ['label' => 'Ocean Blue',    'primary' => '#2563eb'],
-            'indigo-night'  => ['label' => 'Indigo Night',  'primary' => '#4f46e5'],
-            'emerald-fresh' => ['label' => 'Emerald Fresh', 'primary' => '#10b981'],
-            'rose-elegant'  => ['label' => 'Rose Elegant',  'primary' => '#f43f5e'],
-            'amber-warm'    => ['label' => 'Amber Warm',    'primary' => '#f59e0b'],
-            'violet-dream'  => ['label' => 'Violet Dream',  'primary' => '#8b5cf6'],
-            'teal-ocean'    => ['label' => 'Teal Ocean',    'primary' => '#14b8a6'],
-            'slate-pro'     => ['label' => 'Slate Pro',     'primary' => '#475569'],
-            'cyan-tech'     => ['label' => 'Cyan Tech',     'primary' => '#06b6d4'],
-            'fuchsia-bold'  => ['label' => 'Fuchsia Bold',  'primary' => '#d946ef'],
+            'ocean-blue'    => ['label' => 'Verde marca',   'primary' => '#14B87A'],
+            'indigo-night'  => ['label' => 'Anil',          'primary' => '#3730a3'],
+            'emerald-fresh' => ['label' => 'Esmeralda',     'primary' => '#15803d'],
+            'rose-elegant'  => ['label' => 'Rosa',          'primary' => '#be185d'],
+            'amber-warm'    => ['label' => 'Âmbar',         'primary' => '#b45309'],
+            'violet-dream'  => ['label' => 'Violeta',       'primary' => '#6d28d9'],
+            'teal-ocean'    => ['label' => 'Verde-água',    'primary' => '#0f766e'],
+            'slate-pro'     => ['label' => 'Ardósia',       'primary' => '#334155'],
+            'cyan-tech'     => ['label' => 'Ciano',         'primary' => '#0369a1'],
+            'fuchsia-bold'  => ['label' => 'Magenta',       'primary' => '#a21caf'],
         ];
     }
 
