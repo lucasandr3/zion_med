@@ -3,6 +3,7 @@
 $defaultOrigins = [
     'https://app.gestgo.com.br',
     'https://gestgo.com.br',
+    'https://site-homolog.gestgo.com.br',
     'https://homolog.gestgo.com.br',
     'https://api-homolog.gestgo.com.br',
 ];
