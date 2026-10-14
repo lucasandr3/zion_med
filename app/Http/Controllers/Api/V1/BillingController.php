@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ProductEventService;
+use App\Services\PlatformAdminNotifier;
+use App\Notifications\CheckoutFalhouPlataforma;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
@@ -92,6 +95,7 @@ class BillingController extends Controller
                     'subscription_status' => $organization->subscription_status,
                     'billing_status' => $organization->billing_status,
                     'trial_ends_at' => $organization->trial_ends_at?->toIso8601String(),
+                    'grace_ends_at' => $organization->grace_ends_at?->toIso8601String(),
                     'is_on_trial' => $organization->isTrialWindowOpen() && ! $organization->hasConfirmedBillingPayment(),
                     'plan_limits' => $organization->planLimitsForApi(),
                 ],
@@ -167,6 +171,15 @@ class BillingController extends Controller
         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
         $billingType = $this->asaasService->normalizeBillingType($request->input('billing_type', 'PIX'));
 
+        app(ProductEventService::class)->record(
+            'checkout_started',
+            (int) $organization->id,
+            $request->user()?->id ? (int) $request->user()->id : null,
+            ['plan_key' => $planKey, 'billing_type' => $billingType],
+            'checkout_started:org:'.$organization->id.':'.now()->format('YmdHi'),
+            ['channel' => 'billing']
+        );
+
         try {
             $payload = $this->asaasService->createSubscription(
                 $organization,
@@ -177,6 +190,18 @@ class BillingController extends Controller
             );
         } catch (\Throwable $e) {
             Log::warning('Asaas createSubscription failed', ['organization_id' => $organization->id, 'error' => $e->getMessage()]);
+            app(ProductEventService::class)->record(
+                'checkout_failed',
+                (int) $organization->id,
+                $request->user()?->id ? (int) $request->user()->id : null,
+                ['plan_key' => $planKey],
+                'checkout_failed:org:'.$organization->id.':'.sha1($e->getMessage()),
+                ['channel' => 'billing']
+            );
+            app(PlatformAdminNotifier::class)->notify(new CheckoutFalhouPlataforma(
+                $organization,
+                $planKey,
+            ));
             $errorMessage = $this->extractAsaasErrorMessage($e);
 
             return response()->json(['message' => $errorMessage], 422);
@@ -278,6 +303,14 @@ class BillingController extends Controller
                 'subscription_status' => 'canceled',
                 'billing_status' => 'canceled',
             ]);
+        app(ProductEventService::class)->record(
+            'subscription_cancelled',
+            (int) $organization->id,
+            $request->user()?->id ? (int) $request->user()->id : null,
+            ['subscription_id' => $subscription->id],
+            'subscription_cancelled:sub:'.$subscription->id,
+            ['channel' => 'billing']
+        );
         }
 
         return response()->json([

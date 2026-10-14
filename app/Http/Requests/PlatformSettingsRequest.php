@@ -41,6 +41,11 @@ class PlatformSettingsRequest extends FormRequest
             'mail_whatsapp_number' => ['nullable', 'string', 'max:32'],
             'mail_primary_color' => ['nullable', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
             'mail_product_name' => ['nullable', 'string', 'max:128'],
+            'form_import_provider' => ['nullable', 'string', 'in:openai,heuristic'],
+            'openai_api_key' => ['nullable', 'string', 'max:512'],
+            'form_import_openai_model' => ['nullable', 'string', 'max:128'],
+            'openai_base_url' => ['nullable', 'url', 'max:255'],
+            'form_import_retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 
@@ -74,6 +79,11 @@ class PlatformSettingsRequest extends FormRequest
             'mail_whatsapp_number' => 'WhatsApp de contato',
             'mail_primary_color' => 'cor primária dos e-mails',
             'mail_product_name' => 'nome do produto nos e-mails',
+            'form_import_provider' => 'provedor de importação',
+            'openai_api_key' => 'chave da API OpenAI',
+            'form_import_openai_model' => 'modelo OpenAI',
+            'openai_base_url' => 'URL base da OpenAI',
+            'form_import_retention_days' => 'retenção da importação (dias)',
         ];
     }
 }

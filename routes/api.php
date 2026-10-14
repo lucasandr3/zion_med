@@ -26,10 +26,13 @@ use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
 use App\Http\Controllers\Api\V1\ReleaseNotesController;
 use App\Http\Controllers\Api\V1\TemplateController;
+use App\Http\Controllers\Api\V1\FormImportController;
 use App\Http\Controllers\Api\V1\ComeceController as ComeceApiController;
 use App\Http\Controllers\Api\V1\DemonstrationRequestController;
 use App\Http\Controllers\Api\V1\LandingAnalyticsController;
+use App\Http\Controllers\Api\V1\AppointmentController;
 use App\Http\Controllers\Api\V1\LandingController;
+use App\Http\Controllers\Api\V1\ProductEventController;
 use App\Services\LandingAnalyticsService;
 use App\Http\Controllers\Api\V1\DocumentVerificationController;
 use App\Http\Controllers\Api\V1\PublicFormApiController;
@@ -55,6 +58,7 @@ use App\Http\Controllers\Api\V1\Platform\IntegrationsController as PlatformInteg
 use App\Http\Controllers\Api\V1\Platform\SettingsController as PlatformSettingsController;
 use App\Http\Controllers\Api\V1\Platform\TenantsController as PlatformTenantsController;
 use App\Http\Controllers\Api\V1\Platform\LandingAnalyticsController as PlatformLandingAnalyticsController;
+use App\Http\Controllers\Api\V1\Platform\ProductFunnelController as PlatformProductFunnelController;
 use App\Http\Controllers\Api\V1\Platform\OrganizationPresenceController as PlatformOrganizationPresenceController;
 use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Models\DocumentSend;
@@ -72,6 +76,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('/auth/verify-email', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
     Route::get('/landing', LandingController::class)->name('api.v1.landing');
+    Route::get('/landing/segments/{slug}', [LandingController::class, 'segment'])->name('api.v1.landing.segment');
+    Route::get('/landing/como-funciona/{slug}', [LandingController::class, 'howItWorks'])->name('api.v1.landing.how');
+    Route::post('/product-events', [ProductEventController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('api.v1.product-events.store');
     Route::match(['get', 'post'], '/landing/analytics/view', [LandingAnalyticsController::class, 'recordView'])
         ->middleware('throttle:120,1')
         ->name('api.v1.landing.analytics.view');
@@ -87,9 +96,16 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->whereNumber('linkId')
         ->name('api.v1.link-bio.public-go');
     Route::get('/link-bio/public/{slug}/cta/{channel}', [LinkBioController::class, 'publicRedirectCta'])
-        ->where('channel', 'whatsapp|maps|email|phone|instagram|team_whatsapp')
+        ->where('channel', 'whatsapp|maps|email|phone|instagram|team_whatsapp|appointment')
         ->name('api.v1.link-bio.public-cta');
     Route::get('/link-bio/public/{slug}', [LinkBioController::class, 'publicBySlug'])->name('api.v1.link-bio.public');
+    Route::get('/agenda/public/{slug}', [AppointmentController::class, 'publicShow'])->name('api.v1.agenda.public');
+    Route::get('/agenda/public/{slug}/slots', [AppointmentController::class, 'publicSlots'])
+        ->middleware('throttle:60,1')
+        ->name('api.v1.agenda.public-slots');
+    Route::post('/agenda/public/{slug}/reservas', [AppointmentController::class, 'publicBook'])
+        ->middleware('throttle:20,1')
+        ->name('api.v1.agenda.public-book');
     Route::post('/comece', [ComeceApiController::class, 'store'])
         ->middleware('throttle:auth')
         ->name('api.v1.comece.store');
@@ -186,6 +202,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->gro
         Route::get('/logs', [PlatformAuditLogController::class, 'index'])->name('api.v1.platform.logs.index');
         Route::get('/organization-presences', PlatformOrganizationPresenceController::class)->name('api.v1.platform.organization-presences.index');
         Route::get('/landing-analytics', PlatformLandingAnalyticsController::class)->name('api.v1.platform.landing-analytics');
+        Route::get('/product-funnel', PlatformProductFunnelController::class)->name('api.v1.platform.product-funnel');
         Route::get('/emails/recipients', [PlatformManualEmailController::class, 'recipients'])->name('api.v1.platform.emails.recipients');
         Route::get('/emails', [PlatformManualEmailController::class, 'index'])->name('api.v1.platform.emails.index');
         Route::post('/emails/send', [PlatformManualEmailController::class, 'send'])->name('api.v1.platform.emails.send');
@@ -200,6 +217,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->gro
 Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'tenant', 'throttle:api'])->group(function () {
     Route::get('/onboarding/templates', [OnboardingController::class, 'templates'])->name('api.v1.onboarding.templates');
     Route::post('/onboarding/templates/{template}/link-publico', [OnboardingController::class, 'gerarLink'])->name('api.v1.onboarding.link');
+    Route::post('/onboarding/templates/{template}/enviar-para-mim', [OnboardingController::class, 'enviarParaMim'])->name('api.v1.onboarding.send-self');
 });
 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
@@ -222,6 +240,12 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant',
     Route::get('/templates/biblioteca/{libraryKey}', [TemplateController::class, 'bibliotecaShow'])->name('api.v1.templates.biblioteca.show');
     Route::post('/templates/biblioteca/{libraryKey}/instalar', [TemplateController::class, 'installFromLibrary'])->name('api.v1.templates.biblioteca.install');
     Route::post('/templates', [TemplateController::class, 'store'])->name('api.v1.templates.store');
+    Route::post('/form-imports', [FormImportController::class, 'store'])->name('api.v1.form-imports.store');
+    Route::get('/form-imports/{formImport}', [FormImportController::class, 'show'])->name('api.v1.form-imports.show');
+    Route::get('/form-imports/{formImport}/source', [FormImportController::class, 'source'])->name('api.v1.form-imports.source');
+    Route::patch('/form-imports/{formImport}/draft', [FormImportController::class, 'updateDraft'])->name('api.v1.form-imports.draft');
+    Route::post('/form-imports/{formImport}/commit', [FormImportController::class, 'commit'])->name('api.v1.form-imports.commit');
+    Route::delete('/form-imports/{formImport}', [FormImportController::class, 'destroy'])->name('api.v1.form-imports.destroy');
     Route::post('/templates/a-partir-de/{template}', [TemplateController::class, 'storeFromTemplate'])->name('api.v1.templates.storeFromTemplate');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show');
     Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('api.v1.templates.update');
@@ -240,6 +264,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant',
     Route::post('/templates/{template}/enviar', [TemplateController::class, 'enviarDocumento'])->name('api.v1.templates.enviar');
     Route::post('/templates/{template}/duplicar', [TemplateController::class, 'duplicar'])->name('api.v1.templates.duplicar');
 
+    Route::get('/pessoas/{pessoa}/historico-documental', [PersonController::class, 'historicoDocumental'])->name('api.v1.pessoas.historico');
     Route::post('/pessoas/{pessoa}/reconsentimento', [PersonController::class, 'solicitarReconsentimento'])->name('api.v1.pessoas.reconsentimento');
     Route::apiResource('pessoas', PersonController::class)->parameters(['pessoas' => 'pessoa'])->names('api.v1.pessoas');
 
@@ -261,6 +286,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant',
     Route::patch('/protocols/{protocol}/staff-values', [ProtocolController::class, 'staffValues'])->name('api.v1.protocols.staff-values');
 
     Route::get('/links-publicos', [LinksPublicosController::class, 'index'])->name('api.v1.links-publicos.index');
+
+    Route::get('/agenda/servicos', [AppointmentController::class, 'servicesIndex'])->name('api.v1.agenda.services.index');
+    Route::post('/agenda/servicos', [AppointmentController::class, 'servicesStore'])->name('api.v1.agenda.services.store');
+    Route::put('/agenda/servicos/{service}', [AppointmentController::class, 'servicesUpdate'])->name('api.v1.agenda.services.update');
+    Route::delete('/agenda/servicos/{service}', [AppointmentController::class, 'servicesDestroy'])->name('api.v1.agenda.services.destroy');
+    Route::get('/agenda/disponibilidade', [AppointmentController::class, 'availabilityIndex'])->name('api.v1.agenda.availability.index');
+    Route::put('/agenda/disponibilidade', [AppointmentController::class, 'availabilitySync'])->name('api.v1.agenda.availability.sync');
+    Route::get('/agenda/reservas', [AppointmentController::class, 'appointmentsIndex'])->name('api.v1.agenda.appointments.index');
+    Route::patch('/agenda/reservas/{appointment}', [AppointmentController::class, 'appointmentsUpdate'])->name('api.v1.agenda.appointments.update');
 
     Route::get('/link-bio', [LinkBioController::class, 'index'])->name('api.v1.link-bio.index');
     Route::post('/link-bio/links', [LinkBioController::class, 'store'])->name('api.v1.link-bio.links.store');

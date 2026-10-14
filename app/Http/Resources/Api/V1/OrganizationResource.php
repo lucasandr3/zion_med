@@ -29,6 +29,7 @@ class OrganizationResource extends JsonResource
             'billing_status' => $this->billing_status,
             'can_access_app' => $this->canAccessTenantAppFeatures(),
             'trial_ends_at' => $this->trial_ends_at?->toIso8601String(),
+            'grace_ends_at' => $this->grace_ends_at?->toIso8601String(),
             'notification_email' => $this->notification_email,
             'contact_email' => $this->contact_email,
             'phone' => $this->phone,

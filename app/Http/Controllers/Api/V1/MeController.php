@@ -24,12 +24,14 @@ class MeController extends Controller
         }
 
         $trialNotice = $organization?->trialEndingNoticeMeta();
+        $billingNotice = $organization?->pastDueGraceNoticeMeta();
 
         return response()->json([
             'data' => [
                 'user' => new UserResource($user),
                 'organization' => $organization ? new OrganizationResource($organization) : null,
                 'trial_notice' => $trialNotice,
+                'billing_notice' => $billingNotice,
             ],
         ]);
     }

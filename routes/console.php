@@ -69,5 +69,6 @@ Schedule::command('documents:send-reminders')->dailyAt('09:00');
 
 Schedule::command('people:purge-inactive')->dailyAt('04:15');
 Schedule::command('protocols:apply-retention')->dailyAt('04:30');
+Schedule::command('form-imports:purge-expired')->dailyAt('04:45');
 
 Schedule::command('organizations:sync-expired-trials')->hourly();

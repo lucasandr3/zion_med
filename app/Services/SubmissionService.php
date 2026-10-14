@@ -190,6 +190,14 @@ class SubmissionService
 
             $this->attachClinicalDefensibilityMeta($submission, $template, $data, $personId);
 
+            app(ProductEventService::class)->record(
+                'first_protocol_completed',
+                (int) ($submission->organization_id ?? $submission->clinic_id),
+                null,
+                ['submission_id' => $submission->id],
+                'first_protocol_completed:org:'.($submission->organization_id ?? $submission->clinic_id),
+                ['channel' => 'public_form']
+            );
             Event::dispatch(new AuditEvent('submission.created', FormSubmission::class, $submission->id, [
                 'protocol' => $submission->protocol_number,
                 'template_id' => $template->id,

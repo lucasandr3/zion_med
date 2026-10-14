@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ProductEventService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
@@ -196,6 +197,15 @@ class AuthController extends Controller
 
         $user->markEmailAsVerified();
         event(new \Illuminate\Auth\Events\Verified($user));
+
+        app(ProductEventService::class)->record(
+            'email_verified',
+            $user->clinic_id ? (int) $user->clinic_id : null,
+            (int) $user->id,
+            [],
+            'email_verified:user:'.$user->id,
+            ['channel' => 'auth']
+        );
 
         return response()->json([
             'data' => ['message' => 'E-mail verificado com sucesso.'],

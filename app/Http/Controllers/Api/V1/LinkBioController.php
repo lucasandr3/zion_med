@@ -28,12 +28,14 @@ class LinkBioController extends Controller
     use ResolvesOrganizationContext;
 
     /**
-     * Layouts do Link Bio (mesmos IDs do front Angular).
+     * Catálogo Link Bio 2026-10 (mesmos IDs do front Angular):
+     * 1 Solo, 2 Genérico, 3 Estética, 4 Odontologia, 5 Nutrição,
+     * 6 Pediatria, 7 Multiprofissional, 8 Fisioterapia dermatofuncional.
      */
     private const LINK_BIO_LAYOUT_MODELS = [1, 2, 3, 4, 5, 6, 7, 8];
 
     /** CTAs da página pública (botões que não são links cadastrados na aba Links). */
-    private const LINK_BIO_CTA_CHANNELS = ['whatsapp', 'maps', 'email', 'phone', 'instagram', 'team_whatsapp'];
+    private const LINK_BIO_CTA_CHANNELS = ['whatsapp', 'maps', 'email', 'phone', 'instagram', 'team_whatsapp', 'appointment'];
 
     public function __construct(
         private ThemeService $themeService,
@@ -441,9 +443,6 @@ class LinkBioController extends Controller
             'cover_mode' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['banner', 'solid', 'none'])],
             'link_bio_model' => ['nullable', 'integer', \Illuminate\Validation\Rule::in(self::LINK_BIO_LAYOUT_MODELS)],
             'link_bio_extra' => ['nullable', 'array'],
-            'link_bio_extra.vet_exam_results_url' => ['nullable', 'string', 'url', 'max:500'],
-            'link_bio_extra.vet_exam_results_label' => ['nullable', 'string', 'max:120'],
-            'link_bio_extra.vet_exam_results_subtitle' => ['nullable', 'string', 'max:200'],
             'short_description' => ['nullable', 'string', 'max:200'],
             'specialties' => ['nullable', 'string', 'max:500'],
             'founded_year' => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')],
@@ -545,6 +544,13 @@ class LinkBioController extends Controller
             return $name !== '' ? 'WhatsApp — ' . $name : 'WhatsApp (equipe)';
         }
 
+        if ($channel === 'appointment') {
+            $extra = $clinic->link_bio_extra;
+            $label = is_array($extra) ? trim((string) ($extra['appointment_cta_label'] ?? '')) : '';
+
+            return $label !== '' ? $label : 'Agendar atendimento';
+        }
+
         return match ($channel) {
             'whatsapp' => 'WhatsApp',
             'maps' => 'Como chegar / Maps',
@@ -564,8 +570,52 @@ class LinkBioController extends Controller
             'email' => $clinic->contact_email ? 'mailto:' . trim((string) $clinic->contact_email) : null,
             'instagram' => $this->resolveInstagramUrlForCta($clinic),
             'team_whatsapp' => $this->resolveTeamWhatsappUrl($clinic, $ref),
+            'appointment' => $this->resolveAppointmentCtaUrl($clinic),
             default => null,
         };
+    }
+
+    private function resolveAppointmentCtaUrl(Clinic $clinic): ?string
+    {
+        $extra = $clinic->link_bio_extra;
+        if (! is_array($extra)) {
+            return null;
+        }
+        $enabled = filter_var($extra['appointment_cta_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if (! $enabled) {
+            return null;
+        }
+        $mode = strtolower(trim((string) ($extra['appointment_cta_mode'] ?? 'external')));
+        if ($mode === 'gestgo') {
+            $slug = trim((string) $clinic->slug);
+            if ($slug === '') {
+                return null;
+            }
+            $front = rtrim((string) config('app.frontend_url', env('FRONTEND_URL', '')), '/');
+            if ($front === '') {
+                return '/a/'.$slug;
+            }
+
+            return $front.'/a/'.$slug;
+        }
+        if ($mode === 'feegow') {
+            $url = trim((string) ($extra['appointment_feegow_url'] ?? $extra['appointment_url'] ?? ''));
+        } else {
+            $url = trim((string) ($extra['appointment_url'] ?? ''));
+        }
+        if ($url === '' || ! preg_match('#^https://#i', $url)) {
+            return null;
+        }
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['host'])) {
+            return null;
+        }
+        $host = strtolower((string) $parts['host']);
+        if (in_array($host, ['localhost', '127.0.0.1', '0.0.0.0'], true) || str_ends_with($host, '.local')) {
+            return null;
+        }
+
+        return $url;
     }
 
     private function resolveInstagramUrlForCta(Clinic $clinic): ?string

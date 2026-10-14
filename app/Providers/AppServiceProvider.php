@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\FormImport\DocumentExtractionProvider;
+use App\Services\FormImport\HeuristicExtractionProvider;
+use App\Services\FormImport\OpenAiExtractionProvider;
+
 use App\Enums\Role;
 use App\Models\Organization;
 use App\Support\Permission;
@@ -28,7 +32,14 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(DocumentExtractionProvider::class, function ($app) {
+            $provider = strtolower((string) config('form_import.provider', 'openai'));
+            if ($provider === 'openai' && filled(config('form_import.openai_api_key'))) {
+                return $app->make(OpenAiExtractionProvider::class);
+            }
+
+            return $app->make(HeuristicExtractionProvider::class);
+        });
     }
 
     public function boot(): void

@@ -49,6 +49,16 @@ class DashboardController extends Controller
                     'onboarding' => [
                         'needs_public_link' => false,
                         'public_links_count' => 0,
+                        'templates_count' => 0,
+                        'sends_count' => 0,
+                        'submissions_count' => 0,
+                        'checklist' => [
+                            ['key' => 'template', 'label' => 'Escolher um modelo', 'done' => false],
+                            ['key' => 'public_link', 'label' => 'Publicar link', 'done' => false],
+                            ['key' => 'first_send', 'label' => 'Enviar ou testar a ficha', 'done' => false],
+                        ],
+                        'progress' => 0,
+                        'completed' => false,
                     ],
                 ],
             ]);
@@ -203,10 +213,34 @@ class DashboardController extends Controller
                 'ultimas_submissoes' => $ultimasSubmissoes,
                 'modelos_mais_usados' => $modelosMaisUsados,
                 'respostas_por_template' => $respostasPorTemplate,
-                'onboarding' => [
-                    'needs_public_link' => $linksPublicosCount === 0,
-                    'public_links_count' => $linksPublicosCount,
-                ],
+                'onboarding' => (static function () use ($orgId, $linksPublicosCount) {
+                    $templatesCount = (int) \App\Models\FormTemplate::withoutGlobalScopes()
+                        ->where('organization_id', $orgId)
+                        ->count();
+                    $sendsCount = (int) \App\Models\DocumentSend::where('organization_id', $orgId)->count();
+                    $submissionsCount = (int) \App\Models\FormSubmission::withoutGlobalScopes()
+                        ->where('organization_id', $orgId)
+                        ->count();
+                    $hasTemplate = $templatesCount > 0;
+                    $hasLink = $linksPublicosCount > 0;
+                    $hasSend = $sendsCount > 0 || $submissionsCount > 0;
+                    $progress = (int) $hasTemplate + (int) $hasLink + (int) $hasSend;
+
+                    return [
+                        'needs_public_link' => ! $hasLink,
+                        'public_links_count' => $linksPublicosCount,
+                        'templates_count' => $templatesCount,
+                        'sends_count' => $sendsCount,
+                        'submissions_count' => $submissionsCount,
+                        'checklist' => [
+                            ['key' => 'template', 'label' => 'Escolher um modelo', 'done' => $hasTemplate],
+                            ['key' => 'public_link', 'label' => 'Publicar link', 'done' => $hasLink],
+                            ['key' => 'first_send', 'label' => 'Enviar ou testar a ficha', 'done' => $hasSend],
+                        ],
+                        'progress' => $progress,
+                        'completed' => $progress >= 3,
+                    ];
+                })(),
             ],
         ]);
     }

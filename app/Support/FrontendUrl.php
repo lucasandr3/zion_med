@@ -39,4 +39,11 @@ final class FrontendUrl
     {
         return self::base().'/plataforma/assinaturas';
     }
+
+    public static function plataformaCliente(int $organizationId): string
+    {
+        $base = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
+
+        return $base.'/plataforma/clientes/'.$organizationId;
+    }
 }

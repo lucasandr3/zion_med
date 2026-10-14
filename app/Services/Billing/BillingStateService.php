@@ -179,6 +179,87 @@ class BillingStateService
         return now()->lte($organization->grace_ends_at);
     }
 
+    /**
+     * Após estorno/chargeback (ou perda do último pagamento confirmado), recalcula
+     * subscription_status / billing_status / grace_ends_at sem liberar acesso indevido.
+     */
+    public function reevaluateAccessAfterPaymentChange(?Organization $organization): void
+    {
+        if (! $organization) {
+            return;
+        }
+
+        $organization->refresh();
+
+        if ($this->hasConfirmedBillingPayment($organization)) {
+            if (in_array($organization->subscription_status, ['inactive', 'past_due', 'trial'], true)
+                || in_array((string) $organization->billing_status, ['blocked', 'attention'], true)) {
+                $organization->forceFill([
+                    'subscription_status' => 'active',
+                    'billing_status' => 'ok',
+                    'grace_ends_at' => null,
+                ])->save();
+            }
+
+            return;
+        }
+
+        if ($this->isTrialWindowOpen($organization)) {
+            $organization->forceFill([
+                'subscription_status' => 'trial',
+                'billing_status' => 'ok',
+                'grace_ends_at' => null,
+            ])->save();
+
+            return;
+        }
+
+        if ($this->isPastDueInGrace($organization)) {
+            $organization->forceFill([
+                'subscription_status' => 'past_due',
+                'billing_status' => 'attention',
+            ])->save();
+
+            return;
+        }
+
+        $organization->forceFill([
+            'subscription_status' => 'inactive',
+            'billing_status' => 'blocked',
+            'grace_ends_at' => null,
+        ])->save();
+    }
+
+    /**
+     * @return array{visible: true, days_remaining: int, grace_ends_at: string, message: string}|null
+     */
+    public function pastDueGraceNoticeMeta(Organization $organization): ?array
+    {
+        if (! $this->isPastDueInGrace($organization) || ! $organization->grace_ends_at) {
+            return null;
+        }
+
+        $today = now()->copy()->startOfDay();
+        $lastGraceDay = $organization->grace_ends_at->copy()->startOfDay();
+        $daysLeft = max(0, (int) $today->diffInDays($lastGraceDay, false));
+
+        $message = $daysLeft === 0
+            ? 'Pagamento pendente. Regularize hoje para evitar a suspensão do acesso.'
+            : sprintf(
+                'Pagamento pendente. Regularize até %s (%d %s restantes) para evitar a suspensão do acesso.',
+                $organization->grace_ends_at->format('d/m/Y'),
+                $daysLeft,
+                $daysLeft === 1 ? 'dia' : 'dias'
+            );
+
+        return [
+            'visible' => true,
+            'days_remaining' => $daysLeft,
+            'grace_ends_at' => $organization->grace_ends_at->toIso8601String(),
+            'message' => $message,
+        ];
+    }
+
     public function isBillingBlocked(Organization $organization): bool
     {
         return $organization->billing_status === 'blocked';

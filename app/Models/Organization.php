@@ -393,6 +393,11 @@ class Organization extends Model
         return $this->billingState()->trialEndingNoticeMeta($this);
     }
 
+    public function pastDueGraceNoticeMeta(): ?array
+    {
+        return $this->billingState()->pastDueGraceNoticeMeta($this);
+    }
+
     public function isOnTrial(): bool
     {
         return $this->billingState()->isOnTrial($this);

@@ -11,6 +11,7 @@ use App\Http\Requests\PersonUpdateRequest;
 use App\Http\Resources\Api\V1\PersonResource;
 use App\Http\Resources\Api\V1\ProtocolResource;
 use App\Services\PersonConsentService;
+use App\Models\DocumentSend;
 use App\Models\Person;
 use App\Support\ApiPagination;
 use App\Support\ApiErrorResponse;
@@ -199,6 +200,83 @@ class PersonController extends Controller
     /**
      * Envia link de reconsentimento para pessoa com consentimento vencido.
      */
+
+    /**
+     * Linha do tempo documental da pessoa (protocolos + envios).
+     */
+    public function historicoDocumental(Request $request, Person $pessoa): JsonResponse
+    {
+        $this->authorize('view-submissions');
+        $perPage = min(50, max(1, (int) $request->integer('per_page', 20)));
+
+        $protocols = $pessoa->submissions()
+            ->with(['template:id,name', 'templateVersion:id,version_number', 'approvedByUser:id,name'])
+            ->latest('submitted_at')
+            ->limit(100)
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'kind' => 'protocol',
+                    'id' => $s->id,
+                    'occurred_at' => optional($s->submitted_at)->toIso8601String() ?? optional($s->created_at)->toIso8601String(),
+                    'title' => $s->template?->name ?? 'Protocolo',
+                    'status' => $s->status?->value ?? (string) $s->status,
+                    'protocol_number' => $s->protocol_number,
+                    'template_id' => $s->template_id,
+                    'template_version' => $s->templateVersion?->version_number,
+                    'review_status' => $s->review_status ?? null,
+                    'professional_name' => $s->approvedByUser?->name,
+                    'has_pdf' => filled($s->pdf_disk_path),
+                    'signed_at' => optional($s->submitted_at)->toIso8601String(),
+                    'route_hint' => '/protocolos/'.$s->id,
+                ];
+            });
+
+        $sends = DocumentSend::query()
+            ->where('organization_id', $pessoa->organization_id)
+            ->where(function ($q) use ($pessoa) {
+                $q->where('person_id', $pessoa->id);
+                if ($pessoa->email) {
+                    $q->orWhere('recipient_email', $pessoa->email);
+                }
+                if ($pessoa->phone) {
+                    $digits = preg_replace('/\D+/', '', (string) $pessoa->phone);
+                    if ($digits) {
+                        $q->orWhere('recipient_phone', 'like', '%'.$digits.'%');
+                    }
+                }
+            })
+            ->with('template:id,name')
+            ->latest('created_at')
+            ->limit(100)
+            ->get()
+            ->map(function ($d) {
+                return [
+                    'kind' => 'document_send',
+                    'id' => $d->id,
+                    'occurred_at' => optional($d->created_at)->toIso8601String(),
+                    'title' => $d->template?->name ?? 'Envio de documento',
+                    'status' => (string) $d->status,
+                    'channel' => $d->channel,
+                    'template_id' => $d->template_id,
+                    'route_hint' => '/envios',
+                ];
+            });
+
+        $items = $protocols->concat($sends)
+            ->sortByDesc('occurred_at')
+            ->values()
+            ->take($perPage);
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'total' => $items->count(),
+                'person_id' => $pessoa->id,
+            ],
+        ]);
+    }
+
     public function solicitarReconsentimento(Request $request, Person $pessoa, ReconsentService $reconsentService): JsonResponse
     {
         $this->authorize('view-submissions');

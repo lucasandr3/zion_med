@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PlatformSettingsRequest;
 use App\Models\PlatformSetting;
 use App\Services\AsaasConfigService;
+use App\Services\FormImportConfigService;
 use App\Services\MinioConfigService;
 use App\Services\PlatformConfigService;
 use App\Services\PlatformEmailBrandingService;
@@ -19,6 +20,7 @@ class SettingsController extends Controller
         private readonly AsaasConfigService $asaasConfig,
         private readonly MinioConfigService $minioConfig,
         private readonly ResendConfigService $resendConfig,
+        private readonly FormImportConfigService $formImportConfig,
         private readonly PlatformEmailBrandingService $emailBranding,
     ) {}
 
@@ -41,6 +43,7 @@ class SettingsController extends Controller
             ...$this->asaasConfig->toSettingsPayload(),
             'minio' => $this->minioConfig->toSettingsPayload(),
             'resend' => $this->resendConfig->toSettingsPayload(),
+            'form_import' => $this->formImportConfig->toSettingsPayload(),
         ];
 
         return response()->json(['data' => $data]);
@@ -85,9 +88,18 @@ class SettingsController extends Controller
             'product_name' => $request->input('mail_product_name'),
         ]);
 
+        $this->formImportConfig->update([
+            'provider' => $request->input('form_import_provider'),
+            'api_key' => $request->input('openai_api_key'),
+            'model' => $request->input('form_import_openai_model'),
+            'base_url' => $request->input('openai_base_url'),
+            'retention_days' => $request->input('form_import_retention_days'),
+        ]);
+
         $this->asaasConfig->mergeIntoConfig();
         $this->minioConfig->applyFilesystemConfig();
         $this->resendConfig->mergeIntoConfig();
+        $this->formImportConfig->mergeIntoConfig();
 
         return response()->json([
             'message' => 'Configurações salvas.',
@@ -146,6 +158,7 @@ class SettingsController extends Controller
             ...$this->asaasConfig->toSettingsPayload(),
             'minio' => $this->minioConfig->toSettingsPayload(),
             'resend' => $this->resendConfig->toSettingsPayload(),
+            'form_import' => $this->formImportConfig->toSettingsPayload(),
         ];
     }
 }

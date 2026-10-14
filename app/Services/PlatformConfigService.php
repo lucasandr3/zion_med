@@ -23,10 +23,12 @@ class PlatformConfigService
         $asaasConfig = app(AsaasConfigService::class);
         $minioConfig = app(MinioConfigService::class);
         $resendConfig = app(ResendConfigService::class);
+        $formImportConfig = app(FormImportConfigService::class);
 
         $asaasConfig->mergeIntoConfig();
         $minioConfig->applyFilesystemConfig();
         $resendConfig->mergeIntoConfig();
+        $formImportConfig->mergeIntoConfig();
 
         if (! Schema::hasTable('plans')) {
             return;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ProductEventService;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentSendIndexRequest;
@@ -138,6 +139,7 @@ class DocumentSendController extends Controller
             if (! $send) {
                 return response()->json(['message' => 'WhatsApp não configurado para esta clínica (integração Evolution Go) ou número inválido.'], 503);
             }
+            $this->recordFirstFormShared($request, (int) $orgId, (int) $send->id);
             return response()->json([
                 'data' => [
                     'message' => 'Link enviado por WhatsApp.',
@@ -160,6 +162,8 @@ class DocumentSendController extends Controller
             $recipientName
         );
 
+        $this->recordFirstFormShared($request, (int) $orgId, (int) $send->id);
+
         return response()->json([
             'data' => [
                 'message' => 'Link enviado por e-mail.',
@@ -168,6 +172,19 @@ class DocumentSendController extends Controller
             ],
         ], 201);
     }
+
+    private function recordFirstFormShared(Request $request, int $orgId, int $sendId): void
+    {
+        app(ProductEventService::class)->record(
+            'first_form_shared',
+            $orgId,
+            $request->user()?->id ? (int) $request->user()->id : null,
+            ['document_send_id' => $sendId],
+            'first_form_shared:org:'.$orgId,
+            ['channel' => 'app']
+        );
+    }
+
 
     /**
      * Reenvia o link do documento.

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ProductEventService;
+use App\Services\PlatformAdminNotifier;
+use App\Notifications\NovoCadastroPlataforma;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\OrganizationResource;
@@ -203,6 +206,39 @@ class ComeceController extends Controller
                 ? 'Conta criada com sucesso! Período de trial de '.$trialDays.' dias. A primeira cobrança vencerá em '
                     .Carbon::parse($firstInvoiceDueDate)->format('d/m/Y').'.'
                 : 'Conta criada! Você tem '.$trialDays.' dias de trial. Acesse Empresa > Configurações > Assinatura para ativar seu plano.';
+
+            $productEvents = app(ProductEventService::class);
+            $productEvents->record(
+                'signup_completed',
+                (int) $organization->id,
+                (int) $user->id,
+                ['plan_key' => $validated['plan_key'] ?? null, 'niche' => $validated['niche'] ?? null],
+                'signup_completed:org:'.$organization->id,
+                ['channel' => 'comece']
+            );
+            $productEvents->record(
+                'trial_started',
+                (int) $organization->id,
+                (int) $user->id,
+                ['trial_days' => $trialDays],
+                'trial_started:org:'.$organization->id,
+                ['channel' => 'comece']
+            );
+            app(PlatformAdminNotifier::class)->notify(new NovoCadastroPlataforma(
+                $organization,
+                $validated['plan_key'] ?? null,
+                $validated['niche'] ?? null,
+            ));
+            if (! empty($validated['niche'])) {
+                $productEvents->record(
+                    'onboarding_segment_selected',
+                    (int) $organization->id,
+                    (int) $user->id,
+                    ['niche' => $validated['niche']],
+                    'onboarding_segment_selected:org:'.$organization->id,
+                    ['channel' => 'comece']
+                );
+            }
 
             return response()->json([
                 'data' => [

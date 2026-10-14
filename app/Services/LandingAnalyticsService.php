@@ -10,14 +10,29 @@ use Illuminate\Support\Facades\DB;
 
 class LandingAnalyticsService
 {
-    /** Canais de CTA conhecidos na landing (gestgo-landing). */
+    /**
+     * Canais de CTA aceitos (legado + valores atuais do gestgo-site em data-landing-cta).
+     */
     public const CTA_CHANNELS = [
+        // Legado
         'hero_cta',
         'nav_cta',
         'comece',
-        'demo',
-        'pricing',
         'blog',
+        // gestgo-site (index / comece / float)
+        'nav',
+        'hero',
+        'demo',
+        'totem',
+        'api',
+        'pricing',
+        'pricing-secondary',
+        'final',
+        'comece-whatsapp',
+        'comece-whatsapp-mobile',
+        'whatsapp-float',
+        'linkbio',
+        'linkbio-model',
     ];
 
     public function hashIp(Request $request): string

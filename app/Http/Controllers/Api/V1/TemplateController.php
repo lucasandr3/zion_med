@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ProductEventService;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
@@ -159,6 +160,14 @@ class TemplateController extends Controller
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
+        app(ProductEventService::class)->record(
+            'template_created',
+            (int) ($template->organization_id ?? $template->clinic_id),
+            $request->user()?->id ? (int) $request->user()->id : null,
+            ['template_id' => $template->id],
+            'template_created:tpl:'.$template->id,
+            ['channel' => 'app']
+        );
         Event::dispatch(new AuditEvent('template.created', FormTemplate::class, $template->id, [
             'source' => 'library',
             'library_key' => $libraryKey,
@@ -660,6 +669,15 @@ class TemplateController extends Controller
         $this->templateVersionService->getOrCreateCurrentVersion($template);
         $this->publicLinkService->generateToken($template);
         $url = $this->publicLinkService->getPublicUrl($template);
+
+        app(ProductEventService::class)->record(
+            'template_published',
+            (int) ($template->organization_id ?? $template->clinic_id),
+            $request->user()?->id ? (int) $request->user()->id : null,
+            ['template_id' => $template->id],
+            'template_published:tpl:'.$template->id,
+            ['channel' => 'app']
+        );
 
         return response()->json([
             'data' => [
