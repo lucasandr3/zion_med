@@ -56,11 +56,11 @@
 
               <p style="margin-top:0;">Olá, <strong>{{ $recipientName }}</strong>, tudo bem?</p>
 
-              {!! $introductionHtml !!}
+              {!! \App\Support\SafeEmailHtml::clean($introductionHtml ?? '') !!}
 
               <p style="margin:0 0 16px 0;">Queremos garantir que você tenha todo o suporte necessário...</p>
 
-              {!! $messageBodyHtml !!}
+              {!! \App\Support\SafeEmailHtml::clean($messageBodyHtml ?? '') !!}
 
               @if($showWhatsappButton && !empty($whatsappUrl))
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
@@ -80,9 +80,9 @@
                 </table>
               @endif
 
-              {!! $messageAfterWhatsappHtml !!}
+              {!! \App\Support\SafeEmailHtml::clean($messageAfterWhatsappHtml ?? '') !!}
 
-              {!! $closingThanksHtml !!}
+              {!! \App\Support\SafeEmailHtml::clean($closingThanksHtml ?? '') !!}
 
               <p style="margin-bottom:0;">Atenciosamente,</p>
 

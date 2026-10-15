@@ -13,6 +13,7 @@ use App\Models\WebhookDelivery;
 use App\Services\FeegowClient;
 use App\Services\PersonConsentService;
 use App\Support\SafeOutboundUrl;
+use App\Support\SanctumTenantAbility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -101,7 +102,11 @@ class IntegrationsController extends Controller
         ]);
 
         $name = 'clinic:' . $clinicId . '-' . $validated['name'];
-        $token = $request->user()->createToken($name);
+        $abilities = array_values(array_unique(array_merge(
+            ['integration'],
+            SanctumTenantAbility::tokenAbilitiesForOrganization((int) $clinicId),
+        )));
+        $token = $request->user()->createToken($name, $abilities);
 
         return response()->json([
             'data' => [

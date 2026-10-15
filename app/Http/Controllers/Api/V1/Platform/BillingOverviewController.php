@@ -65,6 +65,7 @@ class BillingOverviewController extends Controller
                 'subscription' => $p->subscription ? [
                     'id' => $p->subscription->id,
                     'plan_key' => $p->subscription->plan_key,
+                    'cycle' => $p->subscription->cycle ?? 'MONTHLY',
                     'status' => $p->subscription->status,
                 ] : null,
             ]),

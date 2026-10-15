@@ -44,10 +44,7 @@ return [
         'webhook_url' => env('N8N_WHATSAPP_WEBHOOK_URL'),
     ],
 
-    'n8n_webhook_erro_pagamento' => env(
-        'N8N_WEBHOOK_ERRO_PAGAMENTO',
-        'https://n8n-webhook.gestgo.com.br/webhook/erro-pagamento'
-    ),
+    'n8n_webhook_erro_pagamento' => env('N8N_WEBHOOK_ERRO_PAGAMENTO'),
 
     /*
     |--------------------------------------------------------------------------
@@ -55,10 +52,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'n8n_demonstracao' => [
-        'webhook_url' => env(
-            'N8N_DEMONSTRACAO_WEBHOOK_URL',
-            'https://n8n-webhook.gestgo.com.br/webhook/c08cd03e-0111-4583-af85-a29eb47298bc'
-        ),
+        'webhook_url' => env('N8N_DEMONSTRACAO_WEBHOOK_URL'),
     ],
 
     'google_places' => [

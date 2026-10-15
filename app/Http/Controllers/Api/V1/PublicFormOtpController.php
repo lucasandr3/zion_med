@@ -19,8 +19,9 @@ class PublicFormOtpController extends Controller
      */
     public function send(Request $request, string $token): JsonResponse
     {
-        $key = 'public-form-otp:'.$token;
-        if (RateLimiter::tooManyAttempts($key, 5)) {
+        $ipKey = 'public-form-otp-ip:'.$request->ip();
+        $tokenKey = 'public-form-otp:'.$token;
+        if (RateLimiter::tooManyAttempts($ipKey, 10) || RateLimiter::tooManyAttempts($tokenKey, 5)) {
             return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
         }
 
@@ -29,6 +30,14 @@ class PublicFormOtpController extends Controller
             'email' => ['required_if:channel,email', 'nullable', 'email'],
             'phone' => ['required_if:channel,whatsapp', 'nullable', 'string', 'max:32'],
         ]);
+
+        $recipientRaw = $validated['channel'] === 'email'
+            ? strtolower(trim((string) ($validated['email'] ?? '')))
+            : (preg_replace('/\D+/', '', (string) ($validated['phone'] ?? '')) ?? '');
+        $recipientKey = $recipientRaw !== '' ? 'public-form-otp-rcpt:'.$recipientRaw : null;
+        if ($recipientKey && RateLimiter::tooManyAttempts($recipientKey, 3)) {
+            return response()->json(['message' => 'Muitas tentativas para este destinatário. Tente novamente em alguns minutos.'], 429);
+        }
 
         $template = FormTemplate::withoutGlobalScopes()
             ->where('public_token', $token)
@@ -39,7 +48,11 @@ class PublicFormOtpController extends Controller
             return response()->json(['message' => 'Formulário não encontrado.'], 404);
         }
 
-        RateLimiter::hit($key, 60);
+        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($tokenKey, 60);
+        if ($recipientKey) {
+            RateLimiter::hit($recipientKey, 300);
+        }
 
         if ($validated['channel'] === 'email') {
             $this->otpService->sendByEmail($token, (string) $validated['email']);

@@ -72,6 +72,7 @@ class BillingController extends Controller
             'asaas_subscription_id' => $s->asaas_subscription_id,
             'plan_key' => $s->plan_key,
             'billing_type' => $s->billing_type ?? 'BOLETO',
+            'cycle' => Plan::normalizeCycle($s->cycle ?? 'MONTHLY'),
             'status' => $s->status,
             'next_due_date' => $s->next_due_date,
             'created_at' => $s->created_at?->toIso8601String(),
@@ -123,10 +124,12 @@ class BillingController extends Controller
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido. Escolha um dos planos disponíveis.',
             'billing_type.in' => 'Forma de pagamento inválida. Use Boleto ou PIX.',
+            'cycle.in' => 'Ciclo inválido. Use mensal ou anual.',
         ]);
 
         $organization = $this->currentOrganization($request);
@@ -170,12 +173,14 @@ class BillingController extends Controller
         $wasOnTrial = $organization->isOnTrial();
         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
         $billingType = $this->asaasService->normalizeBillingType($request->input('billing_type', 'PIX'));
+        $cycle = Plan::normalizeCycle($request->input('cycle', 'MONTHLY'));
+        $chargeValue = Plan::resolveChargeValue($plan, $cycle);
 
         app(ProductEventService::class)->record(
             'checkout_started',
             (int) $organization->id,
             $request->user()?->id ? (int) $request->user()->id : null,
-            ['plan_key' => $planKey, 'billing_type' => $billingType],
+            ['plan_key' => $planKey, 'billing_type' => $billingType, 'cycle' => $cycle],
             'checkout_started:org:'.$organization->id.':'.now()->format('YmdHi'),
             ['channel' => 'billing']
         );
@@ -184,9 +189,10 @@ class BillingController extends Controller
             $payload = $this->asaasService->createSubscription(
                 $organization,
                 $planKey,
-                (float) $plan['value'],
+                $chargeValue,
                 $billingType,
-                $firstDue
+                $firstDue,
+                $cycle
             );
         } catch (\Throwable $e) {
             Log::warning('Asaas createSubscription failed', ['organization_id' => $organization->id, 'error' => $e->getMessage()]);
@@ -219,6 +225,7 @@ class BillingController extends Controller
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'billing_type' => $billingType,
+            'cycle' => $cycle,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);
@@ -239,6 +246,7 @@ class BillingController extends Controller
             'plan_key' => $planKey,
             'plan_name' => $plan['name'] ?? $planKey,
             'asaas_subscription_id' => $asaasId,
+            'cycle' => $cycle,
             'next_due_date' => $nextDue,
         ]);
 
@@ -255,6 +263,7 @@ class BillingController extends Controller
                 'message' => $successMessage,
                 'subscription_id' => $subscription->id,
                 'plan_key' => $planKey,
+                'cycle' => $cycle,
                 'next_due_date' => $nextDue,
             ],
         ], 201);
@@ -333,10 +342,12 @@ class BillingController extends Controller
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido.',
             'billing_type.in' => 'Forma de pagamento inválida.',
+            'cycle.in' => 'Ciclo inválido. Use mensal ou anual.',
         ]);
 
         $organization = $this->currentOrganization($request);
@@ -371,14 +382,17 @@ class BillingController extends Controller
         $wasOnTrial = $organization->isOnTrial();
         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
         $billingType = $this->asaasService->normalizeBillingType($request->input('billing_type', 'PIX'));
+        $cycle = Plan::normalizeCycle($request->input('cycle', 'MONTHLY'));
+        $chargeValue = Plan::resolveChargeValue($plan, $cycle);
 
         try {
             $payload = $this->asaasService->createSubscription(
                 $organization,
                 $planKey,
-                (float) $plan['value'],
+                $chargeValue,
                 $billingType,
-                $firstDue
+                $firstDue,
+                $cycle
             );
         } catch (\Throwable $e) {
             Log::warning('Asaas createSubscription (changePlan) failed', ['organization_id' => $organization->id, 'error' => $e->getMessage()]);
@@ -398,6 +412,7 @@ class BillingController extends Controller
             'asaas_subscription_id' => $asaasId,
             'plan_key' => $planKey,
             'billing_type' => $billingType,
+            'cycle' => $cycle,
             'status' => 'active',
             'next_due_date' => $nextDue,
         ]);

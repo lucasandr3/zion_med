@@ -72,3 +72,7 @@ Schedule::command('protocols:apply-retention')->dailyAt('04:30');
 Schedule::command('form-imports:purge-expired')->dailyAt('04:45');
 
 Schedule::command('organizations:sync-expired-trials')->hourly();
+
+Schedule::command('leads:recover-funnel')->dailyAt('10:00');
+
+Schedule::command('platform:health-check --notify')->hourly();

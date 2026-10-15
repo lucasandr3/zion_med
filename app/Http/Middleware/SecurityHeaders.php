@@ -17,6 +17,12 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin', false);
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()', false);
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin', false);
+        // API/JSON: CSP mínima anti-framing; SPAs têm CSP no nginx do front/site.
+        $response->headers->set(
+            'Content-Security-Policy',
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+            false
+        );
 
         if ($request->secure() || app()->environment('production')) {
             $response->headers->set(

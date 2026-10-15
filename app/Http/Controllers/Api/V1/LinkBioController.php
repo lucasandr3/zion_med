@@ -17,6 +17,8 @@ use App\Models\LinkBioLinkClick;
 use App\Models\LinkBioPageView;
 use App\Services\GooglePlacesReviewsService;
 use App\Services\ThemeService;
+use App\Support\FrontendUrl;
+use App\Support\SafePublicLinkUrl;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,6 +69,10 @@ class LinkBioController extends Controller
             abort(404, 'Link não encontrado.');
         }
 
+        if (! SafePublicLinkUrl::isAllowed((string) $clinicLink->url)) {
+            abort(404, 'Link indisponível.');
+        }
+
         LinkBioLinkClick::incrementForLink((int) $clinicLink->id);
 
         return redirect()->away($clinicLink->url);
@@ -101,7 +107,7 @@ class LinkBioController extends Controller
             $ref = '';
         }
 
-        $target = $this->resolveLinkBioCtaTargetUrl($clinic, $channel, $ref !== '' ? $ref : null);
+        $target = $this->resolveLinkBioCtaTargetUrl($clinic, $channel, $ref !== '' ? $ref : null, $request);
         if ($target === null || $target === '') {
             abort(404, 'Link indisponível.');
         }
@@ -130,7 +136,7 @@ class LinkBioController extends Controller
             LinkBioPageView::incrementForClinic($clinic->id);
         }
 
-        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $base = FrontendUrl::spaBase($request);
         $bioLinks = $clinic->bioLinks()->orderBy('sort_order')->get();
         $formLinks = FormTemplate::withoutGlobalScopes()
             ->where('organization_id', $clinic->id)
@@ -204,7 +210,7 @@ class LinkBioController extends Controller
 
         $clinic = Organization::findOrFail($clinicId);
         $bioLinks = $clinic->bioLinks()->get();
-        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $base = FrontendUrl::spaBase($request);
         $publicUrl = $base . '/l/' . $clinic->slug;
 
         $formLinksPublic = FormTemplate::withoutGlobalScopes()
@@ -371,9 +377,10 @@ class LinkBioController extends Controller
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
-            'url' => ['required', 'url', 'max:500'],
+            'url' => ['required', 'string', 'max:500'],
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
+        SafePublicLinkUrl::assertAllowed($data['url']);
 
         $maxOrder = $clinic->bioLinks()->max('sort_order') ?? -1;
         $link = $clinic->bioLinks()->create([
@@ -393,9 +400,10 @@ class LinkBioController extends Controller
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
-            'url' => ['required', 'url', 'max:500'],
+            'url' => ['required', 'string', 'max:500'],
             'icon' => ['nullable', 'string', 'max:50'],
         ]);
+        SafePublicLinkUrl::assertAllowed($data['url']);
 
         $link->update([
             'label' => $data['label'],
@@ -533,11 +541,11 @@ class LinkBioController extends Controller
         ]);
     }
 
-    private function linkBioCtaLabel(Clinic $clinic, string $channel, string $ref): string
+    private function linkBioCtaLabel(Organization $organization, string $channel, string $ref): string
     {
         if ($channel === 'team_whatsapp') {
             $idx = (int) $ref;
-            $extra = $clinic->link_bio_extra;
+            $extra = $organization->link_bio_extra;
             $team = is_array($extra) ? ($extra['team'] ?? null) : null;
             $name = is_array($team) && isset($team[$idx]['name']) ? trim((string) $team[$idx]['name']) : '';
 
@@ -545,7 +553,7 @@ class LinkBioController extends Controller
         }
 
         if ($channel === 'appointment') {
-            $extra = $clinic->link_bio_extra;
+            $extra = $organization->link_bio_extra;
             $label = is_array($extra) ? trim((string) ($extra['appointment_cta_label'] ?? '')) : '';
 
             return $label !== '' ? $label : 'Agendar atendimento';
@@ -561,7 +569,7 @@ class LinkBioController extends Controller
         };
     }
 
-    private function resolveLinkBioCtaTargetUrl(Clinic $clinic, string $channel, ?string $ref): ?string
+    private function resolveLinkBioCtaTargetUrl(Clinic $clinic, string $channel, ?string $ref, ?Request $request = null): ?string
     {
         return match ($channel) {
             'whatsapp' => $this->buildWhatsappUrlFromPhone($clinic->phone),
@@ -570,12 +578,21 @@ class LinkBioController extends Controller
             'email' => $clinic->contact_email ? 'mailto:' . trim((string) $clinic->contact_email) : null,
             'instagram' => $this->resolveInstagramUrlForCta($clinic),
             'team_whatsapp' => $this->resolveTeamWhatsappUrl($clinic, $ref),
-            'appointment' => $this->resolveAppointmentCtaUrl($clinic),
+            'appointment' => $this->resolveAppointmentCtaUrl($clinic, $request),
             default => null,
         };
     }
 
-    private function resolveAppointmentCtaUrl(Clinic $clinic): ?string
+    /**
+     * Base do SPA: prioriza ?front= (origem do Angular), depois Origin/Referer, depois FRONTEND_URL.
+     * Necessário porque o CTA usa rel=noreferrer e a porta do ng serve muda (ex.: 59698 ≠ 4200).
+     */
+    private function resolveFrontendBase(?Request $request = null): string
+    {
+        return FrontendUrl::spaBase($request);
+    }
+
+    private function resolveAppointmentCtaUrl(Clinic $clinic, ?Request $request = null): ?string
     {
         $extra = $clinic->link_bio_extra;
         if (! is_array($extra)) {
@@ -591,7 +608,7 @@ class LinkBioController extends Controller
             if ($slug === '') {
                 return null;
             }
-            $front = rtrim((string) config('app.frontend_url', env('FRONTEND_URL', '')), '/');
+            $front = $this->resolveFrontendBase($request);
             if ($front === '') {
                 return '/a/'.$slug;
             }

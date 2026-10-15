@@ -24,6 +24,19 @@ class AuthenticateBusinessHubConnector
             ], 503);
         }
 
+        $allowedIps = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('BUSINESS_HUB_CONNECTOR_ALLOWED_IPS', '')),
+        )));
+        if ($allowedIps !== [] && ! in_array((string) $request->ip(), $allowedIps, true)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'message' => 'IP não autorizado para o conector.',
+                ],
+            ], 403);
+        }
+
         $expected = $this->businessHub->getConnectorToken();
 
         if (! is_string($expected) || $expected === '') {

@@ -186,6 +186,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->gro
         Route::get('/tenants/{tenant}', [PlatformTenantsController::class, 'show'])->name('api.v1.platform.tenants.show');
         Route::get('/leads', [PlatformLeadsController::class, 'index'])->name('api.v1.platform.leads.index');
         Route::get('/plans', [PlatformPlanController::class, 'index'])->name('api.v1.platform.plans.index');
+        Route::post('/plans', [PlatformPlanController::class, 'store'])->name('api.v1.platform.plans.store');
+        Route::get('/plans/{plan}', [PlatformPlanController::class, 'show'])->name('api.v1.platform.plans.show');
+        Route::put('/plans/{plan}', [PlatformPlanController::class, 'update'])->name('api.v1.platform.plans.update');
+        Route::delete('/plans/{plan}', [PlatformPlanController::class, 'destroy'])->name('api.v1.platform.plans.destroy');
         Route::get('/status', [StatusController::class, 'index'])->name('api.v1.platform.status');
         Route::put('/status', [PlatformStatusController::class, 'update'])->name('api.v1.platform.status.update');
         Route::get('/subscriptions', [PlatformBillingOverviewController::class, 'subscriptions'])->name('api.v1.platform.subscriptions.index');
@@ -290,10 +294,13 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant',
     Route::get('/agenda/servicos', [AppointmentController::class, 'servicesIndex'])->name('api.v1.agenda.services.index');
     Route::post('/agenda/servicos', [AppointmentController::class, 'servicesStore'])->name('api.v1.agenda.services.store');
     Route::put('/agenda/servicos/{service}', [AppointmentController::class, 'servicesUpdate'])->name('api.v1.agenda.services.update');
+    Route::post('/agenda/servicos/{service}/foto', [AppointmentController::class, 'servicesUploadPhoto'])->name('api.v1.agenda.services.photo');
+    Route::delete('/agenda/servicos/{service}/foto', [AppointmentController::class, 'servicesDeletePhoto'])->name('api.v1.agenda.services.photo.destroy');
     Route::delete('/agenda/servicos/{service}', [AppointmentController::class, 'servicesDestroy'])->name('api.v1.agenda.services.destroy');
     Route::get('/agenda/disponibilidade', [AppointmentController::class, 'availabilityIndex'])->name('api.v1.agenda.availability.index');
     Route::put('/agenda/disponibilidade', [AppointmentController::class, 'availabilitySync'])->name('api.v1.agenda.availability.sync');
     Route::get('/agenda/reservas', [AppointmentController::class, 'appointmentsIndex'])->name('api.v1.agenda.appointments.index');
+    Route::post('/agenda/reservas', [AppointmentController::class, 'appointmentsStore'])->name('api.v1.agenda.appointments.store');
     Route::patch('/agenda/reservas/{appointment}', [AppointmentController::class, 'appointmentsUpdate'])->name('api.v1.agenda.appointments.update');
 
     Route::get('/link-bio', [LinkBioController::class, 'index'])->name('api.v1.link-bio.index');

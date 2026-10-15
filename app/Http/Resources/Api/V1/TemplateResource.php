@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use Illuminate\Http\Request;
+use App\Support\FrontendUrl;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class TemplateResource extends JsonResource
@@ -23,6 +24,10 @@ class TemplateResource extends JsonResource
             'uses_clinical_steps' => (bool) $this->uses_clinical_steps,
             'is_active' => $this->is_active,
             'public_enabled' => $this->public_enabled,
+            'public_url' => $this->when(
+                (bool) $this->public_enabled && filled($this->public_token),
+                fn () => FrontendUrl::base().'/f/'.$this->public_token
+            ),
             'public_require_person_link' => (bool) $this->public_require_person_link,
             'public_person_link_mode' => $this->public_require_person_link
                 ? (($this->public_person_link_mode === 'cpf') ? 'cpf' : 'code')

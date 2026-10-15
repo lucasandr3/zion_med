@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Support\PiiMasker;
+
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
 use App\Models\FeegowAppointment;
 use App\Models\FormTemplate;
 use App\Models\Organization;
@@ -245,24 +248,24 @@ class PublicFormApiController extends Controller
      */
     private function buildPersonPrefillData(Person $person): array
     {
-        // Prefill mínimo no endpoint público: sem CPF/RG/notes/plano (LGPD).
+        // Prefill público mínimo (LGPD): sem e-mail/telefone/endereço em claro.
         return [
             'id' => $person->id,
             'code' => $person->code,
             'name' => $person->name,
-            'email' => $person->email,
-            'phone' => $person->phone,
-            'phone_alt' => $person->phone_alt,
+            'email' => PiiMasker::maskEmail($person->email),
+            'phone' => PiiMasker::maskPhone($person->phone),
+            'phone_alt' => null,
             'birth_date' => optional($person->birth_date)->format('Y-m-d'),
             'age' => $person->age,
             'sex' => $person->sex,
-            'marital_status' => $person->marital_status,
-            'profession' => $person->profession,
-            'address' => $person->address,
-            'neighborhood' => $person->neighborhood,
-            'city' => $person->city,
-            'cep' => $person->cep,
-            'referred_by' => $person->referred_by,
+            'marital_status' => null,
+            'profession' => null,
+            'address' => null,
+            'neighborhood' => null,
+            'city' => null,
+            'cep' => null,
+            'referred_by' => null,
         ];
     }
 
@@ -406,6 +409,7 @@ class PublicFormApiController extends Controller
             'feegow_retorno' => ['nullable', 'boolean'],
             'feegow_sys_user' => ['nullable'],
             'feegow_external_reference' => ['nullable', 'string', 'max:120'],
+            '_appointment_token' => ['nullable', 'string', 'max:64'],
         ];
         $documentKind = $template->document_kind
             ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
@@ -604,6 +608,9 @@ class PublicFormApiController extends Controller
             $data['_actors'] = $request->input('_actors');
         }
 
+        $appointmentToken = trim((string) ($validated['_appointment_token'] ?? $request->input('_appointment_token', '')));
+        unset($data['_appointment_token']);
+
         $files = [];
         foreach ($template->fields as $field) {
             if ($field->type === 'file' && $request->hasFile($field->name_key)) {
@@ -619,6 +626,8 @@ class PublicFormApiController extends Controller
             $data,
             $submission->id,
         );
+
+        $this->linkAppointmentFromPublicForm($template, $submission->id, $appointmentToken);
 
         $submission->refresh();
 
@@ -867,6 +876,37 @@ class PublicFormApiController extends Controller
         }
 
         return Organization::query()->find($orgId);
+    }
+
+    /**
+     * Vincula a submissão à reserva pública (token opaco ?a=), sem alterar o status da agenda.
+     */
+    private function linkAppointmentFromPublicForm(FormTemplate $template, int $submissionId, string $appointmentToken): void
+    {
+        $token = trim($appointmentToken);
+        if ($token === '') {
+            return;
+        }
+        $orgId = (int) ($template->organization_id ?? $template->clinic_id ?? 0);
+        if ($orgId <= 0) {
+            return;
+        }
+        $appointment = Appointment::query()
+            ->where('organization_id', $orgId)
+            ->where('public_token', $token)
+            ->where('form_template_id', $template->id)
+            ->where('status', '!=', 'cancelled')
+            ->first();
+        if (! $appointment) {
+            return;
+        }
+        if ($appointment->form_status === 'completed' && $appointment->form_submission_id) {
+            return;
+        }
+        $appointment->update([
+            'form_submission_id' => $submissionId,
+            'form_status' => 'completed',
+        ]);
     }
 
     /**

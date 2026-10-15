@@ -78,7 +78,7 @@ class OnboardingController extends Controller
         return response()->json([
             'data' => [
                 'message' => 'Link público gerado.',
-                'public_url' => $this->publicLinkService->getPublicUrl($template),
+                'public_url' => $this->publicLinkService->getPublicUrl($template, $request),
             ],
         ]);
     }
@@ -125,7 +125,7 @@ class OnboardingController extends Controller
             'data' => [
                 'message' => 'Link de teste enviado para o seu e-mail.',
                 'id' => $send->id,
-                'public_url' => $this->publicLinkService->getPublicUrl($template),
+                'public_url' => $this->publicLinkService->getPublicUrl($template, $request),
             ],
         ], 201);
     }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Organization;
+use App\Models\Plan;
 use App\Models\Payment;
 use App\Models\Subscription;
 use Illuminate\Http\Client\RequestException;
@@ -108,10 +109,16 @@ class AsaasService
     }
 
     /**
-     * Cria assinatura no ASAAS (cycle MONTHLY, primeira cobrança em nextDueDate).
+     * Cria assinatura no ASAAS (cycle MONTHLY|YEARLY, primeira cobrança em nextDueDate).
      */
-    public function createSubscription(Organization $organization, string $planKey, float $value, string $billingType = 'BOLETO', ?string $nextDueDate = null): array
-    {
+    public function createSubscription(
+        Organization $organization,
+        string $planKey,
+        float $value,
+        string $billingType = 'BOLETO',
+        ?string $nextDueDate = null,
+        string $cycle = 'MONTHLY',
+    ): array {
         $customer = $this->ensureCustomer($organization);
         $customerId = $customer['id'] ?? $organization->asaas_customer_id;
         if (! $customerId) {
@@ -121,14 +128,16 @@ class AsaasService
         $productName = config('asaas.product_name', 'Gestgo');
         $nextDue = $nextDueDate ?? now()->format('Y-m-d');
         $billingType = $this->normalizeBillingType($billingType);
+        $cycle = Plan::normalizeCycle($cycle);
+        $periodLabel = $cycle === 'YEARLY' ? 'anual' : 'mensal';
 
         $payload = [
             'customer' => $customerId,
             'billingType' => $billingType,
             'nextDueDate' => $nextDue,
             'value' => $value,
-            'cycle' => 'MONTHLY',
-            'description' => "{$productName} - Plano {$planKey}",
+            'cycle' => $cycle,
+            'description' => "{$productName} - Plano {$planKey} ({$periodLabel})",
         ];
 
         $resp = $this->request('POST', '/subscriptions', $payload);

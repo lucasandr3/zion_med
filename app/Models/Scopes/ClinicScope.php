@@ -6,6 +6,7 @@ use App\Support\OrganizationContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 class ClinicScope implements Scope
@@ -18,6 +19,11 @@ class ClinicScope implements Scope
     {
         $tenantId = OrganizationContext::id();
         if ($tenantId === null) {
+            // Fail-closed: usuário autenticado sem org no contexto não vê dados cross-tenant.
+            if (Auth::check()) {
+                $builder->whereRaw('0 = 1');
+            }
+
             return;
         }
         $table = $model->getTable();

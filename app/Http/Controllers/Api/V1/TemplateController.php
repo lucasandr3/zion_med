@@ -194,6 +194,13 @@ class TemplateController extends Controller
         if ($activeFilter !== null) {
             $query->where('is_active', $activeFilter);
         }
+        $publicFilter = $request->publicEnabledFilter();
+        if ($publicFilter !== null) {
+            $query->where('public_enabled', $publicFilter);
+            if ($publicFilter === true) {
+                $query->whereNotNull('public_token');
+            }
+        }
         if (! empty($validated['category'])) {
             $query->where('category', $validated['category']);
         } else {
@@ -504,6 +511,7 @@ class TemplateController extends Controller
     public function updateCampo(FormFieldRequest $request, FormTemplate $template, FormField $campo): JsonResponse
     {
         $this->authorize('update-template', $template);
+        $this->assertCampoBelongsToTemplate($template, $campo);
         $data = $request->validated();
         unset($data['options_text']);
         if (isset($data['options']) && is_array($data['options'])) {
@@ -554,6 +562,7 @@ class TemplateController extends Controller
     public function destroyCampo(FormTemplate $template, FormField $campo): JsonResponse
     {
         $this->authorize('update-template', $template);
+        $this->assertCampoBelongsToTemplate($template, $campo);
         $campo->delete();
         $this->templateVersionService->ensureSyncedVersion($template->fresh(['fields']));
 
@@ -668,7 +677,7 @@ class TemplateController extends Controller
         }
         $this->templateVersionService->getOrCreateCurrentVersion($template);
         $this->publicLinkService->generateToken($template);
-        $url = $this->publicLinkService->getPublicUrl($template);
+        $url = $this->publicLinkService->getPublicUrl($template, $request);
 
         app(ProductEventService::class)->record(
             'template_published',
@@ -825,5 +834,12 @@ class TemplateController extends Controller
         return response()->json([
             'data' => ['message' => 'Link público desativado.'],
         ], 200);
+    }
+
+    private function assertCampoBelongsToTemplate(FormTemplate $template, FormField $campo): void
+    {
+        if ((int) $campo->template_id !== (int) $template->id) {
+            abort(404);
+        }
     }
 }

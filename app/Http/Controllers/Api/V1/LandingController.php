@@ -50,6 +50,7 @@ class LandingController extends Controller
                 'key' => (string) $key,
                 'name' => (string) ($data['name'] ?? $key),
                 'value' => (float) ($data['value'] ?? 0),
+                'value_yearly' => (float) ($data['value_yearly'] ?? round(((float) ($data['value'] ?? 0)) * 10, 2)),
                 'description' => (string) ($data['description'] ?? ''),
                 'max_users' => array_key_exists('max_users', $data) ? $data['max_users'] : null,
                 'max_organizations_per_tenant' => array_key_exists('max_organizations_per_tenant', $data)

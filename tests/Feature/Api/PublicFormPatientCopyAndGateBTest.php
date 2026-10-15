@@ -9,8 +9,10 @@ use App\Models\Organization;
 use App\Models\Person;
 use App\Models\SubmissionEvent;
 use Database\Seeders\OrganizationSeeder;
+use App\Jobs\GenerateSubmissionPdfJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -48,6 +50,44 @@ class PublicFormPatientCopyAndGateBTest extends TestCase
             // sem _person_name_confirmed
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['_person_name_confirmed']);
+    }
+
+
+    public function test_submit_enqueues_pdf_and_emails_without_blocking_response(): void
+    {
+        Queue::fake();
+
+        [$template] = $this->makeCpfLinkedTemplate();
+        $org = Organization::query()->findOrFail($template->organization_id);
+        $org->update(['notification_email' => 'clinic@example.com']);
+
+        $response = $this->postJson("/api/v1/formulario-publico/{$template->public_token}/submit", [
+            '_submitter_name' => 'Teste',
+            '_submitter_email' => 'paciente@example.com',
+            '_person_cpf' => self::CPF,
+            '_person_birth_date' => '1990-05-10',
+            '_person_name_confirmed' => true,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.patient_download_token', fn ($t) => is_string($t) && $t !== '');
+
+        $submission = FormSubmission::withoutGlobalScopes()
+            ->where('protocol_number', $response->json('data.protocol_number'))
+            ->firstOrFail();
+
+        $this->assertNull($submission->pdf_disk_path);
+        $this->assertNull($submission->patient_copy_emailed_at);
+        $this->assertDatabaseHas('submission_events', [
+            'form_submission_id' => $submission->id,
+            'type' => 'patient_copy_token_issued',
+        ]);
+
+        Queue::assertPushed(GenerateSubmissionPdfJob::class, function (GenerateSubmissionPdfJob $job) use ($submission) {
+            return $job->submissionId === $submission->id
+                && $job->notifyClinicWithPdf === true
+                && $job->notifyPatientCopy === true;
+        });
     }
 
     public function test_submit_with_gate_b_returns_patient_copy_and_identity_snapshot(): void
@@ -97,6 +137,10 @@ class PublicFormPatientCopyAndGateBTest extends TestCase
         $this->assertDatabaseHas('submission_events', [
             'form_submission_id' => $submission->id,
             'type' => 'patient_copy_emailed',
+        ]);
+        $this->assertDatabaseHas('submission_events', [
+            'form_submission_id' => $submission->id,
+            'type' => 'clinic_protocol_emailed',
         ]);
 
         $download = $this->get("/api/v1/formulario-publico/copia/{$token}");

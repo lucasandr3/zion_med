@@ -65,11 +65,81 @@ class LandingAnalyticsController extends Controller
             'to' => ['required', 'url', 'max:2000'],
         ]);
 
+        $target = $this->assertAllowedRedirectTarget((string) $data['to']);
+
         if (! $this->shouldSkipTracking($request)) {
             LandingCtaClick::incrementFor($channel);
         }
 
-        return redirect()->away($data['to']);
+        return redirect()->away($target);
+    }
+
+    /**
+     * Evita open redirect: só HTTPS (ou HTTP em local) para hosts allowlistados.
+     */
+    private function assertAllowedRedirectTarget(string $url): string
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            abort(422, 'URL de redirecionamento inválida.');
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+        $allowedSchemes = app()->environment('production') ? ['https'] : ['https', 'http'];
+        if (! in_array($scheme, $allowedSchemes, true)) {
+            abort(422, 'Esquema de URL não permitido.');
+        }
+
+        $allowed = $this->allowedRedirectHosts();
+        $ok = false;
+        foreach ($allowed as $allowedHost) {
+            if ($host === $allowedHost || str_ends_with($host, '.'.$allowedHost)) {
+                $ok = true;
+                break;
+            }
+        }
+        if (! $ok) {
+            abort(422, 'Destino de redirecionamento não permitido.');
+        }
+
+        return $url;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedRedirectHosts(): array
+    {
+        $hosts = [
+            'gestgo.com.br',
+            'app.gestgo.com.br',
+            'site-homolog.gestgo.com.br',
+            'homolog.gestgo.com.br',
+            'wa.me',
+            'api.whatsapp.com',
+            'www.instagram.com',
+            'instagram.com',
+            'maps.google.com',
+            'www.google.com',
+            'goo.gl',
+            'maps.app.goo.gl',
+        ];
+
+        $frontend = (string) config('app.frontend_url', '');
+        if ($frontend !== '') {
+            $fh = parse_url($frontend, PHP_URL_HOST);
+            if (is_string($fh) && $fh !== '') {
+                $hosts[] = strtolower($fh);
+            }
+        }
+
+        $extra = array_filter(array_map('trim', explode(',', (string) env('LANDING_REDIRECT_ALLOWED_HOSTS', ''))));
+        foreach ($extra as $h) {
+            $hosts[] = strtolower($h);
+        }
+
+        return array_values(array_unique($hosts));
     }
 
     private function shouldSkipTracking(Request $request): bool

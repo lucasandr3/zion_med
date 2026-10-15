@@ -22,6 +22,20 @@ final class ErrorHubSanitizer
         'api_key',
         'apikey',
         'remember_token',
+        'cpf',
+        'cpf_hash',
+        'rg',
+        'email',
+        'phone',
+        'phone_alt',
+        'birth_date',
+        'address',
+        'cep',
+        'webhook_secret',
+        'asaas_api_key',
+        'minio_secret_key',
+        'feegow_token',
+        'evolution_go_instance_token',
     ];
 
     public static function sanitize(mixed $value, int $depth = 0): mixed

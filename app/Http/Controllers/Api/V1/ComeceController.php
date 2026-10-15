@@ -11,6 +11,7 @@ use App\Http\Resources\Api\V1\OrganizationResource;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\FormTemplate;
 use App\Models\Organization;
+use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
@@ -63,6 +64,7 @@ class ComeceController extends Controller
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
             'phone' => [
                 'required',
                 'string',
@@ -154,12 +156,15 @@ class ComeceController extends Controller
                         $organization->refresh();
                         $firstDue = $this->asaasService->firstChargeDueDateForOrganization($organization);
                         $billingType = $this->asaasService->normalizeBillingType($validated['billing_type'] ?? 'PIX');
+                        $cycle = Plan::normalizeCycle($validated['cycle'] ?? 'MONTHLY');
+                        $chargeValue = Plan::resolveChargeValue($plan, $cycle);
                         $payload = $this->asaasService->createSubscription(
                             $organization,
                             $validated['plan_key'],
-                            (float) $plan['value'],
+                            $chargeValue,
                             $billingType,
-                            $firstDue
+                            $firstDue,
+                            $cycle
                         );
                         $asaasId = $payload['id'] ?? null;
                         if ($asaasId) {
@@ -169,6 +174,7 @@ class ComeceController extends Controller
                                 'asaas_subscription_id' => $asaasId,
                                 'plan_key' => $validated['plan_key'],
                                 'billing_type' => $billingType,
+                                'cycle' => $cycle,
                                 'status' => 'active',
                                 'next_due_date' => $firstInvoiceDueDate,
                             ]);

@@ -51,7 +51,8 @@ class SubmissionService
     ) {}
 
     /**
-     * Emite token de cópia do paciente, persiste PDF, notifica clínica (com anexo) e paciente.
+     * Emite o token de cópia imediatamente e enfileira PDF + e-mails (clínica/paciente).
+     * Mantém o submit HTTP rápido; download on-demand ainda funciona via PdfService::streamSubmissionPdf.
      *
      * @return array{patient_download_token: string, patient_download_url: string, patient_download_expires_at: string|null}
      */
@@ -59,21 +60,21 @@ class SubmissionService
     {
         $submission->loadMissing(['template', 'organization']);
 
-        try {
-            app(PdfService::class)->persistSubmissionPdf($submission);
-        } catch (\Throwable $e) {
-            report($e);
-            GenerateSubmissionPdfJob::dispatch($submission->id, true);
+        $token = $this->patientCopyService->issueDownloadToken($submission);
 
-            $copy = $this->patientCopyService->issueAndNotify($submission);
+        GenerateSubmissionPdfJob::dispatch(
+            $submission->id,
+            notifyClinicWithPdf: true,
+            notifyPatientCopy: true,
+        );
 
-            return $copy;
-        }
+        $fresh = $submission->fresh() ?? $submission;
 
-        $this->sendClinicNotificationWithPdf($submission->fresh());
-        $copy = $this->patientCopyService->issueAndNotify($submission);
-
-        return $copy;
+        return [
+            'patient_download_token' => $token,
+            'patient_download_url' => $this->patientCopyService->downloadUrl($token),
+            'patient_download_expires_at' => optional($fresh->patient_download_token_expires_at)?->toIso8601String(),
+        ];
     }
 
     /**
@@ -120,6 +121,18 @@ class SubmissionService
                     }
                 }
             );
+
+            SubmissionEvent::create([
+                'form_submission_id' => $submission->id,
+                'type' => 'clinic_protocol_emailed',
+                'user_id' => null,
+                'body' => 'E-mail de novo protocolo enviado à clínica.',
+                'meta_json' => [
+                    'email' => $email,
+                    'pdf_attached' => is_string($pdfContent) && $pdfContent !== '',
+                    'emailed_at' => now()->toIso8601String(),
+                ],
+            ]);
         } catch (\Throwable) {
             // Log e continuar sem falhar o fluxo
         }
@@ -226,7 +239,7 @@ class SubmissionService
                 }
             }
 
-            // E-mail da clínica com PDF sai em finalizePublicCopyAndPdf (após persistir o artefato).
+            // PDF + e-mails clínica/paciente saem no GenerateSubmissionPdfJob (após o commit).
 
             return $submission;
         });

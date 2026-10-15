@@ -38,7 +38,7 @@ class OrganizationSeeder extends Seeder
                 'name' => 'Clínica QA Gestgo',
                 'niche' => self::NICHE,
                 'notification_email' => 'qa@gestgo.test',
-                'address' => 'Ambiente de testes manuais (QA)',
+                'address' => null,
             ],
         );
 

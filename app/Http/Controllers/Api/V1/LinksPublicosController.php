@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LinksPublicosIndexRequest;
 use App\Models\FormTemplate;
 use App\Support\ApiPagination;
+use App\Support\FrontendUrl;
 use Illuminate\Http\JsonResponse;
 
 class LinksPublicosController extends Controller
@@ -23,7 +24,7 @@ class LinksPublicosController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $base = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $base = FrontendUrl::spaBase($request);
         $data = collect($paginator->items())->map(function (FormTemplate $t) use ($base) {
             return [
                 'id' => $t->id,

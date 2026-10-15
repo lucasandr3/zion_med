@@ -21,10 +21,13 @@ class PlanRequest extends FormRequest
             $keyUnique->ignore($plan->id);
         }
 
+        $isUpdate = $this->isMethod('PUT') || $this->isMethod('PATCH');
+
         return [
-            'key' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9_-]+$/', $keyUnique],
+            'key' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:64', 'regex:/^[a-z0-9_-]+$/', $keyUnique],
             'name' => ['required', 'string', 'max:128'],
             'value' => ['required', 'numeric', 'min:0'],
+            'value_yearly' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string', 'max:500'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
@@ -37,6 +40,7 @@ class PlanRequest extends FormRequest
             'key' => 'chave',
             'name' => 'nome',
             'value' => 'valor (R$/mês)',
+            'value_yearly' => 'valor (R$/ano)',
             'description' => 'descrição',
             'sort_order' => 'ordem',
             'is_active' => 'ativo',

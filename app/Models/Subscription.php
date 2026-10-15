@@ -14,6 +14,7 @@ class Subscription extends Model
         'asaas_subscription_id',
         'plan_key',
         'billing_type',
+        'cycle',
         'status',
         'current_period_end',
         'next_due_date',

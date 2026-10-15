@@ -26,6 +26,7 @@ return [
         'solo' => [
             'name' => env('ASAAS_PLAN_SOLO_NAME', 'Gestgo Profissional'),
             'value' => (float) env('ASAAS_PLAN_SOLO_VALUE', 97),
+            'value_yearly' => (float) env('ASAAS_PLAN_SOLO_VALUE_YEARLY', 970),
             'description' => 'Plano completo: fichas digitais, consentimentos, assinatura eletrônica, protocolo, PDF, link da bio, templates e usuários ilimitados.',
             'max_users' => null,
             'max_organizations_per_tenant' => 1,

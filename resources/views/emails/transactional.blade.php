@@ -1,5 +1,5 @@
 @extends('emails.layout-branded')
 
 @section('content')
-    {!! $body ?? '' !!}
+    {!! \App\Support\SafeEmailHtml::clean($body ?? '') !!}
 @endsection

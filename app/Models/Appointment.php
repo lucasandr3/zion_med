@@ -11,7 +11,7 @@ class Appointment extends Model
     protected $fillable = [
         'organization_id', 'appointment_service_id', 'starts_at', 'ends_at', 'status',
         'patient_name', 'patient_email', 'patient_phone', 'person_id', 'form_template_id',
-        'public_token', 'notes',
+        'form_status', 'form_submission_id', 'public_token', 'notes',
     ];
 
     protected $casts = [
@@ -46,5 +46,10 @@ class Appointment extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(FormTemplate::class, 'form_template_id');
+    }
+
+    public function formSubmission(): BelongsTo
+    {
+        return $this->belongsTo(FormSubmission::class, 'form_submission_id');
     }
 }

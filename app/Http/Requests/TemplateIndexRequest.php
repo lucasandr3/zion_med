@@ -8,13 +8,20 @@ class TemplateIndexRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('view-submissions') ?? false;
+        $user = $this->user();
+
+        return $user !== null && (
+            $user->can('view-submissions')
+            || $user->can('manage-templates')
+            || $user->can('manage-clinic')
+        );
     }
 
     public function rules(): array
     {
         return [
             'is_active' => ['nullable', 'boolean'],
+            'public_enabled' => ['nullable', 'boolean'],
             'category' => ['nullable', 'string', 'max:80'],
         ];
     }
@@ -26,5 +33,14 @@ class TemplateIndexRequest extends FormRequest
         }
 
         return $this->boolean('is_active');
+    }
+
+    public function publicEnabledFilter(): ?bool
+    {
+        if (! $this->has('public_enabled')) {
+            return null;
+        }
+
+        return $this->boolean('public_enabled');
     }
 }

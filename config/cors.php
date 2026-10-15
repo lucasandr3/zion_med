@@ -5,8 +5,14 @@ $defaultOrigins = [
     'https://gestgo.com.br',
     'https://site-homolog.gestgo.com.br',
     'https://homolog.gestgo.com.br',
-    'https://api-homolog.gestgo.com.br',
 ];
+
+// Não usar app() aqui — config carrega cedo demais no bootstrap.
+if (env('APP_ENV', 'production') !== 'production') {
+    $defaultOrigins[] = 'http://localhost:4200';
+    $defaultOrigins[] = 'http://localhost:59698';
+    $defaultOrigins[] = 'http://127.0.0.1:4200';
+}
 
 $fromEnv = array_values(array_filter(array_map(
     'trim',
