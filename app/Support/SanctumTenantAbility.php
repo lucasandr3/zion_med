@@ -31,9 +31,9 @@ final class SanctumTenantAbility
         return null;
     }
 
-    public static function fromToken(?PersonalAccessToken $token): ?int
+    public static function fromToken(mixed $token): ?int
     {
-        if ($token === null) {
+        if (! $token instanceof PersonalAccessToken) {
             return null;
         }
 

@@ -12,7 +12,7 @@ Pressuposto: **não usa Docker** em produção.
 5. [04-nginx-site.md](./04-nginx-site.md) — Nginx do site marketing (`gestgo.com.br`)
 6. [05-dependencias-e-deploy.md](./05-dependencias-e-deploy.md) — composer/npm e deploy
 7. [06-business-hub-e-webhooks.md](./06-business-hub-e-webhooks.md) — conector + n8n + Asaas
-8. [07-sessao-httponly-futuro.md](./07-sessao-httponly-futuro.md) — migração futura do token (localStorage → cookie)
+8. [07-sessao-httponly-futuro.md](./07-sessao-httponly-futuro.md) — sessão HttpOnly do SPA (o que falta no `.env`)
 
 ## Repositórios
 

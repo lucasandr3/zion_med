@@ -68,6 +68,7 @@ use Illuminate\Support\Facades\Route;
 
 // Auth e formulário público (sem auth:sanctum)
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::get('/auth/csrf', [AuthController::class, 'csrf'])->name('api.v1.auth.csrf');
     Route::middleware('throttle:auth')->group(function () {
         Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
         Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.v1.auth.forgot-password');
@@ -157,7 +158,7 @@ Route::bind('protocol', fn ($value) => app(OrganizationScopedRouteBinding::class
 Route::bind('documentSend', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(DocumentSend::class, $value));
 
 // Rotas que qualquer usuário autenticado pode acessar (incl. platform_admin): logout, me, notificações
-Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 'throttle:api'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
     Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
@@ -218,14 +219,14 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'throttle:api'])->gro
 });
 
 // Onboarding pós-cadastro (tenant autenticado; e-mail pode estar pendente de verificação)
-Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'tenant', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 'tenant', 'throttle:api'])->group(function () {
     Route::get('/onboarding/templates', [OnboardingController::class, 'templates'])->name('api.v1.onboarding.templates');
     Route::post('/onboarding/templates/{template}/link-publico', [OnboardingController::class, 'gerarLink'])->name('api.v1.onboarding.link');
     Route::post('/onboarding/templates/{template}/enviar-para-mim', [OnboardingController::class, 'enviarParaMim'])->name('api.v1.onboarding.send-self');
 });
 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
-Route::prefix('v1')->middleware(['auth:sanctum', 'active', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
     Route::get('/compliance/relatorio', ComplianceReportController::class)->name('api.v1.compliance.relatorio');
     Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');

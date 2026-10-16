@@ -27,7 +27,6 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
 use App\Support\PresenceLeaveToken;
-use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
 
 class ComeceController extends Controller
@@ -196,7 +195,6 @@ class ComeceController extends Controller
             }
 
             $user->tokens()->where('name', 'spa')->delete();
-            $token = $user->createToken('spa', SanctumTenantAbility::tokenAbilitiesForOrganization((int) $organization->id))->plainTextToken;
 
             session([
                 'current_clinic_id' => $organization->id,
@@ -248,8 +246,6 @@ class ComeceController extends Controller
 
             return response()->json([
                 'data' => [
-                    'token' => $token,
-                    'token_type' => 'Bearer',
                     'user' => new UserResource($user),
                     'current_organization_id' => $organization->id,
                     'organizations' => OrganizationResource::collection($organizations),

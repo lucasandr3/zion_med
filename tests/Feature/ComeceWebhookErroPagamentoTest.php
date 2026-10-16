@@ -107,8 +107,9 @@ class ComeceWebhookErroPagamentoTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonStructure([
-            'data' => ['token', 'user', 'organizations'],
+            'data' => ['user', 'organizations'],
         ]);
+        $this->assertArrayNotHasKey('token', $response->json('data'));
 
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'erro-pagamento'));
 

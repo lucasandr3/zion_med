@@ -17,6 +17,7 @@
 - [x] Headers de segurança no nginx do app + CSP no site
 - [x] Site `apiBase` → API de produção
 - [x] Business Hub: allowlist opcional de IPs via env
+- [x] Sessão HttpOnly do SPA (Bearer só em token de integração)
 
 ## Você precisa fazer no servidor
 
@@ -32,5 +33,4 @@
 
 ## Não automatizado nesta rodada (planejado)
 
-- Migração completa Sanctum Bearer `localStorage` → cookie HttpOnly (ver `07-sessao-httponly-futuro.md`)
 - Remover `'unsafe-inline'` da CSP (exige nonces/hashes no build)

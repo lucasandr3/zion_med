@@ -44,6 +44,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Em HTTP local o navegador descarta cookie Secure. Produção continua com SESSION_SECURE_COOKIE=true.
+        if ($this->app->environment('local') && ! $this->app->runningInConsole() && ! request()->isSecure()) {
+            config(['session.secure' => false]);
+        }
+
         App::setLocale('pt_BR');
 
         try {

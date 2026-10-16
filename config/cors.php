@@ -7,10 +7,11 @@ $defaultOrigins = [
     'https://homolog.gestgo.com.br',
 ];
 
+$localOrigins = env('APP_ENV', 'production') !== 'production';
+
 // Não usar app() aqui — config carrega cedo demais no bootstrap.
-if (env('APP_ENV', 'production') !== 'production') {
+if ($localOrigins) {
     $defaultOrigins[] = 'http://localhost:4200';
-    $defaultOrigins[] = 'http://localhost:59698';
     $defaultOrigins[] = 'http://127.0.0.1:4200';
 }
 
@@ -39,7 +40,10 @@ return [
 
     'allowed_origins' => $configuredOrigins,
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => $localOrigins ? [
+        '#^http://localhost(:\d+)?$#',
+        '#^http://127\.0\.0\.1(:\d+)?$#',
+    ] : [],
 
     'allowed_headers' => [
         'Authorization',
@@ -48,12 +52,14 @@ return [
         'X-Organization-Id',
         'X-Clinic-Id',
         'X-Requested-With',
+        'X-CSRF-TOKEN',
+        'X-XSRF-TOKEN',
     ],
 
     'exposed_headers' => [],
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

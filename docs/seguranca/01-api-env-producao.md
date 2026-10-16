@@ -18,15 +18,18 @@ APP_DEBUG=false
 APP_URL=https://api.gestgo.com.br
 FRONTEND_URL=https://app.gestgo.com.br
 
-# Sessão / cookies (mesmo se a SPA usa Bearer hoje)
+# Sessão HttpOnly do SPA. Cookie só no host da API — não defina SESSION_DOMAIN=.gestgo.com.br
 SESSION_SECURE_COOKIE=true
 SESSION_ENCRYPT=true
+SESSION_DOMAIN=
+SESSION_SAME_SITE=lax
 
 # CORS — liste só origens reais (vírgula, sem espaços extras desnecessários)
 CORS_ALLOWED_ORIGINS=https://app.gestgo.com.br,https://gestgo.com.br
 
 SANCTUM_EXPIRATION=1440
-SANCTUM_STATEFUL_DOMAINS=app.gestgo.com.br,gestgo.com.br
+# Só o SPA. Não inclua gestgo.com.br (o /comece do site não envia CSRF).
+SANCTUM_STATEFUL_DOMAINS=app.gestgo.com.br
 
 LOG_VIEWER_ENABLED=false
 SCRAMBLE_PUBLIC=false

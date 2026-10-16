@@ -18,13 +18,31 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use App\Support\PresenceLeaveToken;
-use App\Support\SanctumTenantAbility;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
     /**
-     * Login: email + password. Retorna token Sanctum e dados do usuário/organizações.
+     * Token CSRF da sessão SPA. O valor vai no header X-CSRF-TOKEN; o cookie de sessão fica HttpOnly.
+     */
+    public function csrf(Request $request): JsonResponse
+    {
+        if (! $request->hasSession()) {
+            return response()->json([
+                'message' => 'Sessão indisponível para esta origem.',
+            ], 400);
+        }
+
+        return response()->json([
+            'data' => [
+                'csrf_token' => csrf_token(),
+            ],
+        ]);
+    }
+
+    /**
+     * Login: email + password. Abre sessão em cookie HttpOnly (sem Bearer no JSON).
      * Para trocar de empresa, use o header X-Organization-Id (ou X-Clinic-Id) nas próximas requisições.
      * Rate limit: 5 req/min por IP (throttle:auth).
      */
@@ -50,9 +68,15 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! $request->hasSession()) {
+            return response()->json([
+                'message' => 'Login do aplicativo exige a origem do SPA.',
+            ], 400);
+        }
+
+        $request->session()->regenerate();
         $user->tokens()->where('name', 'spa')->delete();
         $currentOrganizationId = $user->clinic_id ? (int) $user->clinic_id : null;
-        $token = $user->createToken('spa', SanctumTenantAbility::tokenAbilitiesForOrganization($currentOrganizationId))->plainTextToken;
 
         $organizations = $this->organizationsForUser($user);
         if ($organizations->isNotEmpty() && $currentOrganizationId) {
@@ -67,11 +91,10 @@ class AuthController extends Controller
         }
 
         $payload = [
-            'token' => $token,
-            'token_type' => 'Bearer',
             'user' => new UserResource($user),
             'current_organization_id' => $currentOrganizationId,
             'organizations' => OrganizationResource::collection($organizations),
+            'csrf_token' => csrf_token(),
         ];
 
         if ($user->isTenantUser() && $currentOrganizationId) {
@@ -94,7 +117,16 @@ class AuthController extends Controller
             app(OrganizationPresenceService::class)->leave((int) $organizationId);
         }
 
-        $user->currentAccessToken()->delete();
+        $accessToken = $user->currentAccessToken();
+        if ($accessToken instanceof PersonalAccessToken) {
+            $accessToken->delete();
+        }
+
+        if ($request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->json(['data' => ['message' => 'Logout realizado com sucesso.']]);
     }

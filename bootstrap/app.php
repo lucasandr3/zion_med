@@ -18,9 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->statefulApi();
+
         $middleware->validateCsrfTokens(except: [
             'webhooks/asaas',
         ]);
+
+        $middleware->append(\App\Http\Middleware\LimitCorsCredentials::class);
 
         $middleware->web(append: [
             \App\Http\Middleware\SetClinic::class,
@@ -40,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \App\Http\Middleware\EnsureEmailIsVerifiedApi::class,
             'business_hub.connector' => \App\Http\Middleware\AuthenticateBusinessHubConnector::class,
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+            'reject.spa_bearer' => \App\Http\Middleware\RejectSpaBearerToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
