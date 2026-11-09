@@ -12,6 +12,7 @@ class Plan extends Model
         'name',
         'value',
         'value_yearly',
+        'value_semiannual',
         'description',
         'max_users',
         'max_organizations_per_tenant',
@@ -22,10 +23,14 @@ class Plan extends Model
     protected $casts = [
         'value' => 'decimal:2',
         'value_yearly' => 'decimal:2',
+        'value_semiannual' => 'decimal:2',
         'is_active' => 'boolean',
         'max_users' => 'integer',
         'max_organizations_per_tenant' => 'integer',
     ];
+
+    /** Ciclos aceitos pelo Asaas neste produto. */
+    public const CYCLES = ['MONTHLY', 'SEMIANNUALLY', 'YEARLY'];
 
     protected static function booted(): void
     {
@@ -41,12 +46,13 @@ class Plan extends Model
     /**
      * Valor cobrado no gateway para o ciclo informado.
      * YEARLY: value_yearly se definido, senão 10 × value (mensal).
+     * SEMIANNUALLY: value_semiannual se definido, senão 5 × value (mensal).
      *
-     * @param  array{value?: float|int|string|null, value_yearly?: float|int|string|null}  $plan
+     * @param  array{value?: float|int|string|null, value_yearly?: float|int|string|null, value_semiannual?: float|int|string|null}  $plan
      */
     public static function resolveChargeValue(array $plan, string $cycle = 'MONTHLY'): float
     {
-        $cycle = strtoupper(trim($cycle)) === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
+        $cycle = static::normalizeCycle($cycle);
         $monthly = (float) ($plan['value'] ?? 0);
 
         if ($cycle === 'YEARLY') {
@@ -58,15 +64,31 @@ class Plan extends Model
             return round($monthly * 10, 2);
         }
 
+        if ($cycle === 'SEMIANNUALLY') {
+            $semi = $plan['value_semiannual'] ?? null;
+            if ($semi !== null && $semi !== '' && (float) $semi > 0) {
+                return round((float) $semi, 2);
+            }
+
+            return round($monthly * 5, 2);
+        }
+
         return round($monthly, 2);
     }
 
     /**
-     * Normaliza ciclo Asaas (MONTHLY|YEARLY).
+     * Normaliza ciclo Asaas (MONTHLY|SEMIANNUALLY|YEARLY).
+     * Aceita aliases: SEMIANNUAL, SEMESTER, SEMESTRAL.
      */
     public static function normalizeCycle(?string $cycle): string
     {
-        return strtoupper(trim((string) $cycle)) === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
+        $raw = strtoupper(trim((string) $cycle));
+
+        return match ($raw) {
+            'YEARLY' => 'YEARLY',
+            'SEMIANNUALLY', 'SEMIANNUAL', 'SEMESTER', 'SEMESTRAL' => 'SEMIANNUALLY',
+            default => 'MONTHLY',
+        };
     }
 
     /**
@@ -85,11 +107,15 @@ class Plan extends Model
                     $yearly = $p->value_yearly !== null
                         ? (float) $p->value_yearly
                         : round($monthly * 10, 2);
+                    $semiannual = $p->value_semiannual !== null
+                        ? (float) $p->value_semiannual
+                        : round($monthly * 5, 2);
 
                     $row = [
                         'name' => $p->name,
                         'value' => $monthly,
                         'value_yearly' => $yearly,
+                        'value_semiannual' => $semiannual,
                         'description' => $p->description,
                     ];
                     if ($p->max_users !== null) {

@@ -28,8 +28,12 @@ class PlanController extends Controller
     public function store(PlanRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $monthly = (float) ($data['value'] ?? 0);
         if (! array_key_exists('value_yearly', $data) || $data['value_yearly'] === null) {
-            $data['value_yearly'] = round(((float) ($data['value'] ?? 0)) * 10, 2);
+            $data['value_yearly'] = round($monthly * 10, 2);
+        }
+        if (! array_key_exists('value_semiannual', $data) || $data['value_semiannual'] === null) {
+            $data['value_semiannual'] = round($monthly * 5, 2);
         }
 
         $plan = Plan::create($data);
@@ -62,6 +66,9 @@ class PlanController extends Controller
         $yearly = $p->value_yearly !== null
             ? (float) $p->value_yearly
             : round($monthly * 10, 2);
+        $semiannual = $p->value_semiannual !== null
+            ? (float) $p->value_semiannual
+            : round($monthly * 5, 2);
 
         return [
             'id' => $p->id,
@@ -69,6 +76,7 @@ class PlanController extends Controller
             'name' => $p->name,
             'value' => $monthly,
             'value_yearly' => $yearly,
+            'value_semiannual' => $semiannual,
             'description' => $p->description,
             'max_users' => $p->max_users,
             'max_organizations_per_tenant' => $p->max_organizations_per_tenant,

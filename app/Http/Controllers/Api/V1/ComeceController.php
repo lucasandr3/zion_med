@@ -63,7 +63,7 @@ class ComeceController extends Controller
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('asaas.plans', [])))],
             'billing_document' => $billingDocumentRules,
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
-            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'SEMIANNUALLY', 'SEMIANNUAL', 'SEMESTER', 'SEMESTRAL', 'YEARLY'])],
             'phone' => [
                 'required',
                 'string',

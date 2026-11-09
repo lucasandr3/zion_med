@@ -59,6 +59,7 @@ class PlatformSettingsSeeder extends Seeder
                 'name' => $plan['name'] ?? $key,
                 'value' => $plan['value'] ?? 0,
                 'value_yearly' => $plan['value_yearly'] ?? round(((float) ($plan['value'] ?? 0)) * 10, 2),
+                'value_semiannual' => $plan['value_semiannual'] ?? round(((float) ($plan['value'] ?? 0)) * 5, 2),
                 'description' => $plan['description'] ?? null,
                 'max_users' => isset($plan['max_users']) ? (int) $plan['max_users'] : null,
                 'max_organizations_per_tenant' => isset($plan['max_organizations_per_tenant'])

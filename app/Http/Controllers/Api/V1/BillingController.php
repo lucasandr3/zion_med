@@ -124,12 +124,12 @@ class BillingController extends Controller
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
-            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'SEMIANNUALLY', 'SEMIANNUAL', 'SEMESTER', 'SEMESTRAL', 'YEARLY'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido. Escolha um dos planos disponíveis.',
             'billing_type.in' => 'Forma de pagamento inválida. Use Boleto ou PIX.',
-            'cycle.in' => 'Ciclo inválido. Use mensal ou anual.',
+            'cycle.in' => 'Ciclo inválido. Use mensal, semestral ou anual.',
         ]);
 
         $organization = $this->currentOrganization($request);
@@ -342,12 +342,12 @@ class BillingController extends Controller
         $request->validate([
             'plan_key' => ['required', 'string', Rule::in($allowedPlanKeys)],
             'billing_type' => ['nullable', 'string', Rule::in(['BOLETO', 'PIX'])],
-            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'YEARLY'])],
+            'cycle' => ['nullable', 'string', Rule::in(['MONTHLY', 'SEMIANNUALLY', 'SEMIANNUAL', 'SEMESTER', 'SEMESTRAL', 'YEARLY'])],
         ], [
             'plan_key.required' => 'Nenhum plano foi selecionado.',
             'plan_key.in' => 'Plano inválido.',
             'billing_type.in' => 'Forma de pagamento inválida.',
-            'cycle.in' => 'Ciclo inválido. Use mensal ou anual.',
+            'cycle.in' => 'Ciclo inválido. Use mensal, semestral ou anual.',
         ]);
 
         $organization = $this->currentOrganization($request);

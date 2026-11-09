@@ -109,7 +109,7 @@ class AsaasService
     }
 
     /**
-     * Cria assinatura no ASAAS (cycle MONTHLY|YEARLY, primeira cobrança em nextDueDate).
+     * Cria assinatura no ASAAS (cycle MONTHLY|SEMIANNUALLY|YEARLY, primeira cobrança em nextDueDate).
      */
     public function createSubscription(
         Organization $organization,
@@ -129,7 +129,11 @@ class AsaasService
         $nextDue = $nextDueDate ?? now()->format('Y-m-d');
         $billingType = $this->normalizeBillingType($billingType);
         $cycle = Plan::normalizeCycle($cycle);
-        $periodLabel = $cycle === 'YEARLY' ? 'anual' : 'mensal';
+        $periodLabel = match ($cycle) {
+            'YEARLY' => 'anual',
+            'SEMIANNUALLY' => 'semestral',
+            default => 'mensal',
+        };
 
         $payload = [
             'customer' => $customerId,
