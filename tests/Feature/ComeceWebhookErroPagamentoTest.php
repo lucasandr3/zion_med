@@ -140,4 +140,32 @@ class ComeceWebhookErroPagamentoTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_duplicate_cnpj_is_rejected(): void
+    {
+        Http::fake();
+
+        $this->mock(AsaasService::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->andReturn(false);
+        });
+
+        $cnpj = '11222333000181';
+
+        $first = $this->postJson(route('api.v1.comece.store'), $this->validPayload([
+            'email' => 'primeiro-cnpj@teste.com',
+            'billing_document' => $cnpj,
+        ]));
+        $first->assertStatus(201);
+
+        $second = $this->postJson(route('api.v1.comece.store'), $this->validPayload([
+            'email' => 'segundo-cnpj@teste.com',
+            'company_name' => 'Outra Clínica',
+            'billing_document' => '11.222.333/0001-81',
+        ]));
+
+        $second->assertStatus(422);
+        $second->assertJsonValidationErrors(['billing_document']);
+        $this->assertDatabaseCount('tenants', 1);
+        $this->assertDatabaseCount('users', 1);
+    }
 }

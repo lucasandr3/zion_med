@@ -10,7 +10,9 @@ use App\Services\FormImportConfigService;
 use App\Services\ProductEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class FormImportController extends Controller
 {
@@ -31,22 +33,40 @@ class FormImportController extends Controller
         }
 
         $maxKb = (int) config('form_import.max_upload_kb', 10240);
-        $data = $request->validate([
-            'file' => ['required', 'file', 'max:'.$maxKb, 'mimes:pdf,jpg,jpeg,png,txt'],
+        $maxFiles = max(1, (int) config('form_import.max_files', 10));
+
+        $request->validate([
+            'file' => ['nullable', 'file', 'max:'.$maxKb, 'mimes:pdf,jpg,jpeg,png,txt'],
+            'files' => ['nullable', 'array', 'min:1', 'max:'.$maxFiles],
+            'files.*' => ['file', 'max:'.$maxKb, 'mimes:pdf,jpg,jpeg,png,txt'],
             'idempotency_key' => ['nullable', 'string', 'max:191'],
             'consent_blank_ack' => ['accepted'],
         ], [
             'consent_blank_ack.accepted' => 'Confirme que o arquivo é uma ficha em branco, sem dados de paciente.',
+            'files.max' => 'Envie no máximo '.$maxFiles.' arquivos por importação.',
         ]);
 
-        $import = $this->imports->createFromUpload(
-            (int) $orgId,
-            (int) $request->user()->id,
-            $data['file'],
-            $data['idempotency_key'] ?? null,
-        );
+        $files = $this->resolveUploadFiles($request);
+        if ($files === []) {
+            throw ValidationException::withMessages([
+                'file' => 'Envie um PDF, foto(s) ou TXT da ficha em branco.',
+            ]);
+        }
 
-        return response()->json(['data' => $this->serialize($import->fresh())], 201);
+        $this->assertCompatibleFileSet($files);
+
+        try {
+            $import = $this->imports->createFromUpload(
+                (int) $orgId,
+                (int) $request->user()->id,
+                $files,
+                $request->input('idempotency_key'),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $this->serialize($import->fresh(['pages']))], 201);
     }
 
     public function show(Request $request, FormImport $formImport): JsonResponse
@@ -54,7 +74,7 @@ class FormImportController extends Controller
         $this->authorize('manage-templates');
         $this->assertOrg($request, $formImport);
 
-        return response()->json(['data' => $this->serialize($formImport)]);
+        return response()->json(['data' => $this->serialize($formImport->loadMissing('pages'))]);
     }
 
     public function updateDraft(Request $request, FormImport $formImport): JsonResponse
@@ -80,7 +100,7 @@ class FormImportController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->serialize($import)]);
+        return response()->json(['data' => $this->serialize($import->loadMissing('pages'))]);
     }
 
     public function commit(Request $request, FormImport $formImport): JsonResponse
@@ -119,7 +139,7 @@ class FormImportController extends Controller
 
         return response()->json([
             'data' => [
-                'form_import' => $this->serialize($formImport->fresh()),
+                'form_import' => $this->serialize($formImport->fresh(['pages'])),
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
@@ -134,13 +154,22 @@ class FormImportController extends Controller
         $this->assertOrg($request, $formImport);
 
         $disk = $formImport->source_disk ?: 'local';
-        $path = (string) $formImport->source_path;
+        $pageNumber = max(1, (int) $request->query('page', 1));
+        $page = $formImport->pages()->where('page_number', $pageNumber)->first();
+
+        if ($page && filled($page->path)) {
+            $path = (string) $page->path;
+            $mime = (string) ($page->mime ?: 'application/octet-stream');
+            $name = (string) ($page->original_name ?: basename($path));
+        } else {
+            $path = (string) $formImport->source_path;
+            $mime = (string) ($formImport->source_mime ?: 'application/octet-stream');
+            $name = (string) ($formImport->source_original_name ?: basename($path));
+        }
+
         if ($path === '' || ! Storage::disk($disk)->exists($path)) {
             abort(404, 'Arquivo fonte não encontrado.');
         }
-
-        $mime = (string) ($formImport->source_mime ?: 'application/octet-stream');
-        $name = (string) ($formImport->source_original_name ?: basename($path));
 
         return Storage::disk($disk)->response($path, $name, [
             'Content-Type' => $mime,
@@ -155,8 +184,20 @@ class FormImportController extends Controller
         $this->authorize('manage-templates');
         $this->assertOrg($request, $formImport);
 
+        $disk = $formImport->source_disk ?: 'local';
+        foreach ($formImport->pages as $page) {
+            if ($page->path) {
+                try {
+                    Storage::disk($disk)->delete($page->path);
+                } catch (\Throwable) {
+                }
+            }
+        }
         if ($formImport->source_path) {
-            Storage::disk($formImport->source_disk ?: 'local')->delete($formImport->source_path);
+            try {
+                Storage::disk($disk)->delete($formImport->source_path);
+            } catch (\Throwable) {
+            }
         }
         $formImport->pages()->delete();
         $formImport->delete();
@@ -169,6 +210,56 @@ class FormImportController extends Controller
         $orgId = $this->currentOrganizationId($request);
         if (! $orgId || (int) $formImport->organization_id !== (int) $orgId) {
             abort(404);
+        }
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function resolveUploadFiles(Request $request): array
+    {
+        $files = [];
+        if ($request->hasFile('files')) {
+            $uploaded = $request->file('files');
+            if (is_array($uploaded)) {
+                foreach ($uploaded as $file) {
+                    if ($file instanceof UploadedFile) {
+                        $files[] = $file;
+                    }
+                }
+            } elseif ($uploaded instanceof UploadedFile) {
+                $files[] = $uploaded;
+            }
+        }
+
+        if ($files === [] && $request->hasFile('file')) {
+            $single = $request->file('file');
+            if ($single instanceof UploadedFile) {
+                $files[] = $single;
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * @param  list<UploadedFile>  $files
+     */
+    private function assertCompatibleFileSet(array $files): void
+    {
+        if (count($files) <= 1) {
+            return;
+        }
+
+        foreach ($files as $file) {
+            $mime = strtolower((string) $file->getMimeType());
+            $name = strtolower($file->getClientOriginalName());
+            $isImage = str_starts_with($mime, 'image/') || preg_match('/\.(jpe?g|png)$/', $name);
+            if (! $isImage) {
+                throw ValidationException::withMessages([
+                    'files' => 'Para documento em várias páginas, envie só fotos (JPG/PNG). PDF deve ser um único arquivo.',
+                ]);
+            }
         }
     }
 
@@ -187,6 +278,10 @@ class FormImportController extends Controller
             $sourceKind = 'text';
         }
 
+        $pages = $import->relationLoaded('pages')
+            ? $import->pages
+            : $import->pages()->orderBy('page_number')->get();
+
         return [
             'id' => $import->id,
             'status' => $import->status,
@@ -196,7 +291,14 @@ class FormImportController extends Controller
             'source_mime' => $import->source_mime,
             'source_size' => $import->source_size,
             'source_kind' => $sourceKind,
-            'has_source' => filled($import->source_path),
+            'has_source' => filled($import->source_path) || $pages->isNotEmpty(),
+            'source_page_count' => max(1, $pages->count() ?: (filled($import->source_path) ? 1 : 0)),
+            'pages' => $pages->map(static fn ($p) => [
+                'page_number' => (int) $p->page_number,
+                'original_name' => $p->original_name,
+                'mime' => $p->mime,
+                'size' => $p->size,
+            ])->values()->all(),
             'extracted_schema' => $import->extracted_schema_json,
             'reviewed_schema' => $import->reviewed_schema_json,
             'warnings' => $import->warnings_json,

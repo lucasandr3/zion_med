@@ -4,6 +4,7 @@ namespace App\Services\FormImport;
 
 use App\Jobs\ProcessFormImportJob;
 use App\Models\FormImport;
+use App\Models\FormImportPage;
 use App\Models\FormTemplate;
 use App\Services\ProductEventService;
 use Illuminate\Http\UploadedFile;
@@ -18,12 +19,20 @@ class FormImportService
         private ProductEventService $productEvents,
     ) {}
 
+    /**
+     * @param  list<UploadedFile>  $files
+     */
     public function createFromUpload(
         int $organizationId,
         int $userId,
-        UploadedFile $file,
+        array $files,
         ?string $idempotencyKey = null,
     ): FormImport {
+        $files = array_values(array_filter($files, static fn ($f) => $f instanceof UploadedFile));
+        if ($files === []) {
+            throw new \InvalidArgumentException('Envie ao menos um arquivo.');
+        }
+
         if ($idempotencyKey) {
             $existing = FormImport::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
@@ -33,7 +42,31 @@ class FormImportService
 
         $disk = (string) config('form_import.disk', 'local');
         $dir = 'form-imports/'.$organizationId.'/'.now()->format('Y/m');
-        $path = $file->storeAs($dir, Str::uuid()->toString().'_'.Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)).'.'.$file->getClientOriginalExtension(), $disk);
+        $first = $files[0];
+        $storedPaths = [];
+
+        try {
+            foreach ($files as $index => $file) {
+                $storedPaths[] = $file->storeAs(
+                    $dir,
+                    Str::uuid()->toString().'_'.Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)).'.'.$file->getClientOriginalExtension(),
+                    $disk
+                );
+            }
+        } catch (\Throwable $e) {
+            foreach ($storedPaths as $path) {
+                try {
+                    Storage::disk($disk)->delete($path);
+                } catch (\Throwable) {
+                }
+            }
+            throw $e;
+        }
+
+        $names = array_map(static fn (UploadedFile $f) => $f->getClientOriginalName(), $files);
+        $displayName = count($names) === 1
+            ? $names[0]
+            : $names[0].' (+'.(count($names) - 1).' arquivo'.(count($names) > 2 ? 's' : '').')';
 
         $import = FormImport::query()->create([
             'organization_id' => $organizationId,
@@ -41,18 +74,29 @@ class FormImportService
             'status' => 'queued',
             'provider' => (string) config('form_import.provider', 'openai'),
             'source_disk' => $disk,
-            'source_path' => $path,
-            'source_original_name' => $file->getClientOriginalName(),
-            'source_mime' => $file->getMimeType(),
-            'source_size' => $file->getSize(),
+            'source_path' => $storedPaths[0],
+            'source_original_name' => $displayName,
+            'source_mime' => $first->getMimeType(),
+            'source_size' => array_sum(array_map(static fn (UploadedFile $f) => (int) $f->getSize(), $files)),
             'idempotency_key' => $idempotencyKey,
         ]);
+
+        foreach ($files as $index => $file) {
+            FormImportPage::query()->create([
+                'form_import_id' => $import->id,
+                'page_number' => $index + 1,
+                'path' => $storedPaths[$index],
+                'original_name' => $file->getClientOriginalName(),
+                'mime' => $file->getMimeType(),
+                'size' => $file->getSize(),
+            ]);
+        }
 
         $this->productEvents->record(
             'template_import_started',
             $organizationId,
             $userId,
-            ['form_import_id' => $import->id],
+            ['form_import_id' => $import->id, 'page_count' => count($files)],
             'template_import_started:import:'.$import->id,
             ['channel' => 'app']
         );
@@ -75,13 +119,15 @@ class FormImportService
 
         try {
             $disk = $import->source_disk ?: 'local';
-            $relative = (string) $import->source_path;
-            if (! Storage::disk($disk)->exists($relative)) {
+            $sources = $this->resolveSources($import, $disk);
+            if ($sources === []) {
                 throw new \RuntimeException('Arquivo fonte ausente no storage.');
             }
-            $absolute = Storage::disk($disk)->path($relative);
+
             $provider = $this->resolveProvider((string) ($import->provider ?: config('form_import.provider')));
-            $result = $provider->extract($absolute, (string) $import->source_mime, $import->source_original_name);
+            $result = count($sources) === 1
+                ? $provider->extract($sources[0]['path'], $sources[0]['mime'], $sources[0]['name'])
+                : $provider->extractMany($sources);
             $validated = $this->validator->validate(['fields' => $result['fields'] ?? []]);
 
             $warnings = array_merge($result['warnings'] ?? [], array_map(
@@ -143,6 +189,43 @@ class FormImportService
         }
 
         return $this->mapper->commit($import, $templateName);
+    }
+
+    /**
+     * @return list<array{path: string, mime: string, name: ?string, page: int}>
+     */
+    private function resolveSources(FormImport $import, string $disk): array
+    {
+        $pages = $import->pages()->orderBy('page_number')->get();
+        if ($pages->isNotEmpty()) {
+            $sources = [];
+            foreach ($pages as $page) {
+                $relative = (string) $page->path;
+                if ($relative === '' || ! Storage::disk($disk)->exists($relative)) {
+                    continue;
+                }
+                $sources[] = [
+                    'path' => Storage::disk($disk)->path($relative),
+                    'mime' => (string) ($page->mime ?: $import->source_mime ?: 'application/octet-stream'),
+                    'name' => $page->original_name ?: $import->source_original_name,
+                    'page' => (int) $page->page_number,
+                ];
+            }
+
+            return $sources;
+        }
+
+        $relative = (string) $import->source_path;
+        if ($relative === '' || ! Storage::disk($disk)->exists($relative)) {
+            return [];
+        }
+
+        return [[
+            'path' => Storage::disk($disk)->path($relative),
+            'mime' => (string) ($import->source_mime ?: 'application/octet-stream'),
+            'name' => $import->source_original_name,
+            'page' => 1,
+        ]];
     }
 
     private function resolveProvider(string $name): DocumentExtractionProvider

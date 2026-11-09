@@ -11,9 +11,45 @@ class HeuristicExtractionProvider implements DocumentExtractionProvider
 {
     public function extract(string $absolutePath, string $mime, ?string $originalName = null): array
     {
+        return $this->extractMany([[
+            'path' => $absolutePath,
+            'mime' => $mime,
+            'name' => $originalName,
+            'page' => 1,
+        ]]);
+    }
+
+    public function extractMany(array $sources): array
+    {
+        $sources = array_values(array_filter($sources, static fn ($s) => is_array($s) && ! empty($s['path'])));
+        if ($sources === []) {
+            return [
+                'fields' => $this->fallbackAnamneseSkeleton(null),
+                'warnings' => [[
+                    'code' => 'missing_file',
+                    'level' => 'error',
+                    'message' => 'Arquivo fonte não encontrado.',
+                ]],
+                'provider' => 'heuristic',
+                'model_version' => 'heuristic-v1',
+            ];
+        }
+
         $warnings = [];
-        $text = $this->readText($absolutePath, $mime, $warnings);
-        $fields = $this->parseFieldsFromText($text);
+        $fields = [];
+        $order = 0;
+
+        foreach ($sources as $source) {
+            $pageWarnings = [];
+            $page = max(1, (int) ($source['page'] ?? 1));
+            $text = $this->readText((string) $source['path'], (string) ($source['mime'] ?? ''), $pageWarnings);
+            $pageFields = $this->parseFieldsFromText($text, $page, $order);
+            $order += count($pageFields);
+            $fields = array_merge($fields, $pageFields);
+            foreach ($pageWarnings as $w) {
+                $warnings[] = $w;
+            }
+        }
 
         if ($fields === []) {
             $warnings[] = [
@@ -21,7 +57,15 @@ class HeuristicExtractionProvider implements DocumentExtractionProvider
                 'level' => 'warning',
                 'message' => 'Pouco texto legível detectado. Revise e complete os campos manualmente (ideal para PDF escaneado/foto).',
             ];
-            $fields = $this->fallbackAnamneseSkeleton($originalName);
+            $fields = $this->fallbackAnamneseSkeleton($sources[0]['name'] ?? null);
+        }
+
+        if (count($sources) > 1) {
+            $warnings[] = [
+                'code' => 'multi_page_import',
+                'level' => 'info',
+                'message' => 'Documento enviado em '.count($sources).' fotos/páginas.',
+            ];
         }
 
         $warnings[] = [
@@ -85,11 +129,11 @@ class HeuristicExtractionProvider implements DocumentExtractionProvider
     /**
      * @return list<array<string, mixed>>
      */
-    private function parseFieldsFromText(string $text): array
+    private function parseFieldsFromText(string $text, int $page = 1, int $orderOffset = 0): array
     {
         $lines = preg_split('/\\R+/', $text) ?: [];
         $fields = [];
-        $order = 0;
+        $order = $orderOffset;
         $prevKey = null;
 
         foreach ($lines as $line) {
@@ -118,7 +162,7 @@ class HeuristicExtractionProvider implements DocumentExtractionProvider
                 'required' => false,
                 'options' => $type === 'radio' ? ['Sim', 'Não'] : [],
                 'sort_order' => $order,
-                'page' => 1,
+                'page' => $page,
                 'source_text' => $line,
             ];
 

@@ -11,5 +11,7 @@ return [
     'openai_max_bytes' => (int) env('FORM_IMPORT_OPENAI_MAX_BYTES', 15728640),
     'openai_image_detail' => env('FORM_IMPORT_OPENAI_IMAGE_DETAIL', 'high'),
     'max_upload_kb' => (int) env('FORM_IMPORT_MAX_UPLOAD_KB', 10240),
+    /** Máximo de fotos/páginas por importação (documento grande em várias imagens). */
+    'max_files' => (int) env('FORM_IMPORT_MAX_FILES', 10),
     'retention_days' => (int) env('FORM_IMPORT_RETENTION_DAYS', 30),
 ];

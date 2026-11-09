@@ -185,6 +185,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
         Route::get('/dashboard', PlatformDashboardController::class)->name('api.v1.platform.dashboard');
         Route::get('/tenants', [PlatformTenantsController::class, 'index'])->name('api.v1.platform.tenants.index');
         Route::get('/tenants/{tenant}', [PlatformTenantsController::class, 'show'])->name('api.v1.platform.tenants.show');
+        Route::delete('/tenants/{tenant}', [PlatformTenantsController::class, 'destroy'])->name('api.v1.platform.tenants.destroy');
         Route::get('/leads', [PlatformLeadsController::class, 'index'])->name('api.v1.platform.leads.index');
         Route::get('/plans', [PlatformPlanController::class, 'index'])->name('api.v1.platform.plans.index');
         Route::post('/plans', [PlatformPlanController::class, 'store'])->name('api.v1.platform.plans.store');

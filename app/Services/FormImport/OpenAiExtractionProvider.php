@@ -17,9 +17,25 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
 
     public function extract(string $absolutePath, string $mime, ?string $originalName = null): array
     {
+        return $this->extractMany([[
+            'path' => $absolutePath,
+            'mime' => $mime,
+            'name' => $originalName,
+            'page' => 1,
+        ]]);
+    }
+
+    public function extractMany(array $sources): array
+    {
+        $sources = array_values(array_filter($sources, static fn ($s) => is_array($s) && ! empty($s['path'])));
+        if ($sources === []) {
+            throw new \RuntimeException('Nenhuma página fonte para extração.');
+        }
+
+        $first = $sources[0];
         $apiKey = trim((string) config('form_import.openai_api_key', ''));
         if ($apiKey === '') {
-            $result = $this->heuristic->extract($absolutePath, $mime, $originalName);
+            $result = $this->heuristic->extractMany($sources);
             $result['warnings'][] = [
                 'code' => 'openai_key_missing',
                 'level' => 'warning',
@@ -30,28 +46,47 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
             return $result;
         }
 
-        if (! is_file($absolutePath)) {
-            throw new \RuntimeException('Arquivo fonte não encontrado para envio à OpenAI.');
-        }
-
-        $bytes = filesize($absolutePath) ?: 0;
         $maxBytes = (int) config('form_import.openai_max_bytes', 15 * 1024 * 1024);
-        if ($bytes <= 0 || $bytes > $maxBytes) {
-            throw new \RuntimeException('Arquivo inválido ou acima do limite para a OpenAI (máx. '.round($maxBytes / 1024 / 1024, 1).' MB).');
-        }
-
-        $mime = strtolower($mime ?: 'application/octet-stream');
         $model = (string) config('form_import.openai_model', 'gpt-4o-mini');
-        $base64 = base64_encode((string) file_get_contents($absolutePath));
-        $filename = $originalName ?: basename($absolutePath);
+        $pageCount = count($sources);
+        $label = $pageCount === 1
+            ? ((string) ($first['name'] ?: basename((string) $first['path'])))
+            : $pageCount.' páginas/fotos';
 
         $userContent = [
             [
                 'type' => 'text',
-                'text' => $this->userPrompt($filename),
+                'text' => $this->userPrompt($label, $pageCount),
             ],
-            $this->buildFilePart($mime, $filename, $base64),
         ];
+
+        $totalBytes = 0;
+        foreach ($sources as $source) {
+            $absolutePath = (string) $source['path'];
+            if (! is_file($absolutePath)) {
+                throw new \RuntimeException('Arquivo fonte não encontrado para envio à OpenAI.');
+            }
+            $bytes = filesize($absolutePath) ?: 0;
+            $totalBytes += $bytes;
+            if ($bytes <= 0) {
+                throw new \RuntimeException('Arquivo inválido para a OpenAI.');
+            }
+            if ($totalBytes > $maxBytes) {
+                throw new \RuntimeException('Arquivos acima do limite para a OpenAI (máx. '.round($maxBytes / 1024 / 1024, 1).' MB no total).');
+            }
+
+            $mime = strtolower((string) ($source['mime'] ?: 'application/octet-stream'));
+            $filename = (string) ($source['name'] ?: basename($absolutePath));
+            $page = (int) ($source['page'] ?? 1);
+            $base64 = base64_encode((string) file_get_contents($absolutePath));
+            if ($pageCount > 1) {
+                $userContent[] = [
+                    'type' => 'text',
+                    'text' => 'Página '.$page.' (arquivo: '.$filename.'):',
+                ];
+            }
+            $userContent[] = $this->buildFilePart($mime, $filename, $base64);
+        }
 
         try {
             $response = Http::withToken($apiKey)
@@ -69,7 +104,7 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
         } catch (\Throwable $e) {
             Log::warning('OpenAI form import request failed', ['error' => $e->getMessage()]);
 
-            return $this->fallback($absolutePath, $mime, $originalName, 'openai_request_failed', $e->getMessage());
+            return $this->fallbackMany($sources, 'openai_request_failed', $e->getMessage());
         }
 
         if (! $response->successful()) {
@@ -77,18 +112,26 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
             $body = mb_substr((string) $response->body(), 0, 400);
             Log::warning('OpenAI form import HTTP error', ['status' => $status]);
 
-            // PDF pode falhar em alguns modelos — tenta texto + chat
-            if (str_contains($mime, 'pdf')) {
-                return $this->extractFromPdfTextViaOpenAi($apiKey, $model, $absolutePath, $mime, $originalName, $status.' '.$body);
+            $mime = strtolower((string) ($first['mime'] ?: ''));
+            // PDF único pode falhar em alguns modelos — tenta texto + chat
+            if ($pageCount === 1 && str_contains($mime, 'pdf')) {
+                return $this->extractFromPdfTextViaOpenAi(
+                    $apiKey,
+                    $model,
+                    (string) $first['path'],
+                    $mime,
+                    $first['name'] ?? null,
+                    $status.' '.$body
+                );
             }
 
-            return $this->fallback($absolutePath, $mime, $originalName, 'openai_http_'.$status, $body);
+            return $this->fallbackMany($sources, 'openai_http_'.$status, $body);
         }
 
         $content = (string) data_get($response->json(), 'choices.0.message.content', '');
         $parsed = $this->parseJsonContent($content);
         if ($parsed === null) {
-            return $this->fallback($absolutePath, $mime, $originalName, 'openai_invalid_json', 'Resposta da OpenAI não era JSON válido.');
+            return $this->fallbackMany($sources, 'openai_invalid_json', 'Resposta da OpenAI não era JSON válido.');
         }
 
         $fields = is_array($parsed['fields'] ?? null) ? $parsed['fields'] : [];
@@ -108,6 +151,14 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
             return ['code' => 'openai_warning', 'level' => 'warning', 'message' => 'Aviso não tipado da OpenAI.'];
         }, $warnings);
 
+        if ($pageCount > 1) {
+            $warnings[] = [
+                'code' => 'multi_page_import',
+                'level' => 'info',
+                'message' => 'Documento enviado em '.$pageCount.' fotos/páginas. Confira a ordem e campos de cada página.',
+            ];
+        }
+
         $warnings[] = [
             'code' => 'human_review_required',
             'level' => 'warning',
@@ -115,7 +166,7 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
         ];
 
         if ($fields === []) {
-            return $this->fallback($absolutePath, $mime, $originalName, 'openai_empty_fields', 'A OpenAI não retornou campos.');
+            return $this->fallbackMany($sources, 'openai_empty_fields', 'A OpenAI não retornou campos.');
         }
 
         return [
@@ -124,6 +175,23 @@ class OpenAiExtractionProvider implements DocumentExtractionProvider
             'provider' => 'openai',
             'model_version' => $model,
         ];
+    }
+
+    /**
+     * @param  list<array{path: string, mime: string, name: ?string, page: int}>  $sources
+     * @return array{fields: list<array<string, mixed>>, warnings: list<array<string, mixed>>, provider: string, model_version: string}
+     */
+    private function fallbackMany(array $sources, string $code, string $detail): array
+    {
+        $result = $this->heuristic->extractMany($sources);
+        $result['warnings'][] = [
+            'code' => $code,
+            'level' => 'warning',
+            'message' => 'OpenAI indisponível ou falhou ('.mb_substr($detail, 0, 180).'). Usando heurística local para revisão.',
+        ];
+        $result['provider'] = 'heuristic_fallback';
+
+        return $result;
     }
 
     /**
@@ -309,8 +377,12 @@ Regras:
 PROMPT;
     }
 
-    private function userPrompt(string $filename): string
+    private function userPrompt(string $filename, int $pageCount = 1): string
     {
+        if ($pageCount > 1) {
+            return 'Analise as '.$pageCount.' páginas/fotos do documento "'.$filename.'" (ficha preferencialmente em branco). Preserve a ordem das páginas no campo "page" de cada campo e extraia a estrutura conforme o schema JSON combinado. Responda só JSON.';
+        }
+
         return 'Analise o documento "'.$filename.'" (ficha preferencialmente em branco) e extraia a estrutura de campos conforme o schema JSON combinado. Responda só JSON.';
     }
 }

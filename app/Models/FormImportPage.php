@@ -11,6 +11,9 @@ class FormImportPage extends Model
         'form_import_id',
         'page_number',
         'path',
+        'original_name',
+        'mime',
+        'size',
         'width',
         'height',
     ];

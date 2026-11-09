@@ -29,9 +29,18 @@ class PurgeExpiredFormImportsCommand extends Command
                         $this->line(sprintf('#%d %s %s', $import->id, $import->status, $import->created_at));
                         continue;
                     }
+                    $disk = $import->source_disk ?: 'local';
+                    foreach ($import->pages as $page) {
+                        if ($page->path) {
+                            try {
+                                Storage::disk($disk)->delete($page->path);
+                            } catch (\Throwable) {
+                            }
+                        }
+                    }
                     if ($import->source_path) {
                         try {
-                            Storage::disk($import->source_disk ?: 'local')->delete($import->source_path);
+                            Storage::disk($disk)->delete($import->source_path);
                         } catch (\Throwable) {
                         }
                     }

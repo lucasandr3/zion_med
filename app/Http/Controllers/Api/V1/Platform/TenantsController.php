@@ -6,10 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Services\TenantDeletionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class TenantsController extends Controller
 {
+    public function __construct(
+        private TenantDeletionService $tenantDeletion,
+    ) {}
+
     public function index(): JsonResponse
     {
         $tenants = Tenant::query()
@@ -58,6 +65,35 @@ class TenantsController extends Controller
                 ],
                 'summary' => $summary,
                 'clinics' => $clinics->map(fn (Organization $c) => $this->mapClinicDetail($c)),
+            ],
+        ]);
+    }
+
+    /**
+     * Exclui o tenant e dados vinculados (empresas, usuários, fichas, etc.).
+     * Exige confirm_name igual ao nome do tenant para evitar exclusão acidental.
+     */
+    public function destroy(Request $request, Tenant $tenant): JsonResponse
+    {
+        $validated = $request->validate([
+            'confirm_name' => ['required', 'string', 'max:255'],
+        ], [
+            'confirm_name.required' => 'Digite o nome do cliente para confirmar a exclusão.',
+        ]);
+
+        $confirmName = trim((string) $validated['confirm_name']);
+        if ($confirmName === '' || strcasecmp($confirmName, (string) $tenant->name) !== 0) {
+            throw ValidationException::withMessages([
+                'confirm_name' => ['O nome informado não confere com o cliente. Digite exatamente: '.$tenant->name],
+            ]);
+        }
+
+        $result = $this->tenantDeletion->delete($tenant);
+
+        return response()->json([
+            'data' => [
+                'message' => 'Cliente e dados vinculados removidos.',
+                'deleted' => $result,
             ],
         ]);
     }

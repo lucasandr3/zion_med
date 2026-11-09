@@ -20,6 +20,7 @@ use Database\Seeders\FormTemplateSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -92,6 +93,10 @@ class ComeceController extends Controller
         }
 
         $validated['phone'] = preg_replace('/\D/', '', (string) $validated['phone']);
+        $billingDocumentDigits = isset($validated['billing_document']) && $validated['billing_document'] !== ''
+            ? preg_replace('/\D/', '', (string) $validated['billing_document'])
+            : '';
+        $this->assertBillingDocumentAvailable($billingDocumentDigits);
 
         try {
             $trialDays = (int) config('asaas.trial_days', 14);
@@ -99,41 +104,51 @@ class ComeceController extends Controller
                 ? $validated['niche']
                 : 'estetica';
 
-            $tenantSlug = $this->uniqueTenantSlug(Str::slug($validated['company_name']));
-            $tenant = Tenant::create([
-                'name' => $validated['company_name'],
-                'slug' => $tenantSlug,
-            ]);
+            [$tenant, $organization, $user] = DB::transaction(function () use ($validated, $niche, $trialDays, $billingDocumentDigits) {
+                // Revalida dentro da transaction para reduzir race de double-submit.
+                $this->assertBillingDocumentAvailable($billingDocumentDigits);
+                if (User::query()->where('email', $validated['email'])->exists()) {
+                    throw ValidationException::withMessages([
+                        'email' => ['Não foi possível concluir o cadastro com estes dados. Faça login ou use outro e-mail.'],
+                    ]);
+                }
 
-            $organizationSlug = Organization::generateUniqueSlug($validated['company_name'], null);
-            $organization = Organization::create([
-                'tenant_id' => $tenant->id,
-                'name' => $validated['company_name'],
-                'slug' => $organizationSlug,
-                'niche' => $niche,
-                'notification_email' => $validated['email'],
-                'billing_email' => $validated['email'],
-                'billing_name' => $validated['company_name'],
-                'billing_document' => isset($validated['billing_document']) && $validated['billing_document'] !== ''
-                    ? preg_replace('/\D/', '', (string) $validated['billing_document'])
-                    : null,
-                'phone' => $validated['phone'],
-                'plan_key' => $validated['plan_key'],
-                'trial_ends_at' => now()->addDays($trialDays),
-                'subscription_status' => 'trial',
-                'billing_status' => 'ok',
-            ]);
+                $tenantSlug = $this->uniqueTenantSlug(Str::slug($validated['company_name']));
+                $tenant = Tenant::create([
+                    'name' => $validated['company_name'],
+                    'slug' => $tenantSlug,
+                ]);
 
-            $user = User::create([
-                'organization_id' => $organization->id,
-                'name' => $validated['responsible_name'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'role' => Role::Owner->value,
-                'active' => true,
-            ]);
+                $organizationSlug = Organization::generateUniqueSlug($validated['company_name'], null);
+                $organization = Organization::create([
+                    'tenant_id' => $tenant->id,
+                    'name' => $validated['company_name'],
+                    'slug' => $organizationSlug,
+                    'niche' => $niche,
+                    'notification_email' => $validated['email'],
+                    'billing_email' => $validated['email'],
+                    'billing_name' => $validated['company_name'],
+                    'billing_document' => $billingDocumentDigits !== '' ? $billingDocumentDigits : null,
+                    'phone' => $validated['phone'],
+                    'plan_key' => $validated['plan_key'],
+                    'trial_ends_at' => now()->addDays($trialDays),
+                    'subscription_status' => 'trial',
+                    'billing_status' => 'ok',
+                ]);
 
-            FormTemplateSeeder::seedTemplatesForOrganization($organization, $user);
+                $user = User::create([
+                    'organization_id' => $organization->id,
+                    'name' => $validated['responsible_name'],
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'role' => Role::Owner->value,
+                    'active' => true,
+                ]);
+
+                FormTemplateSeeder::seedTemplatesForOrganization($organization, $user);
+
+                return [$tenant, $organization, $user];
+            });
 
             try {
                 $user->sendEmailVerificationNotification();
@@ -304,6 +319,36 @@ class ComeceController extends Controller
         }
 
         return $slug;
+    }
+
+    /**
+     * Impede novo cadastro com CPF/CNPJ de cobrança já usado por outra organização.
+     */
+    private function assertBillingDocumentAvailable(string $digits): void
+    {
+        if ($digits === '') {
+            return;
+        }
+
+        $exists = Organization::withoutGlobalScopes()
+            ->whereNotNull('billing_document')
+            ->where('billing_document', '!=', '')
+            ->get(['billing_document'])
+            ->contains(function ($org) use ($digits): bool {
+                return preg_replace('/\D/', '', (string) $org->billing_document) === $digits;
+            });
+
+        if (! $exists) {
+            return;
+        }
+
+        $label = strlen($digits) === 14 ? 'CNPJ' : 'CPF';
+
+        throw ValidationException::withMessages([
+            'billing_document' => [
+                "Este {$label} já está cadastrado. Faça login na conta existente ou fale com o suporte.",
+            ],
+        ]);
     }
 
 }
