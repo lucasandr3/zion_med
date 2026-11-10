@@ -80,6 +80,12 @@ final class FrontendUrl
         return self::base().'/plataforma/leads';
     }
 
+    /** Rota Angular: /plataforma/feedback */
+    public static function plataformaFeedback(): string
+    {
+        return self::base().'/plataforma/feedback';
+    }
+
     /** Rota Angular: /plataforma/faturas */
     public static function plataformaFaturas(): string
     {

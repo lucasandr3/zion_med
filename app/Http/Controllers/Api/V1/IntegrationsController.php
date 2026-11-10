@@ -10,10 +10,15 @@ use App\Models\FeegowAppointment;
 use App\Models\Organization;
 use App\Models\Person;
 use App\Models\WebhookDelivery;
+use App\Services\ClinicorpClient;
 use App\Services\FeegowClient;
+use App\Services\NinsaudeClient;
 use App\Services\PersonConsentService;
+use App\Services\TrinksClient;
 use App\Support\SafeOutboundUrl;
 use App\Support\SanctumTenantAbility;
+use Dedoc\Scramble\CacheableGenerator;
+use Dedoc\Scramble\Scramble;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,6 +29,9 @@ class IntegrationsController extends Controller
 
     public function __construct(
         private readonly FeegowClient $feegow,
+        private readonly TrinksClient $trinks,
+        private readonly ClinicorpClient $clinicorp,
+        private readonly NinsaudeClient $ninsaude,
         private readonly PersonConsentService $personConsentService,
     ) {}
 
@@ -84,6 +92,19 @@ class IntegrationsController extends Controller
                 'event_labels' => $eventLabels,
             ],
         ]);
+    }
+
+    /**
+     * OpenAPI (Scramble) para a documentação interativa dentro do app.
+     * Usa a sessão/API autenticada — não depende do cookie na navegação top-level de /docs/api.
+     */
+    public function openApi(Request $request, CacheableGenerator $generator): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+
+        $document = $generator(Scramble::getGeneratorConfig(Scramble::DEFAULT_API));
+
+        return response()->json(['data' => $document]);
     }
 
     /**
@@ -259,18 +280,43 @@ class IntegrationsController extends Controller
             return response()->json(['message' => 'Selecione uma empresa.'], 422);
         }
 
-        $status = $this->resolveFeegowStatus($organization);
-
         return response()->json([
             'data' => [
                 [
                     'key' => 'feegow',
                     'name' => 'Feegow',
-                    'description' => 'Integração com API Feegow (x-access-token).',
+                    'description' => 'Clínicas médicas — API Feegow (x-access-token).',
                     'enabled' => (bool) $organization->feegow_enabled,
-                    'status' => $status,
+                    'status' => $this->resolveFeegowStatus($organization),
                     'last_check_at' => $organization->feegow_last_check_at?->toIso8601String(),
                     'last_error' => $organization->feegow_last_error,
+                ],
+                [
+                    'key' => 'trinks',
+                    'name' => 'Trinks',
+                    'description' => 'Estética e beleza — API Conecta Trinks (X-Api-Key).',
+                    'enabled' => (bool) $organization->trinks_enabled,
+                    'status' => $this->resolveVendorStatus($organization, 'trinks'),
+                    'last_check_at' => $organization->trinks_last_check_at?->toIso8601String(),
+                    'last_error' => $organization->trinks_last_error,
+                ],
+                [
+                    'key' => 'clinicorp',
+                    'name' => 'Clinicorp',
+                    'description' => 'Odonto e clínicas — API Clinicorp (Basic Auth).',
+                    'enabled' => (bool) $organization->clinicorp_enabled,
+                    'status' => $this->resolveVendorStatus($organization, 'clinicorp'),
+                    'last_check_at' => $organization->clinicorp_last_check_at?->toIso8601String(),
+                    'last_error' => $organization->clinicorp_last_error,
+                ],
+                [
+                    'key' => 'ninsaude',
+                    'name' => 'Ninsaúde',
+                    'description' => 'Clínicas e redes — API Ninsaúde Toro (OAuth2).',
+                    'enabled' => (bool) $organization->ninsaude_enabled,
+                    'status' => $this->resolveVendorStatus($organization, 'ninsaude'),
+                    'last_check_at' => $organization->ninsaude_last_check_at?->toIso8601String(),
+                    'last_error' => $organization->ninsaude_last_error,
                 ],
             ],
         ]);
@@ -593,6 +639,32 @@ class IntegrationsController extends Controller
         };
     }
 
+    private function resolveVendorStatus(Organization $organization, string $vendor): string
+    {
+        $enabled = (bool) $organization->{$vendor.'_enabled'};
+        if (! $enabled) {
+            return 'disabled';
+        }
+
+        $configured = match ($vendor) {
+            'trinks' => ! empty($organization->trinks_token),
+            'clinicorp' => ! empty($organization->clinicorp_api_user) && ! empty($organization->clinicorp_token),
+            'ninsaude' => ! empty($organization->ninsaude_refresh_token)
+                || (! empty($organization->ninsaude_account) && ! empty($organization->ninsaude_username) && ! empty($organization->ninsaude_password)),
+            default => false,
+        };
+
+        if (! $configured) {
+            return 'not_configured';
+        }
+
+        return match ($organization->{$vendor.'_last_status'}) {
+            'ok' => 'ok',
+            'error' => 'error',
+            default => 'unknown',
+        };
+    }
+
     /**
      * @return array{0:string,1:string,2:?string}
      */
@@ -615,5 +687,311 @@ class IntegrationsController extends Controller
         }
 
         return [$token, $baseUrl, null];
+    }
+
+    public function trinksShow(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'enabled' => (bool) $organization->trinks_enabled,
+                'base_url' => $organization->trinks_base_url ?: config('trinks.base_url'),
+                'has_token' => ! empty($organization->trinks_token),
+                'estabelecimento_id' => $organization->trinks_estabelecimento_id,
+                'status' => $this->resolveVendorStatus($organization, 'trinks'),
+                'last_check_at' => $organization->trinks_last_check_at?->toIso8601String(),
+                'last_error' => $organization->trinks_last_error,
+            ],
+        ]);
+    }
+
+    public function trinksUpdate(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'base_url' => ['nullable', 'url', 'max:255'],
+            'token' => ['nullable', 'string', 'max:4096'],
+            'estabelecimento_id' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $enabled = (bool) $validated['enabled'];
+        $incomingToken = isset($validated['token']) ? trim((string) $validated['token']) : null;
+        if ($enabled && empty($organization->trinks_token) && ($incomingToken === null || $incomingToken === '')) {
+            return response()->json(['message' => 'Informe a API Key do Trinks para ativar a integração.'], 422);
+        }
+
+        $updates = [
+            'trinks_enabled' => $enabled,
+            'trinks_base_url' => $this->trinks->normalizeBaseUrl((string) ($validated['base_url'] ?? config('trinks.base_url'))),
+            'trinks_estabelecimento_id' => isset($validated['estabelecimento_id']) ? trim((string) $validated['estabelecimento_id']) ?: null : $organization->trinks_estabelecimento_id,
+        ];
+        if ($incomingToken !== null) {
+            $updates['trinks_token'] = $incomingToken !== '' ? $incomingToken : null;
+        }
+        if (! $enabled) {
+            $updates['trinks_last_status'] = 'disabled';
+            $updates['trinks_last_error'] = null;
+        }
+
+        $organization->forceFill($updates)->save();
+
+        return $this->trinksShow($request);
+    }
+
+    public function trinksTest(Request $request): JsonResponse
+    {
+        return $this->runVendorTest($request, 'trinks', function (Organization $organization) {
+            $token = (string) ($organization->trinks_token ?? '');
+            $baseUrl = $organization->trinks_base_url ?: (string) config('trinks.base_url');
+            if ($token === '') {
+                throw new \InvalidArgumentException('API Key do Trinks não configurada.');
+            }
+            $this->trinks->ping($token, $baseUrl);
+        });
+    }
+
+    public function clinicorpShow(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'enabled' => (bool) $organization->clinicorp_enabled,
+                'base_url' => $organization->clinicorp_base_url ?: config('clinicorp.base_url'),
+                'api_user' => $organization->clinicorp_api_user,
+                'has_token' => ! empty($organization->clinicorp_token),
+                'subscriber_id' => $organization->clinicorp_subscriber_id,
+                'status' => $this->resolveVendorStatus($organization, 'clinicorp'),
+                'last_check_at' => $organization->clinicorp_last_check_at?->toIso8601String(),
+                'last_error' => $organization->clinicorp_last_error,
+            ],
+        ]);
+    }
+
+    public function clinicorpUpdate(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'base_url' => ['nullable', 'url', 'max:255'],
+            'api_user' => ['nullable', 'string', 'max:191'],
+            'token' => ['nullable', 'string', 'max:4096'],
+            'subscriber_id' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $enabled = (bool) $validated['enabled'];
+        $apiUser = isset($validated['api_user']) ? trim((string) $validated['api_user']) : null;
+        $incomingToken = isset($validated['token']) ? trim((string) $validated['token']) : null;
+        $effectiveUser = $apiUser !== null ? $apiUser : (string) ($organization->clinicorp_api_user ?? '');
+        $hasToken = ! empty($organization->clinicorp_token) || ($incomingToken !== null && $incomingToken !== '');
+
+        if ($enabled && ($effectiveUser === '' || ! $hasToken)) {
+            return response()->json(['message' => 'Informe Usuário API e Token API do Clinicorp para ativar.'], 422);
+        }
+
+        $updates = [
+            'clinicorp_enabled' => $enabled,
+            'clinicorp_base_url' => $this->clinicorp->normalizeBaseUrl((string) ($validated['base_url'] ?? config('clinicorp.base_url'))),
+            'clinicorp_subscriber_id' => isset($validated['subscriber_id']) ? trim((string) $validated['subscriber_id']) ?: null : $organization->clinicorp_subscriber_id,
+        ];
+        if ($apiUser !== null) {
+            $updates['clinicorp_api_user'] = $apiUser !== '' ? $apiUser : null;
+        }
+        if ($incomingToken !== null) {
+            $updates['clinicorp_token'] = $incomingToken !== '' ? $incomingToken : null;
+        }
+        if (! $enabled) {
+            $updates['clinicorp_last_status'] = 'disabled';
+            $updates['clinicorp_last_error'] = null;
+        }
+
+        $organization->forceFill($updates)->save();
+
+        return $this->clinicorpShow($request);
+    }
+
+    public function clinicorpTest(Request $request): JsonResponse
+    {
+        return $this->runVendorTest($request, 'clinicorp', function (Organization $organization) {
+            $user = (string) ($organization->clinicorp_api_user ?? '');
+            $token = (string) ($organization->clinicorp_token ?? '');
+            $subscriber = $organization->clinicorp_subscriber_id ? (string) $organization->clinicorp_subscriber_id : null;
+            $baseUrl = $organization->clinicorp_base_url ?: (string) config('clinicorp.base_url');
+            if ($user === '' || $token === '') {
+                throw new \InvalidArgumentException('Usuário API / Token API do Clinicorp não configurados.');
+            }
+            $this->clinicorp->ping($user, $token, $subscriber, $baseUrl);
+        });
+    }
+
+    public function ninsaudeShow(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'enabled' => (bool) $organization->ninsaude_enabled,
+                'base_url' => $organization->ninsaude_base_url ?: config('ninsaude.base_url'),
+                'account' => $organization->ninsaude_account,
+                'username' => $organization->ninsaude_username,
+                'has_password' => ! empty($organization->ninsaude_password),
+                'has_refresh_token' => ! empty($organization->ninsaude_refresh_token),
+                'status' => $this->resolveVendorStatus($organization, 'ninsaude'),
+                'last_check_at' => $organization->ninsaude_last_check_at?->toIso8601String(),
+                'last_error' => $organization->ninsaude_last_error,
+            ],
+        ]);
+    }
+
+    public function ninsaudeUpdate(Request $request): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'base_url' => ['nullable', 'url', 'max:255'],
+            'account' => ['nullable', 'string', 'max:191'],
+            'username' => ['nullable', 'string', 'max:191'],
+            'password' => ['nullable', 'string', 'max:4096'],
+            'refresh_token' => ['nullable', 'string', 'max:8192'],
+        ]);
+
+        $enabled = (bool) $validated['enabled'];
+        $account = isset($validated['account']) ? trim((string) $validated['account']) : null;
+        $username = isset($validated['username']) ? trim((string) $validated['username']) : null;
+        $password = isset($validated['password']) ? (string) $validated['password'] : null;
+        $refresh = isset($validated['refresh_token']) ? trim((string) $validated['refresh_token']) : null;
+
+        $effectiveAccount = $account !== null ? $account : (string) ($organization->ninsaude_account ?? '');
+        $effectiveUsername = $username !== null ? $username : (string) ($organization->ninsaude_username ?? '');
+        $hasPassword = ! empty($organization->ninsaude_password) || ($password !== null && trim($password) !== '');
+        $hasRefresh = ! empty($organization->ninsaude_refresh_token) || ($refresh !== null && $refresh !== '');
+
+        if ($enabled && ! $hasRefresh && ($effectiveAccount === '' || $effectiveUsername === '' || ! $hasPassword)) {
+            return response()->json([
+                'message' => 'Para ativar a Ninsaúde, informe refresh token OU conta + usuário + senha.',
+            ], 422);
+        }
+
+        $updates = [
+            'ninsaude_enabled' => $enabled,
+            'ninsaude_base_url' => $this->ninsaude->normalizeBaseUrl((string) ($validated['base_url'] ?? config('ninsaude.base_url'))),
+        ];
+        if ($account !== null) {
+            $updates['ninsaude_account'] = $account !== '' ? $account : null;
+        }
+        if ($username !== null) {
+            $updates['ninsaude_username'] = $username !== '' ? $username : null;
+        }
+        if ($password !== null) {
+            $updates['ninsaude_password'] = trim($password) !== '' ? $password : null;
+        }
+        if ($refresh !== null) {
+            $updates['ninsaude_refresh_token'] = $refresh !== '' ? $refresh : null;
+        }
+        if (! $enabled) {
+            $updates['ninsaude_last_status'] = 'disabled';
+            $updates['ninsaude_last_error'] = null;
+        }
+
+        $organization->forceFill($updates)->save();
+
+        return $this->ninsaudeShow($request);
+    }
+
+    public function ninsaudeTest(Request $request): JsonResponse
+    {
+        return $this->runVendorTest($request, 'ninsaude', function (Organization $organization) {
+            $baseUrl = $organization->ninsaude_base_url ?: (string) config('ninsaude.base_url');
+            $this->ninsaude->ping(
+                $organization->ninsaude_refresh_token ? (string) $organization->ninsaude_refresh_token : null,
+                $organization->ninsaude_account ? (string) $organization->ninsaude_account : null,
+                $organization->ninsaude_username ? (string) $organization->ninsaude_username : null,
+                $organization->ninsaude_password ? (string) $organization->ninsaude_password : null,
+                $baseUrl,
+            );
+        });
+    }
+
+    /**
+     * @param  callable(Organization):void  $ping
+     */
+    private function runVendorTest(Request $request, string $vendor, callable $ping): JsonResponse
+    {
+        $this->authorize('manage-clinic');
+        $organization = $this->currentOrganization($request);
+        if (! $organization) {
+            return response()->json(['message' => 'Selecione uma empresa.'], 422);
+        }
+
+        $labels = [
+            'trinks' => 'Trinks',
+            'clinicorp' => 'Clinicorp',
+            'ninsaude' => 'Ninsaúde',
+        ];
+        $label = $labels[$vendor] ?? $vendor;
+
+        try {
+            $ping($organization);
+            $organization->forceFill([
+                $vendor.'_last_check_at' => now(),
+                $vendor.'_last_status' => 'ok',
+                $vendor.'_last_error' => null,
+            ])->save();
+
+            return response()->json([
+                'data' => [
+                    'ok' => true,
+                    'status' => 'ok',
+                    'message' => 'Conexão com '.$label.' validada com sucesso.',
+                    'last_check_at' => now()->toIso8601String(),
+                ],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            $organization->forceFill([
+                $vendor.'_last_check_at' => now(),
+                $vendor.'_last_status' => 'error',
+                $vendor.'_last_error' => mb_substr($e->getMessage(), 0, 600),
+            ])->save();
+
+            return response()->json([
+                'data' => [
+                    'ok' => false,
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                    'last_check_at' => now()->toIso8601String(),
+                ],
+            ], 502);
+        }
     }
 }

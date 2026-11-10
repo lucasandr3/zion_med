@@ -29,7 +29,15 @@ return [
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        'description' => 'API REST do Gestgo para integração com sistemas externos. Autenticação via token (Sanctum). Gere um token em **Empresa > Integrações**. Use o header `Authorization: Bearer SEU_TOKEN`.',
+        'description' => <<<'MD'
+API REST do GestGo para **sistemas externos** (ERP, prontuário, automações).
+
+**Escopo documentado:** protocolos, templates (leitura/estrutura), pessoas, links públicos e webhooks.
+
+**Autenticação:** token gerado em **Empresa → Integrações**. Header `Authorization: Bearer SEU_TOKEN`.
+
+Rotas do app (login, painel, cobrança, plataforma etc.) existem na API, mas **não** fazem parte deste contrato de integração.
+MD,
     ],
 
     /*
@@ -71,46 +79,45 @@ MD
     ,
 
     /*
-     * Customize Stoplight Elements UI
+     * Título da página de documentação (usado pela view do renderer).
+     * Não incluir `ui.logo` aqui: no Scramble atual, a presença de `ui.logo`
+     * força o renderer Stoplight Elements.
      */
     'ui' => [
-        /*
-         * Define the title of the documentation's website. App name is used when this config is `null`.
-         */
-        'title' => null,
+        'title' => 'Documentação da API',
+    ],
 
-        /*
-         * Define the theme of the documentation. Available options are `light`, `dark`, and `system`.
-         */
-        'theme' => 'light',
+    /*
+     * UI da documentação: Scalar (MIT). O OpenAPI continua gerado pelo Scramble.
+     */
+    'renderer' => 'scalar',
 
-        /*
-         * Hide the `Try It` feature. Enabled by default.
-         */
-        'hide_try_it' => false,
-
-        /*
-         * Hide the schemas in the Table of Contents. Enabled by default.
-         */
-        'hide_schemas' => false,
-
-        /*
-         * URL to an image that displays as a small square logo next to the title, above the table of contents.
-         */
-        'logo' => '',
-
-        /*
-         * Use to fetch the credential policy for the Try It feature. Options are: omit, include (default), and same-origin
-         */
-        'try_it_credentials_policy' => 'include',
-
-        /*
-         * There are three layouts for Elements:
-         * - sidebar - (Elements default) Three-column design with a sidebar that can be resized.
-         * - responsive - Like sidebar, except at small screen sizes it collapses the sidebar into a drawer that can be toggled open.
-         * - stacked - Everything in a single column, making integrations with existing websites that have their own sidebar or other columns already.
-         */
-        'layout' => 'responsive',
+    'renderers' => [
+        'elements' => [
+            'view' => 'scramble::docs',
+            'theme' => 'light',
+            'hideTryIt' => false,
+            'hideSchemas' => false,
+            'logo' => '',
+            'tryItCredentialsPolicy' => 'include',
+            'layout' => 'responsive',
+            'router' => 'hash',
+        ],
+        'scalar' => [
+            'view' => 'docs.api-scalar',
+            'cdn' => 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.77.0/dist/browser/standalone.js',
+            'theme' => 'default',
+            'proxyUrl' => 'https://proxy.scalar.com',
+            'darkMode' => false,
+            'showDeveloperTools' => 'never',
+            'agent' => ['disabled' => true],
+            'credentials' => 'include',
+            'modelsSectionLabel' => 'Modelos',
+            'localization' => [
+                'locale' => 'pt',
+                'direction' => 'ltr',
+            ],
+        ],
     ],
 
     /*

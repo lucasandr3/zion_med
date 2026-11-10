@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
 use App\Http\Controllers\Api\V1\PermissionCatalogController;
+use App\Http\Controllers\Api\V1\FeedbackController;
 use App\Http\Controllers\Api\V1\GoAssistantController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OnboardingController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\Api\V1\Connector\LeadsController as ConnectorLeadsContr
 use App\Http\Controllers\Api\V1\Platform\AuditLogController as PlatformAuditLogController;
 use App\Http\Controllers\Api\V1\Platform\BillingOverviewController as PlatformBillingOverviewController;
 use App\Http\Controllers\Api\V1\Platform\DashboardController as PlatformDashboardController;
+use App\Http\Controllers\Api\V1\Platform\FeedbackController as PlatformFeedbackController;
 use App\Http\Controllers\Api\V1\Platform\LeadsController as PlatformLeadsController;
 use App\Http\Controllers\Api\V1\Platform\ManualEmailController as PlatformManualEmailController;
 use App\Http\Controllers\Api\V1\Platform\PlanController as PlatformPlanController;
@@ -180,6 +182,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::post('/assistant/events', [GoAssistantController::class, 'store'])->name('api.v1.assistant.events.store');
     Route::delete('/assistant/history', [GoAssistantController::class, 'destroyHistory'])->name('api.v1.assistant.history.destroy');
 
+    Route::post('/feedback', [FeedbackController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('api.v1.feedback.store');
+
     // Área da plataforma: apenas platform_admin
     Route::prefix('platform')->middleware('platform')->group(function () {
         Route::get('/dashboard', PlatformDashboardController::class)->name('api.v1.platform.dashboard');
@@ -187,6 +193,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
         Route::get('/tenants/{tenant}', [PlatformTenantsController::class, 'show'])->name('api.v1.platform.tenants.show');
         Route::delete('/tenants/{tenant}', [PlatformTenantsController::class, 'destroy'])->name('api.v1.platform.tenants.destroy');
         Route::get('/leads', [PlatformLeadsController::class, 'index'])->name('api.v1.platform.leads.index');
+        Route::get('/feedback', [PlatformFeedbackController::class, 'index'])->name('api.v1.platform.feedback.index');
         Route::get('/plans', [PlatformPlanController::class, 'index'])->name('api.v1.platform.plans.index');
         Route::post('/plans', [PlatformPlanController::class, 'store'])->name('api.v1.platform.plans.store');
         Route::get('/plans/{plan}', [PlatformPlanController::class, 'show'])->name('api.v1.platform.plans.show');
@@ -320,6 +327,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::put('/clinica/configuracoes', [ClinicSettingsController::class, 'update'])->name('api.v1.clinica.configuracoes.update');
     Route::get('/clinica/logs', [AuditLogController::class, 'index'])->name('api.v1.clinica.logs.index');
     Route::get('/clinica/integracoes', [IntegrationsController::class, 'index'])->name('api.v1.clinica.integracoes.index');
+    Route::get('/clinica/integracoes/openapi', [IntegrationsController::class, 'openApi'])->name('api.v1.clinica.integracoes.openapi');
     Route::post('/clinica/integracoes/tokens', [IntegrationsController::class, 'createToken'])->name('api.v1.clinica.integracoes.tokens.store');
     Route::delete('/clinica/integracoes/tokens/{token}', [IntegrationsController::class, 'revokeToken'])->name('api.v1.clinica.integracoes.tokens.destroy');
     Route::post('/clinica/integracoes/webhooks', [IntegrationsController::class, 'storeWebhook'])->name('api.v1.clinica.integracoes.webhooks.store');
@@ -333,6 +341,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::get('/clinica/integracoes/sistemas/feegow/catalogos', [IntegrationsController::class, 'feegowCatalogs'])->name('api.v1.clinica.integracoes.sistemas.feegow.catalogos');
     Route::get('/clinica/integracoes/sistemas/feegow/disponibilidade', [IntegrationsController::class, 'feegowAvailableSchedule'])->name('api.v1.clinica.integracoes.sistemas.feegow.disponibilidade');
     Route::post('/clinica/integracoes/sistemas/feegow/agendamentos', [IntegrationsController::class, 'feegowCreateAppointment'])->name('api.v1.clinica.integracoes.sistemas.feegow.agendamentos.store');
+    Route::get('/clinica/integracoes/sistemas/trinks', [IntegrationsController::class, 'trinksShow'])->name('api.v1.clinica.integracoes.sistemas.trinks.show');
+    Route::put('/clinica/integracoes/sistemas/trinks', [IntegrationsController::class, 'trinksUpdate'])->name('api.v1.clinica.integracoes.sistemas.trinks.update');
+    Route::post('/clinica/integracoes/sistemas/trinks/test', [IntegrationsController::class, 'trinksTest'])->name('api.v1.clinica.integracoes.sistemas.trinks.test');
+    Route::get('/clinica/integracoes/sistemas/clinicorp', [IntegrationsController::class, 'clinicorpShow'])->name('api.v1.clinica.integracoes.sistemas.clinicorp.show');
+    Route::put('/clinica/integracoes/sistemas/clinicorp', [IntegrationsController::class, 'clinicorpUpdate'])->name('api.v1.clinica.integracoes.sistemas.clinicorp.update');
+    Route::post('/clinica/integracoes/sistemas/clinicorp/test', [IntegrationsController::class, 'clinicorpTest'])->name('api.v1.clinica.integracoes.sistemas.clinicorp.test');
+    Route::get('/clinica/integracoes/sistemas/ninsaude', [IntegrationsController::class, 'ninsaudeShow'])->name('api.v1.clinica.integracoes.sistemas.ninsaude.show');
+    Route::put('/clinica/integracoes/sistemas/ninsaude', [IntegrationsController::class, 'ninsaudeUpdate'])->name('api.v1.clinica.integracoes.sistemas.ninsaude.update');
+    Route::post('/clinica/integracoes/sistemas/ninsaude/test', [IntegrationsController::class, 'ninsaudeTest'])->name('api.v1.clinica.integracoes.sistemas.ninsaude.test');
 
     Route::get('/clinica/whatsapp/evolution', [WhatsappEvolutionController::class, 'show'])->name('api.v1.clinica.whatsapp.evolution.show');
     Route::post('/clinica/whatsapp/evolution/instance', [WhatsappEvolutionController::class, 'store'])->name('api.v1.clinica.whatsapp.evolution.instance.store');

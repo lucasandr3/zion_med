@@ -21,12 +21,14 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -133,7 +135,55 @@ class AppServiceProvider extends ServiceProvider
                 ]));
         });
 
+        /*
+         * Documentação pública (/docs/api): só o contrato de integração externa.
+         * A API real continua completa; isto filtra apenas o OpenAPI.
+         */
         Scramble::configure()
+            ->routes(function (Route $route) {
+                $config = Scramble::getGeneratorConfig(Scramble::DEFAULT_API);
+                if (! $config->apiPath()->matches($route->uri)) {
+                    return false;
+                }
+                $expectedDomain = $config->get('api_domain');
+                if ($expectedDomain && $route->getDomain() !== $expectedDomain) {
+                    return false;
+                }
+
+                $name = (string) $route->getName();
+                if ($name === '') {
+                    return false;
+                }
+
+                $allowedExact = [
+                    'api.v1.clinica.integracoes.index',
+                    'api.v1.templates.index',
+                    'api.v1.templates.categories',
+                    'api.v1.templates.show',
+                    'api.v1.templates.campos.index',
+                    'api.v1.templates.versoes.index',
+                    'api.v1.templates.versoes.compare',
+                    'api.v1.templates.link.gerar',
+                    'api.v1.links-publicos.index',
+                ];
+                if (in_array($name, $allowedExact, true)) {
+                    return true;
+                }
+
+                $allowedPrefixes = [
+                    'api.v1.protocols.',
+                    'api.v1.pessoas.',
+                    'api.v1.clinica.integracoes.webhooks.',
+                    'api.v1.clinica.integracoes.webhook-deliveries.',
+                ];
+                foreach ($allowedPrefixes as $prefix) {
+                    if (Str::startsWith($name, $prefix)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
             ->withDocumentTransformers(function (OpenApi $openApi) {
                 $openApi->secure(
                     SecurityScheme::http('bearer', 'JWT')->as('bearerAuth')->setDescription('Token de API (Sanctum). Header: Authorization: Bearer {token}')
@@ -142,6 +192,34 @@ class AppServiceProvider extends ServiceProvider
                 if ($append !== '' && isset($openApi->info)) {
                     $openApi->info->description = trim($openApi->info->description."\n\n".$append);
                 }
+
+                $tagLabels = [
+                    'Integrations' => 'Webhooks',
+                    'LinksPublicos' => 'Links públicos',
+                    'Person' => 'Pessoas',
+                    'Protocol' => 'Protocolos',
+                    'Template' => 'Templates',
+                ];
+
+                foreach ($openApi->paths as $path) {
+                    foreach ($path->operations as $operation) {
+                        if ($operation->tags === []) {
+                            continue;
+                        }
+                        $operation->setTags(array_map(
+                            static fn (string $tag): string => $tagLabels[$tag] ?? $tag,
+                            $operation->tags
+                        ));
+                    }
+                }
+
+                $openApi->tags = array_map(static function ($tag) use ($tagLabels) {
+                    if (is_object($tag) && isset($tag->name)) {
+                        $tag->name = $tagLabels[$tag->name] ?? $tag->name;
+                    }
+
+                    return $tag;
+                }, $openApi->tags);
             });
 
         Gate::define('view-dashboard', function (User $user) {
@@ -173,7 +251,12 @@ class AppServiceProvider extends ServiceProvider
                 return false;
             }
 
-            return in_array($user->roleEnum(), [Role::SuperAdmin, Role::PlatformAdmin], true);
+            // Admins da plataforma e quem gerencia a empresa (tela Integrações).
+            if (in_array($user->roleEnum(), [Role::SuperAdmin, Role::PlatformAdmin], true)) {
+                return true;
+            }
+
+            return $user->hasPermission(Permission::ORGANIZATION_MANAGE);
         });
 
         Gate::define('viewLogViewer', function (?User $user) {

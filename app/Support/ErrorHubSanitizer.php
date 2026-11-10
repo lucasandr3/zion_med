@@ -35,6 +35,11 @@ final class ErrorHubSanitizer
         'asaas_api_key',
         'minio_secret_key',
         'feegow_token',
+        'trinks_token',
+        'clinicorp_token',
+        'clinicorp_api_user',
+        'ninsaude_password',
+        'ninsaude_refresh_token',
         'evolution_go_instance_token',
     ];
 
