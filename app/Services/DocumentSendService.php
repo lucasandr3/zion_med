@@ -31,7 +31,6 @@ class DocumentSendService
             $template->refresh();
         }
 
-        $url = $this->publicLinkService->getPublicUrl($template);
         $expiresAt = $expiresAt ?? $template->public_token_expires_at?->toDateTimeImmutable();
 
         $send = DocumentSend::create([
@@ -47,6 +46,7 @@ class DocumentSendService
             'public_token' => $template->public_token,
         ]);
 
+        $url = $this->publicUrlForSend($template, $send);
         $organizationName = $template->organization?->name ?? 'Organização';
         $templateName = $template->name;
 
@@ -66,6 +66,16 @@ class DocumentSendService
         );
 
         return $send;
+    }
+
+    public function publicUrlForSend(FormTemplate $template, DocumentSend $send, ?\Illuminate\Http\Request $request = null): string
+    {
+        $base = $this->publicLinkService->getPublicUrl($template, $request);
+        if ($base === '' || ! $send->send_token) {
+            return $base;
+        }
+
+        return $base.(str_contains($base, '?') ? '&' : '?').'s='.rawurlencode($send->send_token);
     }
 
     /**
@@ -104,7 +114,9 @@ class DocumentSendService
     }
 
     /**
-     * Cancela um envio (revoga o convite para assinar; não desativa o link do template).
+     * Cancela um envio (revoga o convite para assinar).
+     * Não desativa o link público do template (Totem / link na bio / QR compartilhado
+     * continuam funcionando). O envio cancelado deixa de ser vinculado a novas submissões.
      */
     public function cancel(DocumentSend $documentSend): void
     {
@@ -126,7 +138,7 @@ class DocumentSendService
         if (! $template->public_token || ! $template->public_enabled) {
             return false;
         }
-        $url = $this->publicLinkService->getPublicUrl($template);
+        $url = $this->publicUrlForSend($template, $documentSend);
         $organizationName = $template->organization?->name ?? 'Organização';
         $templateName = $template->name;
         $email = $documentSend->recipient_email;
@@ -176,7 +188,6 @@ class DocumentSendService
             $this->publicLinkService->generateToken($template);
             $template->refresh();
         }
-        $url = $this->publicLinkService->getPublicUrl($template);
         $expiresAt = $expiresAt ?? $template->public_token_expires_at?->toDateTimeImmutable();
         $send = DocumentSend::create([
             'organization_id' => $template->organization_id ?? $template->clinic_id,
@@ -189,6 +200,7 @@ class DocumentSendService
             'expires_at' => $expiresAt,
             'public_token' => $template->public_token,
         ]);
+        $url = $this->publicUrlForSend($template, $send);
         $payload = [
             'message' => "Documento para assinatura: {$template->name}. Acesse: {$url}",
         ];

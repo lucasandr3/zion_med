@@ -150,9 +150,24 @@ class SubmissionService
         $signingChannel = $data['_signing_channel'] ?? 'web';
         $locale = $data['_locale'] ?? 'pt_BR';
         $timezone = $data['_timezone'] ?? config('app.timezone', 'America/Sao_Paulo');
-        $acceptedTextAt = isset($data['_accepted_text_at'])
-            ? \Carbon\Carbon::parse((string) $data['_accepted_text_at'])
-            : now();
+        // Aceite e carimbo de tempo são sempre do servidor (cliente pode mentir o relógio).
+        $acceptedTextAt = now();
+        if (! empty($data['_accepted_text_at'])) {
+            $data['_accepted_text_at_client'] = (string) $data['_accepted_text_at'];
+        }
+        $data['_accepted_text_at'] = $acceptedTextAt->toIso8601String();
+        if (! empty($data['_term_scrolled_at'])) {
+            $data['_term_scrolled_at_client'] = (string) $data['_term_scrolled_at'];
+        }
+        if (! empty($data['_term_scrolled_at']) || ! empty($data['_term_scrolled_at_client'])) {
+            $data['_term_scrolled_at'] = $acceptedTextAt->toIso8601String();
+        }
+        if (! empty($data['_comprehension_ack'])) {
+            if (! empty($data['_comprehension_ack_at'])) {
+                $data['_comprehension_ack_at_client'] = (string) $data['_comprehension_ack_at'];
+            }
+            $data['_comprehension_ack_at'] = $acceptedTextAt->toIso8601String();
+        }
 
         $submission = DB::transaction(function () use ($template, $data, $files, $signatures, $request, $signingChannel, $locale, $timezone, $acceptedTextAt, $personId) {
             $orgId = $template->organization_id ?? $template->clinic_id;
@@ -249,22 +264,38 @@ class SubmissionService
         $this->notifyClinicUsersNewSubmission($submission);
 
         $orgId = $submission->organization_id ?? $submission->clinic_id;
-        if ($submission->submitter_email) {
+        $linkedBySendToken = false;
+        $sendToken = trim((string) ($data['_send_token'] ?? ''));
+        if ($sendToken !== '') {
+            $documentSendByToken = DocumentSend::where('organization_id', $orgId)
+                ->where('form_template_id', $submission->template_id)
+                ->where('send_token', $sendToken)
+                ->whereNull('form_submission_id')
+                ->whereNull('cancelled_at')
+                ->first();
+            if ($documentSendByToken) {
+                $this->documentSendService->linkSubmissionToSend($documentSendByToken, $submission->id);
+                $linkedBySendToken = true;
+            }
+        }
+        if (! $linkedBySendToken && $submission->submitter_email) {
             $documentSend = DocumentSend::where('organization_id', $orgId)
                 ->where('form_template_id', $submission->template_id)
                 ->where('recipient_email', $submission->submitter_email)
                 ->whereNull('form_submission_id')
+                ->whereNull('cancelled_at')
                 ->orderByDesc('sent_at')
                 ->first();
             if ($documentSend) {
                 $this->documentSendService->linkSubmissionToSend($documentSend, $submission->id);
             }
         }
-        if ($submission->person_id) {
+        if (! $linkedBySendToken && $submission->person_id) {
             $documentSendByPerson = DocumentSend::where('organization_id', $orgId)
                 ->where('form_template_id', $submission->template_id)
                 ->where('person_id', $submission->person_id)
                 ->whereNull('form_submission_id')
+                ->whereNull('cancelled_at')
                 ->orderByDesc('sent_at')
                 ->first();
             if ($documentSendByPerson) {
@@ -443,8 +474,15 @@ class SubmissionService
             'comprehension_ack' => ! empty($data['_comprehension_ack']),
             'comprehension_ack_at' => $data['_comprehension_ack_at'] ?? null,
             'term_scrolled_at' => $data['_term_scrolled_at'] ?? null,
+            'term_scrolled_at_client' => $data['_term_scrolled_at_client'] ?? null,
+            'accepted_text_at_client' => $data['_accepted_text_at_client'] ?? null,
+            'comprehension_ack_at_client' => $data['_comprehension_ack_at_client'] ?? null,
             'privacy_ack' => ! empty($data['_accept_terms']) || ! empty($data['_accepted_text_at']),
             'assisted_mode' => ! empty($data['_assisted_mode']),
+            'assisted_by_user_id' => isset($data['_assisted_by_user_id']) ? (int) $data['_assisted_by_user_id'] : null,
+            'assisted_by_user_name' => isset($data['_assisted_by_user_name'])
+                ? trim((string) $data['_assisted_by_user_name'])
+                : null,
             'professional_explained_at_submit' => ! empty($data['_professional_explained']),
             'professional_cosigned_at_submit' => ! empty($data['_assisted_mode'])
                 && $this->hasProfessionalCosignInData($template, $data),
@@ -767,15 +805,15 @@ class SubmissionService
         }
     }
 
-    /** Todos os usuários ativos da clínica (recebem todas as notificações). Inclui SuperAdmins. */
+    /**
+     * Usuários ativos da mesma organização (recebem notificações).
+     * Não inclui super_admin de outras clínicas/tenants.
+     */
     protected function getClinicUsers(int $organizationId): \Illuminate\Support\Collection
     {
         return User::withoutGlobalScopes()
             ->where('active', true)
-            ->where(function ($q) use ($organizationId) {
-                $q->where('organization_id', $organizationId)
-                    ->orWhereIn('role', ['super_admin']);
-            })
+            ->where('organization_id', $organizationId)
             ->get();
     }
 }

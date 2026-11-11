@@ -143,11 +143,20 @@ class BillingStateService
             return false;
         }
 
+        // Cancelamento explícito: um pagamento antigo não reabre o acesso.
+        // Clientes active/trial/past_due (com carência) continuam intactos.
+        $subscriptionStatus = (string) $organization->subscription_status;
+        $billingStatus = (string) $organization->billing_status;
+        if (in_array($subscriptionStatus, ['canceled', 'cancelled'], true)
+            || $billingStatus === 'canceled') {
+            return false;
+        }
+
         if ($this->isAwaitingFirstBillingPayment($organization)) {
             return false;
         }
 
-        if ($organization->subscription_status === 'past_due') {
+        if ($subscriptionStatus === 'past_due') {
             if ($organization->grace_ends_at && now()->lte($organization->grace_ends_at)) {
                 return true;
             }
@@ -163,11 +172,13 @@ class BillingStateService
                 return true;
             }
 
-            return $this->hasConfirmedBillingPayment($organization);
+            // Após o trial: exige pagamento confirmado e status ativo (não canceled).
+            return $this->hasConfirmedBillingPayment($organization)
+                && in_array($subscriptionStatus, ['active', 'trial'], true);
         }
 
-        return $organization->subscription_status === 'active'
-            && in_array((string) $organization->billing_status, ['ok', 'attention'], true);
+        return $subscriptionStatus === 'active'
+            && in_array($billingStatus, ['ok', 'attention'], true);
     }
 
     public function isPastDueInGrace(Organization $organization): bool

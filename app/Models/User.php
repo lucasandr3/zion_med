@@ -123,9 +123,13 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function effectivePermissions(): array
     {
-        $enum = $this->roleEnum();
-        if ($enum === Role::PlatformAdmin) {
+        if ($this->isPlatformAdmin()) {
             return Permission::keys();
+        }
+        $enum = $this->roleEnum();
+        // role=platform_admin em usuário de clínica não concede permissões totais
+        if ($enum === Role::PlatformAdmin) {
+            return $this->permissionsFallbackFromEnum();
         }
         if ($enum === Role::SuperAdmin) {
             return Permission::keys();
@@ -195,6 +199,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isPlatformAdmin(): bool
     {
+        // Contas de clínica nunca são admin da plataforma — evita escalada
+        // via role=platform_admin com organization_id preenchido.
+        if ($this->organization_id !== null) {
+            return false;
+        }
+
         return $this->roleEnum() === Role::PlatformAdmin;
     }
 

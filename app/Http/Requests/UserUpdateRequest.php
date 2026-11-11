@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ReservedOrganizationRoles;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -30,6 +31,7 @@ class UserUpdateRequest extends FormRequest
                 'required',
                 'string',
                 'max:64',
+                Rule::notIn(ReservedOrganizationRoles::platformOnly()),
                 Rule::exists('organization_roles', 'slug')->where(function ($query) use ($clinicId) {
                     return $query->where('organization_id', $clinicId)->where('is_assignable', true);
                 }),

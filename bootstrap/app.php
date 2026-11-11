@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\PdfIntegrityException;
 use App\Support\ApiErrorResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -82,6 +83,17 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return ApiErrorResponse::fromStatus(404);
+        });
+
+        $exceptions->render(function (PdfIntegrityException $e, Request $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return response('PDF com integridade comprometida. Contate o suporte.', 409);
+            }
+
+            return ApiErrorResponse::fromStatus(
+                409,
+                'O PDF armazenado foi alterado e não corresponde ao hash registrado. Contate o suporte.'
+            );
         });
 
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) {

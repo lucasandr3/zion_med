@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\PdfIntegrityException;
 use App\Models\FormSubmission;
 use App\Support\EsteticaStaffFieldRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -12,30 +13,19 @@ class PdfService
 {
     public function streamSubmissionPdf(FormSubmission $submission): \Illuminate\Http\Response
     {
-        $stored = $this->readStoredPdf($submission);
+        $content = $this->resolvePdfContent($submission);
         $filename = 'protocolo-' . ($submission->protocol_number ?? $submission->id) . '.pdf';
 
-        if ($stored !== null) {
-            return response($stored, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            ]);
-        }
-
-        $pdf = $this->buildPdf($submission);
-
-        return $pdf->stream($filename);
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
     }
 
     /** Retorna o conteúdo binário do PDF para inclusão em ZIP / e-mail. */
     public function getSubmissionPdfContent(FormSubmission $submission): string
     {
-        $stored = $this->readStoredPdf($submission);
-        if ($stored !== null) {
-            return $stored;
-        }
-
-        return $this->buildPdf($submission)->output();
+        return $this->resolvePdfContent($submission);
     }
 
     /**
@@ -64,6 +54,32 @@ class PdfService
         return $content;
     }
 
+    /**
+     * Serve o PDF persistido (com checagem de hash). Só regenera se nunca houve arquivo/hash.
+     * Se o arquivo foi adulterado, lança PdfIntegrityException.
+     */
+    private function resolvePdfContent(FormSubmission $submission): string
+    {
+        $stored = $this->readStoredPdf($submission);
+        if ($stored !== null) {
+            return $stored;
+        }
+
+        $hasIntegrityAnchor = is_string($submission->pdf_sha256) && $submission->pdf_sha256 !== '';
+        $hasPath = is_string($submission->pdf_disk_path) && $submission->pdf_disk_path !== '';
+
+        // Havia PDF registrado, mas o arquivo sumiu: regenera e regrava (recuperação operacional).
+        if ($hasPath || $hasIntegrityAnchor) {
+            report(new \RuntimeException(
+                'PDF ausente no storage; regenerando submission='.$submission->id
+            ));
+
+            return $this->persistSubmissionPdf($submission);
+        }
+
+        return $this->buildPdf($submission)->output();
+    }
+
     private function readStoredPdf(FormSubmission $submission): ?string
     {
         $path = $submission->pdf_disk_path;
@@ -77,8 +93,23 @@ class PdfService
                 return null;
             }
             $bytes = $disk->get($path);
+            if (! is_string($bytes) || $bytes === '') {
+                return null;
+            }
 
-            return is_string($bytes) && $bytes !== '' ? $bytes : null;
+            $expected = $submission->pdf_sha256;
+            if (is_string($expected) && $expected !== '') {
+                $actual = hash('sha256', $bytes);
+                if (! hash_equals($expected, $actual)) {
+                    throw new PdfIntegrityException(
+                        'PDF armazenado diverge do pdf_sha256 registrado (submission='.$submission->id.').'
+                    );
+                }
+            }
+
+            return $bytes;
+        } catch (PdfIntegrityException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 

@@ -67,9 +67,37 @@ class AssistedCosignTest extends TestCase
             ->assertJsonValidationErrors(['_signature']);
     }
 
+    public function test_assisted_mode_requires_authenticated_staff_from_same_org(): void
+    {
+        $owner = $this->qaClinicOwnerUser();
+
+        $template = FormTemplate::withoutGlobalScopes()->create([
+            'organization_id' => $owner->organization_id,
+            'name' => 'TCLE Assistido Auth',
+            'category' => 'consentimento',
+            'document_kind' => 'consentimento',
+            'is_active' => true,
+            'public_enabled' => true,
+            'public_token' => str_repeat('c', 32),
+        ]);
+
+        // Sem sessão Sanctum: rejeita modo assistido.
+        $this->postJson("/api/v1/formulario-publico/{$template->public_token}/submit", [
+            '_submitter_name' => 'Paciente',
+            '_comprehension_ack' => true,
+            '_accept_terms' => true,
+            '_assisted_mode' => true,
+            '_professional_explained' => true,
+            '_professional_name' => 'Dr. Fake',
+            '_signature' => ['assinatura_paciente' => $this->tinyPngDataUrl()],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['_assisted_mode']);
+    }
+
     public function test_assisted_mode_persists_professional_cosign_signature(): void
     {
         $user = $this->actingOwner();
+        $user->clinic?->update(['signing_security_level' => 'basic']);
 
         $template = FormTemplate::withoutGlobalScopes()->create([
             'organization_id' => $user->organization_id,

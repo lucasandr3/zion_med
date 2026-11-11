@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class DocumentSend extends Model
 {
@@ -19,6 +20,7 @@ class DocumentSend extends Model
         'expires_at',
         'form_submission_id',
         'public_token',
+        'send_token',
         'cancelled_at',
         'reminded_at',
     ];
@@ -31,6 +33,15 @@ class DocumentSend extends Model
             'cancelled_at' => 'datetime',
             'reminded_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $model): void {
+            if (! $model->send_token) {
+                $model->send_token = Str::random(40);
+            }
+        });
     }
 
     public function scopeNotCancelled($query)

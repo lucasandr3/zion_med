@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesOrganizationContext;
 use App\Http\Controllers\Controller;
 use App\Models\OrganizationRole;
 use App\Support\Permission;
+use App\Support\ReservedOrganizationRoles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -63,7 +64,7 @@ class OrganizationRoleController extends Controller
                 'string',
                 'max:64',
                 'regex:/^[a-z][a-z0-9_]{1,62}$/',
-                Rule::notIn(['novo', 'edit', 'criar', 'permissoes', 'papeis']),
+                Rule::notIn(ReservedOrganizationRoles::blockedCustomSlugs()),
                 Rule::unique('organization_roles', 'slug')->where('organization_id', $orgId),
             ],
             'label' => ['required', 'string', 'max:255'],

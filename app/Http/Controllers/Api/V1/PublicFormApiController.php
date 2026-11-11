@@ -6,6 +6,7 @@ use App\Support\PiiMasker;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\DocumentSend;
 use App\Models\FeegowAppointment;
 use App\Models\FormTemplate;
 use App\Models\Organization;
@@ -76,6 +77,11 @@ class PublicFormApiController extends Controller
 
         if (! $template) {
             return response()->json(['message' => 'Formulário não encontrado ou não disponível.'], 404);
+        }
+
+        $sendGate = $this->assertDocumentSendAccess($template, request()->query('s'));
+        if ($sendGate !== null) {
+            return $sendGate;
         }
 
         $clinic = $template->clinic;
@@ -364,6 +370,12 @@ class PublicFormApiController extends Controller
             return response()->json(['message' => 'Formulário não encontrado ou não disponível.'], 404);
         }
 
+        $sendToken = trim((string) ($request->input('_send_token') ?: $request->query('s', '')));
+        $sendGate = $this->assertDocumentSendAccess($template, $sendToken !== '' ? $sendToken : null);
+        if ($sendGate !== null) {
+            return $sendGate;
+        }
+
         $rules = [
             '_submitter_name' => ['nullable', 'string', 'max:255'],
             '_submitter_email' => ['nullable', 'email', 'max:255'],
@@ -410,6 +422,7 @@ class PublicFormApiController extends Controller
             'feegow_sys_user' => ['nullable'],
             'feegow_external_reference' => ['nullable', 'string', 'max:120'],
             '_appointment_token' => ['nullable', 'string', 'max:64'],
+            '_send_token' => ['nullable', 'string', 'max:64'],
         ];
         $documentKind = $template->document_kind
             ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha');
@@ -532,18 +545,30 @@ class PublicFormApiController extends Controller
         }
 
         if ($request->boolean('_assisted_mode')) {
+            $staff = $request->user('sanctum');
+            $templateOrgId = (int) ($template->organization_id ?? $template->clinic_id ?? 0);
+            $staffOrgId = $staff ? (int) ($staff->currentOrganizationId() ?? $staff->organization_id ?? 0) : 0;
+            if (! $staff || ! $staff->active || $staffOrgId <= 0 || $staffOrgId !== $templateOrgId) {
+                throw ValidationException::withMessages([
+                    '_assisted_mode' => ['Modo assistido exige profissional autenticado desta organização no mesmo navegador.'],
+                ]);
+            }
+
             if (! $request->boolean('_professional_explained')) {
                 throw ValidationException::withMessages([
                     '_professional_explained' => ['Confirme que explicou o termo ao paciente no modo assistido.'],
                 ]);
             }
 
-            $professionalName = trim((string) ($data['_professional_name'] ?? ''));
+            $professionalName = trim((string) ($data['_professional_name'] ?? $staff->name ?? ''));
             if ($professionalName === '') {
                 throw ValidationException::withMessages([
                     '_professional_name' => ['Informe o nome do profissional que assina no modo assistido.'],
                 ]);
             }
+            $data['_professional_name'] = $professionalName;
+            $data['_assisted_by_user_id'] = $staff->id;
+            $data['_assisted_by_user_name'] = $staff->name;
 
             if (! $this->signatureFieldResolver->hasProfessionalCosignSignature($template, $signatures)) {
                 throw ValidationException::withMessages([
@@ -610,6 +635,9 @@ class PublicFormApiController extends Controller
 
         $appointmentToken = trim((string) ($validated['_appointment_token'] ?? $request->input('_appointment_token', '')));
         unset($data['_appointment_token']);
+        if ($sendToken !== '') {
+            $data['_send_token'] = $sendToken;
+        }
 
         $files = [];
         foreach ($template->fields as $field) {
@@ -1187,6 +1215,40 @@ class PublicFormApiController extends Controller
             } catch (\Throwable) {
                 // tenta próximo formato
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Quando o link traz ?s= / _send_token, valida o envio pontual.
+     * Link sem s= (Totem / QR / bio) continua liberado.
+     */
+    private function assertDocumentSendAccess(FormTemplate $template, mixed $rawToken): ?JsonResponse
+    {
+        $sendToken = is_string($rawToken) ? trim($rawToken) : '';
+        if ($sendToken === '') {
+            return null;
+        }
+
+        $orgId = (int) ($template->organization_id ?? $template->clinic_id ?? 0);
+        $send = DocumentSend::query()
+            ->where('organization_id', $orgId)
+            ->where('form_template_id', $template->id)
+            ->where('send_token', $sendToken)
+            ->first();
+
+        if (! $send) {
+            return response()->json(['message' => 'Convite de documento inválido ou expirado.'], 404);
+        }
+        if ($send->isCancelled()) {
+            return response()->json(['message' => 'Este convite foi cancelado pela clínica.'], 410);
+        }
+        if ($send->isExpired()) {
+            return response()->json(['message' => 'Este convite expirou.'], 410);
+        }
+        if ($send->form_submission_id) {
+            return response()->json(['message' => 'Este convite já foi utilizado.'], 410);
         }
 
         return null;
