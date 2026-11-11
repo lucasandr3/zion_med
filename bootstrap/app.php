@@ -22,6 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'webhooks/asaas',
+            // Links públicos do cliente (token/slug) — não exigem sessão do painel
+            'api/v1/formulario-publico/*',
+            'api/v1/agenda/public/*',
+            'api/v1/link-bio/public/*',
+            'api/v1/demonstracao',
+            'api/v1/comece',
+            'api/v1/landing/analytics/*',
+            'api/v1/product-events',
         ]);
 
         $middleware->append(\App\Http\Middleware\LimitCorsCredentials::class);
