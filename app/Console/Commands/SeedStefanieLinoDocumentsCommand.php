@@ -24,7 +24,7 @@ class SeedStefanieLinoDocumentsCommand extends Command
                             {--force : Em produção, confirma sem prompt interativo}
                             {--create-local-demo : Cria conta demo local (proibido em produção)}';
 
-    protected $description = 'Provisiona os 9 documentos da Dra. Stefanie Lino (templates + PDF original) em uma organização existente';
+    protected $description = 'Remove os outros templates da organização e provisiona só os 9 documentos da Dra. Stefanie Lino (+ PDF original)';
 
     public function handle(StefanieLinoDocumentProvisioner $provisioner): int
     {
@@ -88,7 +88,8 @@ class SeedStefanieLinoDocumentsCommand extends Command
 
         $this->newLine();
         $this->info(sprintf(
-            'Criados: %d | Atualizados: %d | PDFs anexados: %d | Pulados: %d',
+            'Removidos: %d | Criados: %d | Atualizados: %d | PDFs anexados: %d | Pulados: %d',
+            $result['removed'],
             $result['created'],
             $result['updated'],
             $result['attached'],
@@ -96,6 +97,7 @@ class SeedStefanieLinoDocumentsCommand extends Command
         ));
 
         if (! (bool) $this->option('dry-run')) {
+            $this->comment('A organização fica só com os 9 documentos do pacote Stefanie Lino.');
             $this->comment('Próximo: no painel, abra Templates → Editar para conferir o PDF original e publique os links.');
         }
 

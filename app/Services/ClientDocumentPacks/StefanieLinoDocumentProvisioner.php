@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Provisiona os 9 documentos da Dra. Stefanie Lino em uma organização existente.
- * Idempotente por nome do template; reanexa o PDF original.
+ * Remove os demais templates da organização (fica só o pacote do seeder).
+ * Idempotente por nome; reanexa o PDF original.
  */
 final class StefanieLinoDocumentProvisioner
 {
     /**
-     * @return array{created: int, updated: int, attached: int, skipped: int, items: list<string>}
+     * @return array{created: int, updated: int, attached: int, removed: int, skipped: int, items: list<string>}
      */
     public function provision(Organization $organization, ?User $createdBy = null, bool $dryRun = false): array
     {
@@ -28,11 +29,19 @@ final class StefanieLinoDocumentProvisioner
             throw new \RuntimeException('Pasta de PDFs não encontrada: '.$assetsDir);
         }
 
+        $keepNames = array_values(array_map(
+            static fn (array $doc): string => (string) $doc['name'],
+            StefanieLinoDocumentPack::documents(),
+        ));
+
         $created = 0;
         $updated = 0;
         $attached = 0;
+        $removed = 0;
         $skipped = 0;
         $items = [];
+
+        $removed += $this->purgeOtherTemplates($organization, $keepNames, $dryRun, $items);
 
         foreach (StefanieLinoDocumentPack::documents() as $doc) {
             $extra = $doc['extra_fields'] ?? [];
@@ -105,7 +114,58 @@ final class StefanieLinoDocumentProvisioner
             $items[] = "OK {$name}";
         }
 
-        return compact('created', 'updated', 'attached', 'skipped', 'items');
+        return compact('created', 'updated', 'attached', 'removed', 'skipped', 'items');
+    }
+
+    /**
+     * Remove templates da organização que não fazem parte do pacote Stefanie.
+     *
+     * @param  list<string>  $keepNames
+     * @param  list<string>  $items
+     */
+    private function purgeOtherTemplates(
+        Organization $organization,
+        array $keepNames,
+        bool $dryRun,
+        array &$items,
+    ): int {
+        $others = FormTemplate::withoutGlobalScopes()
+            ->where('organization_id', $organization->id)
+            ->whereNotIn('name', $keepNames)
+            ->orderBy('id')
+            ->get();
+
+        $removed = 0;
+        foreach ($others as $template) {
+            $label = "#{$template->id} {$template->name}";
+            if ($dryRun) {
+                $items[] = "DRY-RUN remove: {$label}";
+                $removed++;
+
+                continue;
+            }
+
+            $this->deleteSourceDocumentFile($template);
+            $template->delete();
+            $items[] = "REMOVED {$label}";
+            $removed++;
+        }
+
+        return $removed;
+    }
+
+    private function deleteSourceDocumentFile(FormTemplate $template): void
+    {
+        $path = (string) ($template->source_document_path ?? '');
+        if ($path === '') {
+            return;
+        }
+
+        $disk = (string) ($template->source_document_disk ?: 'minio_assets');
+        try {
+            Storage::disk($disk)->delete($path);
+        } catch (\Throwable) {
+        }
     }
 
     private function attachSourcePdf(FormTemplate $template, string $absolutePdfPath, string $originalName): void

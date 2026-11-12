@@ -11,7 +11,8 @@ Usados pelo comando de provisionamento (produção e local).
 php artisan templates:seed-stefanie-lino --list
 ```
 
-3. Rode migration + documentos na organização certa:
+3. Rode migration + documentos na organização certa.
+   **Atenção:** o comando **apaga os demais templates** da organização e deixa só os 9 do pacote.
 
 ```bash
 php artisan gestgo:provision-stefanie-lino --organization=ID --migrate --force
