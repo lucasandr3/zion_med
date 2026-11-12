@@ -27,9 +27,11 @@ use App\Services\TemplateVersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use App\Support\ClinicalStepKind;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TemplateController extends Controller
 {
@@ -391,10 +393,122 @@ class TemplateController extends Controller
         $this->authorize('update-template', $template);
         $templateId = $template->id;
         $clinicId = $template->organization_id ?? $template->clinic_id;
+        $this->deleteSourceDocumentFile($template);
         $template->delete();
         Event::dispatch(new AuditEvent('template.deleted', FormTemplate::class, $templateId, null, $clinicId, $request->user()?->id));
 
         return response()->json(['data' => ['message' => 'Template removido.']], 200);
+    }
+
+    /**
+     * Anexa o PDF original do documento (layout da clínica) ao modelo.
+     */
+    public function uploadSourceDocument(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf', 'max:20480'],
+        ], [
+            'file.required' => 'Envie um arquivo PDF.',
+            'file.mimes' => 'O documento original deve ser um PDF.',
+            'file.max' => 'O PDF pode ter no máximo 20 MB.',
+        ]);
+
+        $organizationId = (int) ($template->organization_id ?? $template->clinic_id ?? 0);
+        if ($organizationId <= 0) {
+            return response()->json(['message' => 'Organização do modelo inválida.'], 422);
+        }
+
+        $file = $request->file('file');
+        $this->deleteSourceDocumentFile($template);
+
+        $disk = 'minio_assets';
+        $directory = 'organizations/'.$organizationId.'/templates/'.$template->id.'/source';
+        $path = $file->store($directory, $disk);
+
+        $template->update([
+            'source_document_disk' => $disk,
+            'source_document_path' => $path,
+            'source_document_original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 255),
+            'source_document_mime' => $file->getMimeType() ?: 'application/pdf',
+            'source_document_size' => $file->getSize() ?: null,
+        ]);
+
+        Event::dispatch(new AuditEvent('template.source_document.uploaded', FormTemplate::class, $template->id, [
+            'original_name' => $template->source_document_original_name,
+            'size' => $template->source_document_size,
+        ], $organizationId, $request->user()?->id));
+
+        return response()->json([
+            'data' => new TemplateResource($template->fresh()),
+        ]);
+    }
+
+    /**
+     * Baixa o PDF original anexado ao modelo.
+     */
+    public function downloadSourceDocument(FormTemplate $template): StreamedResponse|JsonResponse
+    {
+        $this->authorize('view-template', $template);
+
+        $path = (string) ($template->source_document_path ?? '');
+        $disk = (string) ($template->source_document_disk ?: 'minio_assets');
+        if ($path === '' || ! Storage::disk($disk)->exists($path)) {
+            return response()->json(['message' => 'Documento original não encontrado.'], 404);
+        }
+
+        $name = (string) ($template->source_document_original_name ?: 'documento-original.pdf');
+        $mime = (string) ($template->source_document_mime ?: 'application/pdf');
+
+        return Storage::disk($disk)->response($path, $name, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="'.$name.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=60',
+        ]);
+    }
+
+    /**
+     * Remove o PDF original anexado ao modelo.
+     */
+    public function destroySourceDocument(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+
+        if (! $template->hasSourceDocument()) {
+            return response()->json(['data' => new TemplateResource($template)]);
+        }
+
+        $organizationId = (int) ($template->organization_id ?? $template->clinic_id ?? 0);
+        $this->deleteSourceDocumentFile($template);
+        $template->update([
+            'source_document_disk' => null,
+            'source_document_path' => null,
+            'source_document_original_name' => null,
+            'source_document_mime' => null,
+            'source_document_size' => null,
+        ]);
+
+        Event::dispatch(new AuditEvent('template.source_document.deleted', FormTemplate::class, $template->id, null, $organizationId, $request->user()?->id));
+
+        return response()->json([
+            'data' => new TemplateResource($template->fresh()),
+        ]);
+    }
+
+    private function deleteSourceDocumentFile(FormTemplate $template): void
+    {
+        $path = (string) ($template->source_document_path ?? '');
+        if ($path === '') {
+            return;
+        }
+
+        $disk = (string) ($template->source_document_disk ?: 'minio_assets');
+        try {
+            Storage::disk($disk)->delete($path);
+        } catch (\Throwable) {
+        }
     }
 
     /**

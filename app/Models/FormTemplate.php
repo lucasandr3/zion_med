@@ -37,6 +37,11 @@ class FormTemplate extends Model
         'public_token',
         'public_token_expires_at',
         'created_by',
+        'source_document_disk',
+        'source_document_path',
+        'source_document_original_name',
+        'source_document_mime',
+        'source_document_size',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -128,7 +133,13 @@ class FormTemplate extends Model
             'actors_visibility_rules' => 'array',
             'uses_clinical_steps' => 'boolean',
             'library_reviewed_at' => 'datetime',
+            'source_document_size' => 'integer',
         ];
+    }
+
+    public function hasSourceDocument(): bool
+    {
+        return filled($this->source_document_path);
     }
 
     public function organization(): BelongsTo

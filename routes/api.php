@@ -262,6 +262,9 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::post('/templates/a-partir-de/{template}', [TemplateController::class, 'storeFromTemplate'])->name('api.v1.templates.storeFromTemplate');
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show');
     Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('api.v1.templates.update');
+    Route::post('/templates/{template}/source-document', [TemplateController::class, 'uploadSourceDocument'])->name('api.v1.templates.source-document.upload');
+    Route::get('/templates/{template}/source-document', [TemplateController::class, 'downloadSourceDocument'])->name('api.v1.templates.source-document.download');
+    Route::delete('/templates/{template}/source-document', [TemplateController::class, 'destroySourceDocument'])->name('api.v1.templates.source-document.destroy');
     Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])->name('api.v1.templates.destroy');
     Route::get('/templates/{template}/campos', [TemplateController::class, 'campos'])->name('api.v1.templates.campos.index');
     Route::post('/templates/{template}/campos', [TemplateController::class, 'storeCampo'])->name('api.v1.templates.campos.store');

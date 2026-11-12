@@ -39,6 +39,10 @@ class TemplateResource extends JsonResource
             'legal_review_status' => $this->legal_review_status,
             'clinical_review_status' => $this->clinical_review_status,
             'library_reviewed_at' => $this->library_reviewed_at?->toIso8601String(),
+            'has_source_document' => $this->hasSourceDocument(),
+            'source_document_original_name' => $this->source_document_original_name,
+            'source_document_mime' => $this->source_document_mime,
+            'source_document_size' => $this->source_document_size,
             'fields' => $this->whenLoaded(
                 'fields',
                 fn () => FormFieldResource::collection($this->fields)
