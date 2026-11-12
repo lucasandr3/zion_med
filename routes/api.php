@@ -131,6 +131,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->middleware('throttle:10,1')
         ->name('api.v1.formulario-publico.copia.email');
     Route::get('/formulario-publico/{token}', [PublicFormApiController::class, 'show'])->name('api.v1.formulario-publico.show');
+    Route::get('/formulario-publico/{token}/documento-original', [PublicFormApiController::class, 'downloadSourceDocument'])
+        ->middleware('throttle:30,1')
+        ->name('api.v1.formulario-publico.documento-original');
     Route::get('/formulario-publico/{token}/feegow/disponibilidade', [PublicFormApiController::class, 'feegowAvailability'])->name('api.v1.formulario-publico.feegow.disponibilidade');
     Route::post('/formulario-publico/{token}/validate-person', [PublicFormApiController::class, 'validatePerson'])->name('api.v1.formulario-publico.validate-person');
     Route::post('/formulario-publico/{token}/submit', [PublicFormApiController::class, 'submit'])->name('api.v1.formulario-publico.submit');

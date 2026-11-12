@@ -18,10 +18,6 @@ class ClinicalStepValidationService
         $template->loadMissing('fields');
         $issues = [];
 
-        $isConsent = ($template->document_kind ?? '') === 'consentimento'
-            || ($template->category ?? '') === 'consentimento'
-            || str_contains(mb_strtolower((string) $template->name), 'tcle');
-
         $kinds = $template->fields
             ->pluck('clinical_step_kind')
             ->filter(fn ($k) => is_string($k) && $k !== '')
@@ -37,7 +33,8 @@ class ClinicalStepValidationService
             ];
         }
 
-        if (! $isConsent) {
+        // TCLE clínico (CFM). Não aplicar a imagem/marketing, LGPD isolada ou cessão de imagem.
+        if (! $this->isClinicalConsent($template)) {
             return $issues;
         }
 
@@ -210,5 +207,51 @@ class ClinicalStepValidationService
             return (str_contains($blob, 'marketing') || str_contains($blob, 'publicidade') || str_contains($blob, 'rede social') || str_contains($blob, 'sem identificação') || str_contains($blob, 'sem identificacao'))
                 && (str_contains($blob, 'imagem') || str_contains($blob, 'foto') || str_contains($blob, 'foto_'));
         });
+    }
+
+    /**
+     * Consentimento clínico (TCLE) sujeito à Rec. CFM 1/2016.
+     * Autorização de imagem, cessão e ciência LGPD isolada ficam de fora.
+     */
+    private function isClinicalConsent(FormTemplate $template): bool
+    {
+        $kind = (string) ($template->document_kind ?? '');
+        if ($kind === 'ciencia_lgpd') {
+            return false;
+        }
+
+        $name = mb_strtolower((string) $template->name);
+        if ($this->isNonClinicalConsentName($name)) {
+            return false;
+        }
+
+        return $kind === 'consentimento'
+            || ($template->category ?? '') === 'consentimento'
+            || str_contains($name, 'tcle');
+    }
+
+    private function isNonClinicalConsentName(string $name): bool
+    {
+        foreach (['cessão', 'cessao', 'uso de imagem', 'autorização de imagem', 'autorizacao de imagem'] as $marker) {
+            if (str_contains($name, $marker)) {
+                return true;
+            }
+        }
+
+        // "Imagem" sozinho, sem TCLE/procedimento clínico no nome.
+        if (str_contains($name, 'imagem')
+            && ! str_contains($name, 'tcle')
+            && ! str_contains($name, 'procedimento')
+            && ! str_contains($name, 'cirurgia')) {
+            return true;
+        }
+
+        if ((str_contains($name, 'lgpd') || str_contains($name, 'dados pessoais') || str_contains($name, 'privacidade'))
+            && ! str_contains($name, 'tcle')
+            && ! str_contains($name, 'procedimento')) {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -61,7 +61,7 @@ final class StefanieLinoDocumentPack
             [
                 'name' => 'Termo de Consentimento — Dados Pessoais (LGPD)',
                 'description' => 'Consentimento para tratamento de dados pessoais — controladora Dra. Stefanie Lino.',
-                'category' => 'consentimento',
+                'category' => 'cadastro_documentacao',
                 'document_kind' => 'ciencia_lgpd',
                 'source_pdf' => 'termo-dados-pessoais-lgpd.pdf',
                 'fields' => self::patientIdentityFields(1),
@@ -80,9 +80,9 @@ final class StefanieLinoDocumentPack
             ],
             [
                 'name' => 'Termo de Cessão — Uso de Imagem',
-                'description' => 'Cessão de direito de uso de imagem — Dra. Stefanie Lino.',
-                'category' => 'consentimento',
-                'document_kind' => 'consentimento',
+                'description' => 'Cessão de direito de uso de imagem — Dra. Stefanie Lino (documento separado do TCLE clínico).',
+                'category' => 'cadastro_documentacao',
+                'document_kind' => 'ficha',
                 'source_pdf' => 'termo-uso-imagem.pdf',
                 'fields' => self::patientIdentityFields(1),
                 'extra_fields' => [

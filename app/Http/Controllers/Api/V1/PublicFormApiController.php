@@ -30,7 +30,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicFormApiController extends Controller
 {
@@ -120,6 +122,10 @@ class PublicFormApiController extends Controller
                 'accent_hex' => $accentHex,
                 'form_accent_hex' => $organization?->form_accent_hex,
                 'hide_platform_branding' => (bool) ($organization?->hide_platform_branding ?? false),
+                'has_source_document' => $template->hasSourceDocument(),
+                'source_document_original_name' => $template->hasSourceDocument()
+                    ? $template->source_document_original_name
+                    : null,
                 'signing_security_level' => $signingLevel,
                 'otp_whatsapp_available' => $waOtp,
                 'person_link' => [
@@ -717,6 +723,50 @@ class PublicFormApiController extends Controller
         $this->patientCopyService->markDownloaded($submission);
 
         return $this->pdfService->streamSubmissionPdf($submission);
+    }
+
+    /**
+     * Download público do PDF original (layout em branco) anexado ao modelo.
+     */
+    public function downloadSourceDocument(string $token): StreamedResponse|JsonResponse
+    {
+        $key = 'public-form-source:'.sha1($token);
+        $ipKey = 'public-form-source-ip:'.request()->ip();
+        if (RateLimiter::tooManyAttempts($key, 30) || RateLimiter::tooManyAttempts($ipKey, 60)) {
+            return response()->json(['message' => 'Muitas tentativas. Tente novamente em alguns minutos.'], 429);
+        }
+        RateLimiter::hit($key, 60);
+        RateLimiter::hit($ipKey, 60);
+
+        $template = FormTemplate::withoutGlobalScopes()
+            ->where('public_token', $token)
+            ->where('public_enabled', true)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('public_token_expires_at')
+                    ->orWhere('public_token_expires_at', '>', now());
+            })
+            ->first();
+
+        if (! $template || ! $template->hasSourceDocument()) {
+            return response()->json(['message' => 'Documento original não disponível.'], 404);
+        }
+
+        $path = (string) ($template->source_document_path ?? '');
+        $disk = (string) ($template->source_document_disk ?: 'minio_assets');
+        if ($path === '' || ! Storage::disk($disk)->exists($path)) {
+            return response()->json(['message' => 'Documento original não encontrado.'], 404);
+        }
+
+        $name = (string) ($template->source_document_original_name ?: 'documento-original.pdf');
+        $mime = (string) ($template->source_document_mime ?: 'application/pdf');
+
+        return Storage::disk($disk)->response($path, $name, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="'.$name.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=60',
+        ]);
     }
 
     /**
