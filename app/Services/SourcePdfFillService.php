@@ -20,7 +20,7 @@ class SourcePdfFillService
      */
     public function fillSubmission(FormSubmission $submission): ?string
     {
-        $submission->loadMissing(['template', 'values', 'signatures']);
+        $submission->loadMissing(['template', 'values', 'signatures', 'organization']);
         $template = $submission->template;
         if (! $template instanceof FormTemplate || ! $template->hasSourceDocument()) {
             return null;
@@ -98,29 +98,35 @@ class SourcePdfFillService
                     $align = in_array($align, ['L', 'C', 'R'], true) ? $align : 'L';
 
                     if ($kind === 'signature' || $kind === 'image') {
-                        $sig = $signaturesByField[$nameKey] ?? null;
-                        $path = is_object($sig) ? (string) ($sig->image_path ?? '') : '';
-                        if ($path === '') {
+                        $img = $this->resolvePlacementImage(
+                            $nameKey,
+                            $signaturesByField,
+                            $submission,
+                        );
+                        if ($img === null) {
                             continue;
                         }
-                        $imgBytes = $this->readSignatureBytes($path);
-                        if ($imgBytes === null) {
-                            continue;
-                        }
-                        $tmp = tempnam(sys_get_temp_dir(), 'sigpng_');
+                        [$imgBytes, $imgType] = $img;
+                        $ext = $imgType === 'JPEG' ? '.jpg' : '.png';
+                        $tmp = tempnam(sys_get_temp_dir(), 'sigimg_');
                         if ($tmp === false) {
                             continue;
                         }
-                        $tmpPng = $tmp.'.png';
+                        $tmpFile = $tmp.$ext;
                         @unlink($tmp);
-                        file_put_contents($tmpPng, $imgBytes);
-                        $tempFiles[] = $tmpPng;
-                        $pdf->Image($tmpPng, $x, $y, $w, $h, 'PNG');
+                        file_put_contents($tmpFile, $imgBytes);
+                        $tempFiles[] = $tmpFile;
+                        $pdf->Image($tmpFile, $x, $y, $w, $h, $imgType);
                         continue;
                     }
 
                     if ($kind === 'checkbox') {
-                        if ($this->isChecked($values->get($nameKey))) {
+                        $option = trim((string) ($placement['option'] ?? ''));
+                        if ($option !== '') {
+                            if ($this->optionIsSelected($values->get($nameKey), $option)) {
+                                $this->drawCheckmark($pdf, $x, $y, $w, $h);
+                            }
+                        } elseif ($this->isChecked($values->get($nameKey))) {
                             $this->drawCheckmark($pdf, $x, $y, $w, $h);
                         }
                         continue;
@@ -186,6 +192,9 @@ class SourcePdfFillService
                 'font_size' => isset($item['font_size']) ? (float) $item['font_size'] : null,
                 'align' => $item['align'] ?? 'left',
                 'kind' => $item['kind'] ?? 'text',
+                'option' => isset($item['option']) && trim((string) $item['option']) !== ''
+                    ? trim((string) $item['option'])
+                    : null,
             ];
         }
 
@@ -242,6 +251,77 @@ class SourcePdfFillService
         return null;
     }
 
+    /**
+     * @param  array<string, mixed>  $signaturesByField
+     * @return array{0:string,1:'PNG'|'JPEG'}|null
+     */
+    private function resolvePlacementImage(
+        string $nameKey,
+        array $signaturesByField,
+        FormSubmission $submission,
+    ): ?array {
+        if ($nameKey === '__clinic_logo' || $nameKey === '__clinic_signature') {
+            return $this->readOrganizationLogo($submission);
+        }
+
+        $sig = $signaturesByField[$nameKey] ?? null;
+        $path = is_object($sig) ? (string) ($sig->image_path ?? '') : '';
+        if ($path === '') {
+            return null;
+        }
+        $bytes = $this->readSignatureBytes($path);
+        if ($bytes === null) {
+            return null;
+        }
+
+        return [$bytes, $this->detectImageType($bytes)];
+    }
+
+    /**
+     * @return array{0:string,1:'PNG'|'JPEG'}|null
+     */
+    private function readOrganizationLogo(FormSubmission $submission): ?array
+    {
+        $submission->loadMissing('organization');
+        $org = $submission->organization;
+        if (! $org) {
+            return null;
+        }
+        $path = (string) ($org->logo_path ?? '');
+        if ($path === '') {
+            return null;
+        }
+
+        try {
+            if (Storage::disk('minio_assets')->exists($path)) {
+                $bytes = Storage::disk('minio_assets')->get($path);
+                if (is_string($bytes) && $bytes !== '') {
+                    return [$bytes, $this->detectImageType($bytes)];
+                }
+            }
+            if (Storage::disk('public')->exists($path)) {
+                $bytes = Storage::disk('public')->get($path);
+                if (is_string($bytes) && $bytes !== '') {
+                    return [$bytes, $this->detectImageType($bytes)];
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return null;
+    }
+
+    /** @return 'PNG'|'JPEG' */
+    private function detectImageType(string $bytes): string
+    {
+        if (str_starts_with($bytes, "\xFF\xD8\xFF")) {
+            return 'JPEG';
+        }
+
+        return 'PNG';
+    }
+
     private function valueToText(mixed $valueRow): string
     {
         if ($valueRow === null) {
@@ -277,6 +357,37 @@ class SourcePdfFillService
         }
 
         return $text !== '' && ! in_array($text, ['0', 'false', 'não', 'nao', 'no', 'off'], true);
+    }
+
+    private function optionIsSelected(mixed $valueRow, string $option): bool
+    {
+        $target = mb_strtolower(trim($option));
+        if ($target === '') {
+            return false;
+        }
+
+        if (is_object($valueRow) && $valueRow->value_json !== null && is_array($valueRow->value_json)) {
+            foreach ($valueRow->value_json as $item) {
+                if (mb_strtolower(trim((string) $item)) === $target) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $text = mb_strtolower(trim($this->valueToText($valueRow)));
+        if ($text === $target) {
+            return true;
+        }
+
+        foreach (preg_split('/[;,]/', $text) ?: [] as $part) {
+            if (mb_strtolower(trim((string) $part)) === $target) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function drawCheckmark(Fpdi $pdf, float $x, float $y, float $w, float $h): void
