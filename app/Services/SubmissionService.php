@@ -48,6 +48,7 @@ class SubmissionService
         protected SubmissionPersonSyncService $personSyncService,
         protected SignatureFieldResolver $signatureFieldResolver,
         protected PatientCopyService $patientCopyService,
+        protected PdfService $pdfService,
     ) {}
 
     /**
@@ -339,6 +340,22 @@ class SubmissionService
             } catch (\Throwable $e) {
                 report($e);
             }
+
+            // Regenera PDF após anexar a assinatura do perfil (o job do submit gera PDF cedo demais).
+            try {
+                $fresh = $submission->fresh([
+                    'template.fields',
+                    'templateVersion',
+                    'values',
+                    'signatures',
+                    'attachments',
+                    'organization',
+                    'person',
+                ]) ?? $submission;
+                $this->pdfService->persistSubmissionPdf($fresh);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         if ($status === 'approved' && $submission->person_id) {
@@ -605,13 +622,16 @@ class SubmissionService
         $filledKeys = $submission->signatures->pluck('field_key')->filter()->unique()->all();
         /** @var Collection<int, FormField> $empty */
         $empty = $slots->filter(fn ($f) => $f instanceof FormField && ! in_array($f->name_key, $filledKeys, true));
-        if ($empty->isEmpty()) {
-            return;
-        }
 
         $chosen = $this->signatureFieldResolver->pickProfessionalSlot($empty);
-        if (! $chosen instanceof FormField) {
-            return;
+        if ($chosen instanceof FormField) {
+            $fieldKey = (string) $chosen->name_key;
+        } else {
+            // Modelo só com assinatura do paciente: ainda assim anexa a do aprovador (perfil).
+            $fieldKey = SignatureFieldResolver::ASSISTED_COSIGN_FIELD_KEY;
+            if (in_array($fieldKey, $filledKeys, true)) {
+                return;
+            }
         }
 
         try {
@@ -626,7 +646,6 @@ class SubmissionService
         }
 
         $signedAt = now();
-        $fieldKey = (string) $chosen->name_key;
         $signedName = $reviewer->name;
         $locale = $submission->locale ?: 'pt_BR';
         $timezone = $submission->timezone ?: config('app.timezone', 'America/Sao_Paulo');

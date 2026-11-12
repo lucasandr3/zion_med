@@ -49,6 +49,8 @@ class SubmissionPersistenceService
     ): string {
         $submission->load('values');
         $valuesKeyed = $submission->values->keyBy('key')->map(fn ($v) => $v->value_json ?? $v->value_text)->all();
+        $printLayout = is_array($template->print_layout) ? $template->print_layout : null;
+
         $documentSnapshot = [
             'protocol_number' => $submission->protocol_number,
             'template_version_id' => $templateVersion->id,
@@ -57,6 +59,9 @@ class SubmissionPersistenceService
             'template_description' => $templateVersion->description ?? $template->description,
             'document_kind' => $template->document_kind ?: ($template->category === 'consentimento' ? 'consentimento' : 'ficha'),
             'fields_snapshot' => $templateVersion->fields_snapshot,
+            // Congela o mapa de aparência no momento do envio (PDF = layout da clínica).
+            'print_layout' => $printLayout,
+            'has_source_document' => $template->hasSourceDocument(),
             'values' => $valuesKeyed,
             'submitted_at' => $submission->submitted_at->toIso8601String(),
         ];

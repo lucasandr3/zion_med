@@ -7,6 +7,7 @@ use App\Models\FormImport;
 use App\Models\FormTemplate;
 use App\Services\TemplateVersionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class FormImportMapper
 {
@@ -17,6 +18,7 @@ class FormImportMapper
 
     /**
      * Cria template + campos a partir do schema revisado. Não publica link público.
+     * Se a fonte for PDF, anexa como documento original (aparência da clínica).
      */
     public function commit(FormImport $import, ?string $templateName = null): FormTemplate
     {
@@ -53,6 +55,8 @@ class FormImportMapper
                 ]);
             }
 
+            $this->attachSourcePdfFromImport($import, $template);
+
             $this->versions->ensureSyncedVersion($template->fresh(['fields']));
 
             $import->update([
@@ -64,5 +68,65 @@ class FormImportMapper
 
             return $template->fresh(['fields']);
         });
+    }
+
+    /**
+     * Copia o PDF importado para source_document do modelo (aparência, sem mapa ainda).
+     */
+    private function attachSourcePdfFromImport(FormImport $import, FormTemplate $template): void
+    {
+        $mime = strtolower((string) ($import->source_mime ?? ''));
+        $name = strtolower((string) ($import->source_original_name ?? ''));
+        $isPdf = $mime === 'application/pdf' || str_ends_with($name, '.pdf');
+        if (! $isPdf) {
+            return;
+        }
+
+        $sourcePath = (string) ($import->source_path ?? '');
+        if ($sourcePath === '') {
+            return;
+        }
+
+        $sourceDisk = (string) ($import->source_disk ?: 'local');
+        try {
+            if (! Storage::disk($sourceDisk)->exists($sourcePath)) {
+                return;
+            }
+            $bytes = Storage::disk($sourceDisk)->get($sourcePath);
+            if (! is_string($bytes) || $bytes === '') {
+                return;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        $organizationId = (int) ($template->organization_id ?? $import->organization_id ?? 0);
+        if ($organizationId <= 0) {
+            return;
+        }
+
+        $disk = 'minio_assets';
+        $directory = 'organizations/'.$organizationId.'/templates/'.$template->id.'/source';
+        $targetPath = $directory.'/original.pdf';
+
+        try {
+            Storage::disk($disk)->put($targetPath, $bytes);
+            $template->update([
+                'source_document_disk' => $disk,
+                'source_document_path' => $targetPath,
+                'source_document_original_name' => mb_substr(
+                    (string) ($import->source_original_name ?: 'documento-original.pdf'),
+                    0,
+                    255
+                ),
+                'source_document_mime' => 'application/pdf',
+                'source_document_size' => strlen($bytes),
+                'print_layout' => null,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

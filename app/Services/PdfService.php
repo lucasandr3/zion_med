@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Storage;
 
 class PdfService
 {
+    public function __construct(
+        protected SourcePdfFillService $sourcePdfFillService,
+    ) {}
+
     public function streamSubmissionPdf(FormSubmission $submission): \Illuminate\Http\Response
     {
         $content = $this->resolvePdfContent($submission);
@@ -33,7 +37,7 @@ class PdfService
      */
     public function persistSubmissionPdf(FormSubmission $submission): string
     {
-        $content = $this->buildPdf($submission)->output();
+        $content = $this->renderPdfContent($submission);
         $sha = hash('sha256', $content);
         $orgId = (int) ($submission->organization_id ?? $submission->clinic_id ?? 0);
         $path = sprintf(
@@ -52,6 +56,23 @@ class PdfService
         ]);
 
         return $content;
+    }
+
+    /**
+     * Preferência: PDF original da clínica + print_layout; senão DomPDF padrão.
+     */
+    private function renderPdfContent(FormSubmission $submission): string
+    {
+        try {
+            $branded = $this->sourcePdfFillService->fillSubmission($submission);
+            if (is_string($branded) && $branded !== '') {
+                return $branded;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $this->buildPdf($submission)->output();
     }
 
     /**
@@ -77,7 +98,7 @@ class PdfService
             return $this->persistSubmissionPdf($submission);
         }
 
-        return $this->buildPdf($submission)->output();
+        return $this->renderPdfContent($submission);
     }
 
     private function readStoredPdf(FormSubmission $submission): ?string
@@ -140,7 +161,38 @@ class PdfService
             'templateName' => $templateName,
             'templateVersionLabel' => $templateVersionLabel,
             'staffFields' => EsteticaStaffFieldRegistry::definitions($submission->template?->name ?? null),
+            'signatureDataUris' => $this->signatureDataUris($submission),
         ])->setPaper('a4');
+    }
+
+    /**
+     * DomPDF não acessa bem URLs temporárias do MinIO — embute PNG em data-URI.
+     *
+     * @return array<int, string>
+     */
+    private function signatureDataUris(FormSubmission $submission): array
+    {
+        $out = [];
+        foreach ($submission->signatures as $sig) {
+            $path = (string) ($sig->image_path ?? '');
+            if ($path === '') {
+                continue;
+            }
+            try {
+                if (! Storage::disk('minio_submissions')->exists($path)) {
+                    continue;
+                }
+                $bytes = Storage::disk('minio_submissions')->get($path);
+                if (! is_string($bytes) || $bytes === '') {
+                    continue;
+                }
+                $out[(int) $sig->id] = 'data:image/png;base64,'.base64_encode($bytes);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $out;
     }
 
     /**

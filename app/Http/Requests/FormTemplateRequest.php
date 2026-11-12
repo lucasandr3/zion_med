@@ -37,7 +37,18 @@ class FormTemplateRequest extends FormRequest
             'actors_visibility_rules.show_when.*.value' => ['nullable', 'string', 'max:255'],
             'actors_visibility_rules.require_guardian' => ['nullable', 'boolean'],
             'uses_clinical_steps' => ['nullable', 'boolean'],
-
+            'print_layout' => ['nullable', 'array'],
+            'print_layout.version' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'print_layout.placements' => ['nullable', 'array', 'max:200'],
+            'print_layout.placements.*.name_key' => ['required_with:print_layout.placements', 'string', 'max:80', 'regex:/^[a-z0-9_]+$/'],
+            'print_layout.placements.*.page' => ['required_with:print_layout.placements', 'integer', 'min:0', 'max:50'],
+            'print_layout.placements.*.x' => ['required_with:print_layout.placements', 'numeric', 'min:0', 'max:1'],
+            'print_layout.placements.*.y' => ['required_with:print_layout.placements', 'numeric', 'min:0', 'max:1'],
+            'print_layout.placements.*.w' => ['required_with:print_layout.placements', 'numeric', 'min:0.005', 'max:1'],
+            'print_layout.placements.*.h' => ['required_with:print_layout.placements', 'numeric', 'min:0.005', 'max:1'],
+            'print_layout.placements.*.font_size' => ['nullable', 'numeric', 'min:6', 'max:48'],
+            'print_layout.placements.*.align' => ['nullable', 'string', 'in:left,center,right'],
+            'print_layout.placements.*.kind' => ['nullable', 'string', 'in:text,checkbox,signature,image'],
         ];
     }
 
@@ -56,6 +67,7 @@ class FormTemplateRequest extends FormRequest
             'public_require_person_link' => 'exigir código e data de nascimento no formulário público',
             'public_person_link_mode' => 'modo de identificação no formulário público',
             'actors_visibility_rules' => 'visibilidade do bloco responsável',
+            'print_layout' => 'mapa de aparência do PDF',
         ];
     }
 }

@@ -196,7 +196,13 @@
             <p class="signature-notice" style="font-size:9px;color:#64748b;margin:4px 0 8px 0;">A assinatura digital tem validade jurídica nos termos da legislação vigente.</p>
             @foreach($submission->signatures as $sig)
                 <div style="margin-top:12px;padding:8px 0;border-bottom:1px solid #e2e8f0">
-                    @if($sig->image_path)
+                    @php
+                        $sigDataUri = $signatureDataUris[(int) $sig->id] ?? null;
+                    @endphp
+                    @if($sigDataUri)
+                        <img src="{{ $sigDataUri }}" alt="Assinatura" style="max-width:280px;max-height:80px">
+                    @elseif($sig->image_path)
+                        {{-- Fallback: DomPDF costuma falhar com URL temporária do MinIO --}}
                         <img src="{{ $sig->url }}" alt="Assinatura" style="max-width:280px;max-height:80px">
                     @endif
                     <p style="font-size:9px;color:#475569;margin:6px 0 2px 0">

@@ -433,6 +433,8 @@ class TemplateController extends Controller
             'source_document_original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 255),
             'source_document_mime' => $file->getMimeType() ?: 'application/pdf',
             'source_document_size' => $file->getSize() ?: null,
+            // Novo PDF = posições antigas provavelmente inválidas
+            'print_layout' => null,
         ]);
 
         Event::dispatch(new AuditEvent('template.source_document.uploaded', FormTemplate::class, $template->id, [
@@ -488,6 +490,7 @@ class TemplateController extends Controller
             'source_document_original_name' => null,
             'source_document_mime' => null,
             'source_document_size' => null,
+            'print_layout' => null,
         ]);
 
         Event::dispatch(new AuditEvent('template.source_document.deleted', FormTemplate::class, $template->id, null, $organizationId, $request->user()?->id));

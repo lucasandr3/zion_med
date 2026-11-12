@@ -42,6 +42,7 @@ class FormTemplate extends Model
         'source_document_original_name',
         'source_document_mime',
         'source_document_size',
+        'print_layout',
     ];
 
     public function getClinicIdAttribute(): ?int
@@ -134,6 +135,7 @@ class FormTemplate extends Model
             'uses_clinical_steps' => 'boolean',
             'library_reviewed_at' => 'datetime',
             'source_document_size' => 'integer',
+            'print_layout' => 'array',
         ];
     }
 

@@ -143,6 +143,8 @@ class FormImportController extends Controller
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
+                    'has_source_document' => $template->hasSourceDocument(),
+                    'source_document_original_name' => $template->source_document_original_name,
                 ],
             ],
         ]);

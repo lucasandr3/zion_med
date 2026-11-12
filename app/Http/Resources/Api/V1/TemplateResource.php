@@ -43,6 +43,7 @@ class TemplateResource extends JsonResource
             'source_document_original_name' => $this->source_document_original_name,
             'source_document_mime' => $this->source_document_mime,
             'source_document_size' => $this->source_document_size,
+            'print_layout' => $this->print_layout,
             'fields' => $this->whenLoaded(
                 'fields',
                 fn () => FormFieldResource::collection($this->fields)
