@@ -183,12 +183,13 @@ class ProtocolController extends Controller
 
     /**
      * Stream do PDF do protocolo.
+     * ?fresh=1 regenera na hora (mapa de aparência / assinaturas atualizados).
      */
-    public function pdf(FormSubmission $protocol): \Illuminate\Http\Response|StreamedResponse
+    public function pdf(Request $request, FormSubmission $protocol): \Illuminate\Http\Response|StreamedResponse
     {
         $this->authorize('view-submission', $protocol);
 
-        return $this->pdfService->streamSubmissionPdf($protocol);
+        return $this->pdfService->streamSubmissionPdf($protocol, $request->boolean('fresh'));
     }
 
     /**

@@ -133,14 +133,15 @@ class SourcePdfFillService
                     }
 
                     $text = $this->valueToText($values->get($nameKey));
+                    $option = trim((string) ($placement['option'] ?? ''));
+                    if ($option !== '' && $this->isDatePartOption($option)) {
+                        $text = $this->extractDatePart($text, strtolower($option));
+                    }
                     if ($text === '') {
                         continue;
                     }
 
-                    $pdf->SetFont('Helvetica', '', $fontSize);
-                    $pdf->SetTextColor(15, 23, 42);
-                    $pdf->SetXY($x, $y);
-                    $pdf->MultiCell($w, max(3.2, $fontSize * 0.45), $this->safeText($text), 0, $align);
+                    $this->drawFittedText($pdf, $text, $x, $y, $w, $h, $fontSize, $align, $option);
                 }
             }
 
@@ -260,7 +261,16 @@ class SourcePdfFillService
         array $signaturesByField,
         FormSubmission $submission,
     ): ?array {
-        if ($nameKey === '__clinic_logo' || $nameKey === '__clinic_signature') {
+        if ($nameKey === '__clinic_logo') {
+            return $this->readOrganizationLogo($submission);
+        }
+
+        if ($nameKey === '__clinic_signature') {
+            $clinicSig = $this->resolveClinicSignatureImage($signaturesByField, $submission);
+            if ($clinicSig !== null) {
+                return $clinicSig;
+            }
+
             return $this->readOrganizationLogo($submission);
         }
 
@@ -275,6 +285,73 @@ class SourcePdfFillService
         }
 
         return [$bytes, $this->detectImageType($bytes)];
+    }
+
+    /**
+     * Assinatura institucional: co-assinatura profissional do protocolo, senão logo.
+     *
+     * @param  array<string, mixed>  $signaturesByField
+     * @return array{0:string,1:'PNG'|'JPEG'}|null
+     */
+    private function resolveClinicSignatureImage(array $signaturesByField, FormSubmission $submission): ?array
+    {
+        $preferredKeys = ['assinatura_profissional'];
+        $submission->loadMissing('template.fields');
+        $template = $submission->template;
+        if ($template) {
+            try {
+                $preferredKeys[] = app(SignatureFieldResolver::class)->resolveProfessionalFieldKey($template);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        foreach (array_unique($preferredKeys) as $key) {
+            $sig = $signaturesByField[$key] ?? null;
+            $path = is_object($sig) ? (string) ($sig->image_path ?? '') : '';
+            if ($path === '') {
+                continue;
+            }
+            $bytes = $this->readSignatureBytes($path);
+            if ($bytes !== null) {
+                return [$bytes, $this->detectImageType($bytes)];
+            }
+        }
+
+        // Heurística: campo de assinatura com etiqueta de profissional/clínica
+        foreach ($signaturesByField as $key => $sig) {
+            $hay = mb_strtolower((string) $key);
+            $label = '';
+            $field = $template?->fields?->first(fn ($f) => (string) ($f->name_key ?? '') === (string) $key);
+            if ($field) {
+                $label = mb_strtolower((string) ($field->label ?? ''));
+            }
+            $blob = $hay.' '.$label;
+            $score = 0;
+            foreach (['profissional', 'responsavel', 'responsável', 'clinica', 'clínica', 'equipe', 'medico', 'médico'] as $w) {
+                if (str_contains($blob, $w)) {
+                    $score += 3;
+                }
+            }
+            foreach (['paciente', 'cliente', 'titular', 'acompanhante'] as $w) {
+                if (str_contains($blob, $w)) {
+                    $score -= 5;
+                }
+            }
+            if ($score <= 0) {
+                continue;
+            }
+            $path = is_object($sig) ? (string) ($sig->image_path ?? '') : '';
+            if ($path === '') {
+                continue;
+            }
+            $bytes = $this->readSignatureBytes($path);
+            if ($bytes !== null) {
+                return [$bytes, $this->detectImageType($bytes)];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -344,6 +421,106 @@ class SourcePdfFillService
         }
 
         return trim((string) $valueRow);
+    }
+
+    private function isDatePartOption(string $option): bool
+    {
+        return in_array(strtolower(trim($option)), ['day', 'month', 'year'], true);
+    }
+
+    /** Extrai dia/mês/ano de texto BR (dd/mm/aaaa) ou ISO (aaaa-mm-dd). */
+    private function extractDatePart(string $text, string $part): string
+    {
+        $raw = trim($text);
+        if ($raw === '') {
+            return '';
+        }
+
+        if (preg_match('/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/', $raw, $m)) {
+            $d = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+            $mo = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+            $y = $m[3];
+            if (strlen($y) === 2) {
+                $y = '20'.$y;
+            }
+
+            return match ($part) {
+                'day' => $d,
+                'month' => $mo,
+                default => $y,
+            };
+        }
+
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $raw, $m)) {
+            return match ($part) {
+                'year' => $m[1],
+                'month' => $m[2],
+                default => $m[3],
+            };
+        }
+
+        return '';
+    }
+
+    /**
+     * Escreve texto cabendo na caixa: reduz fonte em vez de quebrar no meio
+     * (evita "12/11/2026" virar "1" + "2/11/2026" ou colar campos vizinhos).
+     */
+    private function drawFittedText(
+        Fpdi $pdf,
+        string $text,
+        float $x,
+        float $y,
+        float $w,
+        float $h,
+        float $preferredSize,
+        string $align,
+        string $option = '',
+    ): void {
+        $safe = $this->safeText($text);
+        if ($safe === '') {
+            return;
+        }
+
+        $singleLine = $this->isDatePartOption($option)
+            || ! preg_match('/\s/u', $text)
+            || mb_strlen($text) <= 24;
+
+        $fontSize = max(6.0, $preferredSize);
+        $pdf->SetTextColor(15, 23, 42);
+
+        if ($singleLine) {
+            $pdf->SetFont('Helvetica', '', $fontSize);
+            while ($fontSize > 6.0 && $pdf->GetStringWidth($safe) > max(1.0, $w - 0.6)) {
+                $fontSize -= 0.5;
+                $pdf->SetFont('Helvetica', '', $fontSize);
+            }
+            while ($fontSize > 6.0 && $fontSize > $h * 0.95) {
+                $fontSize -= 0.5;
+                $pdf->SetFont('Helvetica', '', $fontSize);
+            }
+            // Cell com altura da caixa alinha melhor que MultiCell em espaços curtos
+            $pdf->SetXY($x, $y);
+            $pdf->Cell($w, $h, $safe, 0, 0, $align);
+
+            return;
+        }
+
+        $pdf->SetFont('Helvetica', '', $fontSize);
+        $lineHeight = max(3.2, $fontSize * 0.45);
+        // Reduz até caber em poucas linhas sem estourar a altura
+        for ($i = 0; $i < 20; $i++) {
+            $lines = max(1, (int) ceil($pdf->GetStringWidth($safe) / max(1.0, $w - 0.6)));
+            if ($lines * $lineHeight <= $h + 0.5 && $pdf->GetStringWidth($safe) / max(1, $lines) <= $w + 1) {
+                break;
+            }
+            $fontSize = max(6.0, $fontSize - 0.5);
+            $pdf->SetFont('Helvetica', '', $fontSize);
+            $lineHeight = max(3.0, $fontSize * 0.45);
+        }
+
+        $pdf->SetXY($x, $y);
+        $pdf->MultiCell($w, $lineHeight, $safe, 0, $align);
     }
 
     private function isChecked(mixed $valueRow): bool

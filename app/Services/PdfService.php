@@ -15,9 +15,10 @@ class PdfService
         protected SourcePdfFillService $sourcePdfFillService,
     ) {}
 
-    public function streamSubmissionPdf(FormSubmission $submission): \Illuminate\Http\Response
+    public function streamSubmissionPdf(FormSubmission $submission, bool $fresh = false): \Illuminate\Http\Response
     {
-        $content = $this->resolvePdfContent($submission);
+        // fresh=true: regenera na hora (útil quando o mapa de aparência mudou após o PDF persistido)
+        $content = $fresh ? $this->renderPdfContent($submission) : $this->resolvePdfContent($submission);
         $filename = 'protocolo-' . ($submission->protocol_number ?? $submission->id) . '.pdf';
 
         return response($content, 200, [
