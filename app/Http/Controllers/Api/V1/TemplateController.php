@@ -401,6 +401,63 @@ class TemplateController extends Controller
     }
 
     /**
+     * Salva só o mapa de aparência do PDF (print_layout), sem passar pelo update geral do modelo.
+     */
+    public function updatePrintLayout(Request $request, FormTemplate $template): JsonResponse
+    {
+        $this->authorize('update-template', $template);
+
+        $validated = $request->validate([
+            'print_layout' => ['nullable', 'array'],
+            'print_layout.version' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'print_layout.placements' => ['nullable', 'array', 'max:200'],
+            'print_layout.placements.*.name_key' => ['required_with:print_layout.placements', 'string', 'max:80', 'regex:/^[a-z0-9_]+$/'],
+            'print_layout.placements.*.page' => ['required_with:print_layout.placements', 'integer', 'min:0', 'max:50'],
+            'print_layout.placements.*.x' => ['required_with:print_layout.placements', 'numeric', 'min:0', 'max:1'],
+            'print_layout.placements.*.y' => ['required_with:print_layout.placements', 'numeric', 'min:0', 'max:1'],
+            'print_layout.placements.*.w' => ['required_with:print_layout.placements', 'numeric', 'min:0.005', 'max:1'],
+            'print_layout.placements.*.h' => ['required_with:print_layout.placements', 'numeric', 'min:0.005', 'max:1'],
+            'print_layout.placements.*.font_size' => ['nullable', 'numeric', 'min:6', 'max:48'],
+            'print_layout.placements.*.align' => ['nullable', 'string', 'in:left,center,right'],
+            'print_layout.placements.*.kind' => ['nullable', 'string', 'in:text,checkbox,signature,image'],
+            'print_layout.placements.*.option' => ['nullable', 'string', 'max:255'],
+            'print_layout.placements.*.uid' => ['nullable', 'string', 'max:64'],
+        ], [], [
+            'print_layout' => 'mapa de aparência do PDF',
+        ]);
+
+        $layout = $validated['print_layout'] ?? null;
+        if (is_array($layout)) {
+            $placements = $layout['placements'] ?? [];
+            if (! is_array($placements) || $placements === []) {
+                $layout = null;
+            } else {
+                $layout['version'] = (int) ($layout['version'] ?? 1);
+            }
+        } else {
+            $layout = null;
+        }
+
+        $template->print_layout = $layout;
+        $template->save();
+
+        Event::dispatch(new AuditEvent(
+            'template.print_layout.updated',
+            FormTemplate::class,
+            $template->id,
+            ['placements' => is_array($layout) ? count($layout['placements'] ?? []) : 0],
+            $template->organization_id ?? $template->clinic_id,
+            $request->user()?->id
+        ));
+
+        $fresh = $template->fresh();
+
+        return response()->json([
+            'data' => new TemplateResource($fresh),
+        ]);
+    }
+
+    /**
      * Anexa o PDF original do documento (layout da clínica) ao modelo.
      */
     public function uploadSourceDocument(Request $request, FormTemplate $template): JsonResponse

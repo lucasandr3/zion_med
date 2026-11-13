@@ -50,6 +50,7 @@ class FormTemplateRequest extends FormRequest
             'print_layout.placements.*.align' => ['nullable', 'string', 'in:left,center,right'],
             'print_layout.placements.*.kind' => ['nullable', 'string', 'in:text,checkbox,signature,image'],
             'print_layout.placements.*.option' => ['nullable', 'string', 'max:255'],
+            'print_layout.placements.*.uid' => ['nullable', 'string', 'max:64'],
         ];
     }
 

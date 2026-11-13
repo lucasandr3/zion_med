@@ -160,9 +160,11 @@ class SourcePdfFillService
                         continue;
                     }
 
-                    $text = $nameKey === '__verify_code'
-                        ? $this->verificationCode($submission)
-                        : $this->valueToText($values->get($nameKey));
+                    $text = match ($nameKey) {
+                        '__verify_code' => $this->verificationCode($submission),
+                        '__doc_date' => $this->documentDateText($submission),
+                        default => $this->valueToText($values->get($nameKey)),
+                    };
                     $option = trim((string) ($placement['option'] ?? ''));
                     if ($option !== '' && $this->isDatePartOption($option)) {
                         $text = $this->extractDatePart($text, strtolower($option));
@@ -488,6 +490,21 @@ class SourcePdfFillService
         }
 
         return $hash !== '' ? strtoupper(substr($hash, 0, 8)) : '';
+    }
+
+    /** Data genérica do documento (aprovação > envio > criação > agora), formato BR. */
+    private function documentDateText(FormSubmission $submission): string
+    {
+        $dt = $submission->approved_at
+            ?? $submission->submitted_at
+            ?? $submission->created_at
+            ?? now();
+
+        try {
+            return $dt->timezone((string) config('app.timezone', 'America/Sao_Paulo'))->format('d/m/Y');
+        } catch (\Throwable) {
+            return now()->format('d/m/Y');
+        }
     }
 
     private function verificationUrl(FormSubmission $submission): string
