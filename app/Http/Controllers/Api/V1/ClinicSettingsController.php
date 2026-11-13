@@ -14,7 +14,9 @@ use App\Services\ProtocolRetentionService;
 use App\Services\ThemeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 
 class ClinicSettingsController extends Controller
 {
@@ -88,6 +90,42 @@ class ClinicSettingsController extends Controller
                 'can_add_multi_empresa' => $canAddMultiEmpresa,
                 'tenant_organizations' => OrganizationResource::collection($tenantOrganizations),
             ],
+        ]);
+    }
+
+    /**
+     * Bytes do logo da clínica (same-origin — evita CORS do MinIO no browser / PDF).
+     */
+    public function logo(Request $request): Response|JsonResponse
+    {
+        $organizationId = $this->currentOrganizationId($request);
+        $organization = Organization::query()->findOrFail($organizationId);
+        $path = (string) ($organization->logo_path ?? '');
+        if ($path === '') {
+            return response()->json(['message' => 'Clínica sem logo.'], 404);
+        }
+
+        try {
+            $bytes = null;
+            if (Storage::disk('minio_assets')->exists($path)) {
+                $bytes = Storage::disk('minio_assets')->get($path);
+            } elseif (Storage::disk('public')->exists($path)) {
+                $bytes = Storage::disk('public')->get($path);
+            }
+            if (! is_string($bytes) || $bytes === '') {
+                return response()->json(['message' => 'Arquivo do logo não encontrado.'], 404);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'Não foi possível ler o logo.'], 503);
+        }
+
+        $mime = str_starts_with($bytes, "\xFF\xD8\xFF") ? 'image/jpeg' : 'image/png';
+
+        return response($bytes, 200, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=60',
         ]);
     }
 

@@ -168,6 +168,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::post('/auth/send-verification-email', [AuthController::class, 'sendVerificationEmail'])->name('api.v1.auth.send-verification-email');
     Route::get('/me', MeController::class)->name('api.v1.me');
     Route::patch('/me/appearance', [MeAppearanceController::class, 'update'])->name('api.v1.me.appearance');
+    Route::get('/me/electronic-signature', [MeElectronicSignatureController::class, 'show'])
+        ->name('api.v1.me.electronic-signature.show');
     Route::patch('/me/electronic-signature', [MeElectronicSignatureController::class, 'update'])
         ->name('api.v1.me.electronic-signature');
     Route::delete('/me/account', [MeAccountController::class, 'destroy'])->name('api.v1.me.account.destroy');
@@ -329,6 +331,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::get('/clinica/escolher', [ChooseClinicController::class, 'index'])->name('api.v1.clinica.escolher.index');
     Route::post('/clinica/escolher', [ChooseClinicController::class, 'store'])->name('api.v1.clinica.escolher.store');
     Route::get('/clinica/configuracoes', [ClinicSettingsController::class, 'show'])->name('api.v1.clinica.configuracoes.show');
+    Route::get('/clinica/logo', [ClinicSettingsController::class, 'logo'])->name('api.v1.clinica.logo');
     Route::get('/clinica/retencao-protocolos/preview', [ClinicSettingsController::class, 'previewProtocolRetention'])->name('api.v1.clinica.retencao-protocolos.preview');
     Route::put('/clinica/configuracoes', [ClinicSettingsController::class, 'update'])->name('api.v1.clinica.configuracoes.update');
     Route::get('/clinica/logs', [AuditLogController::class, 'index'])->name('api.v1.clinica.logs.index');

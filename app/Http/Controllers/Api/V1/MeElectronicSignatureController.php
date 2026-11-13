@@ -12,6 +12,40 @@ use Illuminate\Validation\ValidationException;
 class MeElectronicSignatureController extends Controller
 {
     /**
+     * Bytes da assinatura eletrônica (same-origin — evita CORS do MinIO no browser).
+     */
+    public function show(Request $request): \Illuminate\Http\Response|JsonResponse
+    {
+        $user = $request->user();
+        $path = (string) ($user->electronic_signature_path ?? '');
+        if ($path === '') {
+            return response()->json(['message' => 'Sem assinatura eletrônica.'], 404);
+        }
+
+        try {
+            $disk = Storage::disk('minio_submissions');
+            if (! $disk->exists($path)) {
+                return response()->json(['message' => 'Arquivo da assinatura não encontrado.'], 404);
+            }
+            $bytes = $disk->get($path);
+            if (! is_string($bytes) || $bytes === '') {
+                return response()->json(['message' => 'Assinatura vazia.'], 404);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'Não foi possível ler a assinatura.'], 503);
+        }
+
+        $mime = str_starts_with($bytes, "\xFF\xD8\xFF") ? 'image/jpeg' : 'image/png';
+
+        return response($bytes, 200, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=60',
+        ]);
+    }
+
+    /**
      * Atualiza a assinatura eletrônica persistida no armazenamento (PNG).
      *
      * Corpo JSON: `{ "image_base64": "data:image/png;base64,..." }` ou `{ "clear": true }`.

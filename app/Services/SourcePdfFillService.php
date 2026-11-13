@@ -24,11 +24,7 @@ class SourcePdfFillService
             return false;
         }
 
-        return $this->normalizeLayout(
-            $submission->document_snapshot['print_layout']
-                ?? $template->print_layout
-                ?? null
-        ) !== null;
+        return $this->resolvePrintLayout($submission, $template) !== null;
     }
 
     /**
@@ -36,17 +32,13 @@ class SourcePdfFillService
      */
     public function fillSubmission(FormSubmission $submission): ?string
     {
-        $submission->loadMissing(['template', 'values', 'signatures', 'organization']);
+        $submission->loadMissing(['template', 'values', 'signatures', 'organization', 'approvedByUser']);
         $template = $submission->template;
         if (! $template instanceof FormTemplate || ! $template->hasSourceDocument()) {
             return null;
         }
 
-        $layout = $this->normalizeLayout(
-            $submission->document_snapshot['print_layout']
-                ?? $template->print_layout
-                ?? null
-        );
+        $layout = $this->resolvePrintLayout($submission, $template);
         if ($layout === null) {
             return null;
         }
@@ -57,6 +49,18 @@ class SourcePdfFillService
         }
 
         return $this->fillBytes($sourceBytes, $layout, $submission);
+    }
+
+    /**
+     * Aparência atual do modelo tem prioridade. Snapshot vazio/`[]` NÃO pode bloquear o mapa vivo
+     * (o operador `??` do PHP não faz fallback quando a chave existe com array vazio).
+     *
+     * @return array{version:int,placements:list<array<string,mixed>>}|null
+     */
+    private function resolvePrintLayout(FormSubmission $submission, FormTemplate $template): ?array
+    {
+        return $this->normalizeLayout($template->print_layout ?? null)
+            ?? $this->normalizeLayout($submission->document_snapshot['print_layout'] ?? null);
     }
 
     /**
@@ -318,13 +322,18 @@ class SourcePdfFillService
     }
 
     /**
-     * Assinatura institucional: co-assinatura profissional do protocolo, senão logo.
+     * Assinatura institucional: eletrônica do aprovador/usuário > co-assinatura profissional > (logo no caller).
      *
      * @param  array<string, mixed>  $signaturesByField
      * @return array{0:string,1:'PNG'|'JPEG'}|null
      */
     private function resolveClinicSignatureImage(array $signaturesByField, FormSubmission $submission): ?array
     {
+        $electronic = $this->resolveElectronicSignatureImage($submission);
+        if ($electronic !== null) {
+            return $electronic;
+        }
+
         $preferredKeys = ['assinatura_profissional'];
         $submission->loadMissing('template.fields');
         $template = $submission->template;
@@ -372,6 +381,41 @@ class SourcePdfFillService
                 continue;
             }
             $path = is_object($sig) ? (string) ($sig->image_path ?? '') : '';
+            if ($path === '') {
+                continue;
+            }
+            $bytes = $this->readSignatureBytes($path);
+            if ($bytes !== null) {
+                return [$bytes, $this->detectImageType($bytes)];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Assinatura eletrônica do perfil (aprovador do protocolo ou usuário autenticado).
+     *
+     * @return array{0:string,1:'PNG'|'JPEG'}|null
+     */
+    private function resolveElectronicSignatureImage(FormSubmission $submission): ?array
+    {
+        $submission->loadMissing('approvedByUser');
+        $candidates = [];
+        if ($submission->approvedByUser) {
+            $candidates[] = $submission->approvedByUser;
+        }
+        try {
+            $authUser = auth()->user();
+            if ($authUser instanceof \App\Models\User) {
+                $candidates[] = $authUser;
+            }
+        } catch (\Throwable) {
+            // CLI / fila sem auth
+        }
+
+        foreach ($candidates as $user) {
+            $path = (string) ($user->electronic_signature_path ?? '');
             if ($path === '') {
                 continue;
             }
