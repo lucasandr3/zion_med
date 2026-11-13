@@ -17,8 +17,13 @@ class PdfService
 
     public function streamSubmissionPdf(FormSubmission $submission, bool $fresh = false): \Illuminate\Http\Response
     {
-        // fresh=true: regenera na hora (útil quando o mapa de aparência mudou após o PDF persistido)
-        $content = $fresh ? $this->renderPdfContent($submission) : $this->resolvePdfContent($submission);
+        // Layout mapeado da clínica: sempre o fill atual (igual à tela / e-mail).
+        // fresh=true também força regeneração do DomPDF legado.
+        if ($fresh || $this->sourcePdfFillService->canFill($submission)) {
+            $content = $this->renderPdfContent($submission);
+        } else {
+            $content = $this->resolvePdfContent($submission);
+        }
         $filename = 'protocolo-' . ($submission->protocol_number ?? $submission->id) . '.pdf';
 
         return response($content, 200, [
@@ -27,9 +32,16 @@ class PdfService
         ]);
     }
 
-    /** Retorna o conteúdo binário do PDF para inclusão em ZIP / e-mail. */
+    /**
+     * Conteúdo do PDF para ZIP / e-mail / download.
+     * Se houver mapa de aparência, usa o mesmo layout da clínica da tela (não o DomPDF antigo persistido).
+     */
     public function getSubmissionPdfContent(FormSubmission $submission): string
     {
+        if ($this->sourcePdfFillService->canFill($submission)) {
+            return $this->renderPdfContent($submission);
+        }
+
         return $this->resolvePdfContent($submission);
     }
 

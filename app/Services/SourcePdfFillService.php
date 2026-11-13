@@ -15,6 +15,22 @@ use setasign\Fpdi\PdfParser\StreamReader;
  */
 class SourcePdfFillService
 {
+    /** Indica se o protocolo pode sair no layout original da clínica. */
+    public function canFill(FormSubmission $submission): bool
+    {
+        $submission->loadMissing(['template']);
+        $template = $submission->template;
+        if (! $template instanceof FormTemplate || ! $template->hasSourceDocument()) {
+            return false;
+        }
+
+        return $this->normalizeLayout(
+            $submission->document_snapshot['print_layout']
+                ?? $template->print_layout
+                ?? null
+        ) !== null;
+    }
+
     /**
      * @return string|null Bytes do PDF preenchido, ou null se não houver layout/PDF fonte.
      */
@@ -93,7 +109,7 @@ class SourcePdfFillService
                     }
 
                     $kind = (string) ($placement['kind'] ?? 'text');
-                    $fontSize = (float) ($placement['font_size'] ?? max(8, min(14, $h * 0.55)));
+                    $fontSize = (float) ($placement['font_size'] ?? max(7, min(10, $h * 0.72)));
                     $align = strtoupper((string) ($placement['align'] ?? 'L'));
                     $align = in_array($align, ['L', 'C', 'R'], true) ? $align : 'L';
 
@@ -107,6 +123,14 @@ class SourcePdfFillService
                             continue;
                         }
                         [$imgBytes, $imgType] = $img;
+                        $stripWhite = $kind === 'signature' || $nameKey === '__clinic_signature';
+                        if ($stripWhite) {
+                            $cleared = $this->makeWhitePixelsTransparent($imgBytes);
+                            if ($cleared !== null) {
+                                $imgBytes = $cleared;
+                                $imgType = 'PNG';
+                            }
+                        }
                         $ext = $imgType === 'JPEG' ? '.jpg' : '.png';
                         $tmp = tempnam(sys_get_temp_dir(), 'sigimg_');
                         if ($tmp === false) {
@@ -132,7 +156,9 @@ class SourcePdfFillService
                         continue;
                     }
 
-                    $text = $this->valueToText($values->get($nameKey));
+                    $text = $nameKey === '__verify_code'
+                        ? $this->verificationCode($submission)
+                        : $this->valueToText($values->get($nameKey));
                     $option = trim((string) ($placement['option'] ?? ''));
                     if ($option !== '' && $this->isDatePartOption($option)) {
                         $text = $this->extractDatePart($text, strtolower($option));
@@ -263,6 +289,10 @@ class SourcePdfFillService
     ): ?array {
         if ($nameKey === '__clinic_logo') {
             return $this->readOrganizationLogo($submission);
+        }
+
+        if ($nameKey === '__verify_qr') {
+            return $this->buildVerificationQrPng($submission);
         }
 
         if ($nameKey === '__clinic_signature') {
@@ -399,6 +429,146 @@ class SourcePdfFillService
         return 'PNG';
     }
 
+    private function verificationCode(FormSubmission $submission): string
+    {
+        $hash = strtolower(trim((string) ($submission->document_hash ?? '')));
+        if ($hash === '') {
+            $submission->loadMissing('signatures');
+            foreach ($submission->signatures as $sig) {
+                $h = strtolower(trim((string) ($sig->document_hash ?? '')));
+                if (strlen($h) >= 8) {
+                    $hash = $h;
+                    break;
+                }
+            }
+        }
+
+        return $hash !== '' ? strtoupper(substr($hash, 0, 8)) : '';
+    }
+
+    private function verificationUrl(FormSubmission $submission): string
+    {
+        $code = $this->verificationCode($submission);
+        if ($code === '') {
+            return '';
+        }
+        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return $base.'/verificar/'.$code;
+    }
+
+    /**
+     * @return array{0:string,1:'PNG'}|null
+     */
+    private function buildVerificationQrPng(FormSubmission $submission): ?array
+    {
+        $url = $this->verificationUrl($submission);
+        if ($url === '' || ! class_exists(\chillerlan\QRCode\QRCode::class)) {
+            return null;
+        }
+
+        try {
+            $options = new \chillerlan\QRCode\QROptions;
+            $options->outputInterface = \chillerlan\QRCode\Output\QRGdImagePNG::class;
+            $options->scale = 6;
+            $options->outputBase64 = false;
+            $options->quietzoneSize = 1;
+
+            $png = (new \chillerlan\QRCode\QRCode($options))->render($url);
+            if (! is_string($png) || $png === '') {
+                return null;
+            }
+            if (str_starts_with($png, 'data:image')) {
+                $raw = preg_replace('#^data:image/[^;]+;base64,#', '', $png) ?? '';
+                $decoded = base64_decode($raw, true);
+                if (! is_string($decoded) || $decoded === '') {
+                    return null;
+                }
+
+                return [$decoded, 'PNG'];
+            }
+
+            return [$png, 'PNG'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * Torna pixels brancos/quase brancos transparentes (assinatura sem retângulo opaco no PDF).
+     */
+    private function makeWhitePixelsTransparent(string $bytes): ?string
+    {
+        if (! function_exists('imagecreatefromstring') || ! function_exists('imagepng')) {
+            return null;
+        }
+
+        try {
+            $src = @imagecreatefromstring($bytes);
+            if ($src === false) {
+                return null;
+            }
+
+            $w = imagesx($src);
+            $h = imagesy($src);
+            if ($w < 1 || $h < 1) {
+                imagedestroy($src);
+
+                return null;
+            }
+
+            $dst = imagecreatetruecolor($w, $h);
+            if ($dst === false) {
+                imagedestroy($src);
+
+                return null;
+            }
+
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+            imagefilledrectangle($dst, 0, 0, $w, $h, $transparent);
+
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $rgba = imagecolorat($src, $x, $y);
+                    $a = ($rgba & 0x7F000000) >> 24;
+                    $r = ($rgba >> 16) & 0xFF;
+                    $g = ($rgba >> 8) & 0xFF;
+                    $b = $rgba & 0xFF;
+
+                    // GD alpha: 0=opaco, 127=transparente
+                    if ($a >= 120 || ($r >= 245 && $g >= 245 && $b >= 245)) {
+                        continue;
+                    }
+
+                    $outA = $a;
+                    if ($r >= 230 && $g >= 230 && $b >= 230) {
+                        $brightness = (int) (($r + $g + $b) / 3);
+                        $outA = max($a, min(127, (int) ((255 - $brightness) / 2)));
+                    }
+
+                    $col = imagecolorallocatealpha($dst, $r, $g, $b, $outA);
+                    imagesetpixel($dst, $x, $y, $col);
+                }
+            }
+
+            ob_start();
+            imagepng($dst);
+            $png = ob_get_clean();
+            imagedestroy($src);
+            imagedestroy($dst);
+
+            return is_string($png) && $png !== '' ? $png : null;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+
     private function valueToText(mixed $valueRow): string
     {
         if ($valueRow === null) {
@@ -425,10 +595,10 @@ class SourcePdfFillService
 
     private function isDatePartOption(string $option): bool
     {
-        return in_array(strtolower(trim($option)), ['day', 'month', 'year'], true);
+        return in_array(strtolower(trim($option)), ['day', 'month', 'month_name', 'year'], true);
     }
 
-    /** Extrai dia/mês/ano de texto BR (dd/mm/aaaa) ou ISO (aaaa-mm-dd). */
+    /** Extrai dia/mês/ano (ou mês por extenso) de texto BR (dd/mm/aaaa) ou ISO (aaaa-mm-dd). */
     private function extractDatePart(string $text, string $part): string
     {
         $raw = trim($text);
@@ -436,30 +606,53 @@ class SourcePdfFillService
             return '';
         }
 
+        $day = '';
+        $month = '';
+        $year = '';
+
         if (preg_match('/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/', $raw, $m)) {
-            $d = str_pad($m[1], 2, '0', STR_PAD_LEFT);
-            $mo = str_pad($m[2], 2, '0', STR_PAD_LEFT);
-            $y = $m[3];
-            if (strlen($y) === 2) {
-                $y = '20'.$y;
+            $day = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+            $month = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+            $year = $m[3];
+            if (strlen($year) === 2) {
+                $year = '20'.$year;
             }
-
-            return match ($part) {
-                'day' => $d,
-                'month' => $mo,
-                default => $y,
-            };
+        } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $raw, $m)) {
+            $year = $m[1];
+            $month = $m[2];
+            $day = $m[3];
         }
 
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $raw, $m)) {
-            return match ($part) {
-                'year' => $m[1],
-                'month' => $m[2],
-                default => $m[3],
-            };
+        if ($day === '' || $month === '' || $year === '') {
+            return '';
         }
 
-        return '';
+        return match ($part) {
+            'day' => $day,
+            'month' => $month,
+            'month_name' => $this->monthNamePt((int) $month),
+            default => $year,
+        };
+    }
+
+    private function monthNamePt(int $month): string
+    {
+        $names = [
+            1 => 'janeiro',
+            2 => 'fevereiro',
+            3 => 'marco',
+            4 => 'abril',
+            5 => 'maio',
+            6 => 'junho',
+            7 => 'julho',
+            8 => 'agosto',
+            9 => 'setembro',
+            10 => 'outubro',
+            11 => 'novembro',
+            12 => 'dezembro',
+        ];
+
+        return $names[$month] ?? '';
     }
 
     /**
@@ -495,20 +688,20 @@ class SourcePdfFillService
                 $fontSize -= 0.5;
                 $pdf->SetFont('Helvetica', '', $fontSize);
             }
-            while ($fontSize > 6.0 && $fontSize > $h * 0.95) {
+            while ($fontSize > 6.0 && $fontSize > $h * 0.92) {
                 $fontSize -= 0.5;
                 $pdf->SetFont('Helvetica', '', $fontSize);
             }
-            // Cell com altura da caixa alinha melhor que MultiCell em espaços curtos
-            $pdf->SetXY($x, $y);
-            $pdf->Cell($w, $h, $safe, 0, 0, $align);
+            // Base da caixa = underline (igual ao preview do mapa).
+            $cellH = max($fontSize * 1.05, min($h, $fontSize * 1.2));
+            $pdf->SetXY($x, $y + max(0, $h - $cellH));
+            $pdf->Cell($w, $cellH, $safe, 0, 0, $align);
 
             return;
         }
 
         $pdf->SetFont('Helvetica', '', $fontSize);
-        $lineHeight = max(3.2, $fontSize * 0.45);
-        // Reduz até caber em poucas linhas sem estourar a altura
+        $lineHeight = max(3.0, $fontSize * 0.42);
         for ($i = 0; $i < 20; $i++) {
             $lines = max(1, (int) ceil($pdf->GetStringWidth($safe) / max(1.0, $w - 0.6)));
             if ($lines * $lineHeight <= $h + 0.5 && $pdf->GetStringWidth($safe) / max(1, $lines) <= $w + 1) {
@@ -516,10 +709,11 @@ class SourcePdfFillService
             }
             $fontSize = max(6.0, $fontSize - 0.5);
             $pdf->SetFont('Helvetica', '', $fontSize);
-            $lineHeight = max(3.0, $fontSize * 0.45);
+            $lineHeight = max(2.8, $fontSize * 0.42);
         }
 
-        $pdf->SetXY($x, $y);
+        $blockH = $lineHeight * max(1, (int) ceil($pdf->GetStringWidth($safe) / max(1.0, $w - 0.6)));
+        $pdf->SetXY($x, $y + max(0, $h - min($h, $blockH)));
         $pdf->MultiCell($w, $lineHeight, $safe, 0, $align);
     }
 
