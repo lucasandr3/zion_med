@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MinioConfigService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -57,8 +58,18 @@ class AppointmentService extends Model
         if (! $this->photo_path) {
             return null;
         }
-        if (Storage::disk('minio_assets')->exists($this->photo_path)) {
-            return Storage::disk('minio_assets')->temporaryUrl($this->photo_path, now()->addMinutes(60));
+
+        $minio = app(MinioConfigService::class);
+        $minio->applyFilesystemConfig();
+
+        if ($minio->isConfigured()) {
+            try {
+                if (Storage::disk('minio_assets')->exists($this->photo_path)) {
+                    return Storage::disk('minio_assets')->temporaryUrl($this->photo_path, now()->addMinutes(60));
+                }
+            } catch (\Throwable) {
+                // MinIO indisponível: não derrubar request.
+            }
         }
 
         return rtrim((string) config('app.url'), '/').'/storage/'.ltrim($this->photo_path, '/');

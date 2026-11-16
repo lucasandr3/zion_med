@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Billing\BillingStateService;
+use App\Services\MinioConfigService;
 use App\Services\ThemeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -249,38 +250,45 @@ class Organization extends Model
     /** URL assinada (15 min) para a logo no MinIO. Fallback para storage público se path antigo. */
     public function getLogoUrlAttribute(): ?string
     {
-        if (! $this->logo_path) {
-            return null;
-        }
-        if (Storage::disk('minio_assets')->exists($this->logo_path)) {
-            return Storage::disk('minio_assets')->temporaryUrl($this->logo_path, now()->addMinutes(15));
-        }
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->logo_path, '/');
+        return $this->resolveMinioAssetUrl($this->logo_path);
     }
 
     /** URL assinada (15 min) para a capa no MinIO. Fallback para storage público se path antigo. */
     public function getCoverImageUrlAttribute(): ?string
     {
-        if (! $this->cover_image_path) {
-            return null;
-        }
-        if (Storage::disk('minio_assets')->exists($this->cover_image_path)) {
-            return Storage::disk('minio_assets')->temporaryUrl($this->cover_image_path, now()->addMinutes(15));
-        }
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->cover_image_path, '/');
+        return $this->resolveMinioAssetUrl($this->cover_image_path);
     }
 
     /** Foto do profissional no Link Bio (avatar grande), separada da logo da clínica. */
     public function getProfessionalPhotoUrlAttribute(): ?string
     {
-        if (! $this->professional_photo_path) {
+        return $this->resolveMinioAssetUrl($this->professional_photo_path);
+    }
+
+    /**
+     * Resolve URL de asset no MinIO sem derrubar login/API quando o storage
+     * não está configurado ou está indisponível (ex.: Unable to check existence).
+     */
+    private function resolveMinioAssetUrl(?string $path, int $minutes = 15): ?string
+    {
+        if (! is_string($path) || $path === '') {
             return null;
         }
-        if (Storage::disk('minio_assets')->exists($this->professional_photo_path)) {
-            return Storage::disk('minio_assets')->temporaryUrl($this->professional_photo_path, now()->addMinutes(15));
+
+        $minio = app(MinioConfigService::class);
+        $minio->applyFilesystemConfig();
+
+        if ($minio->isConfigured()) {
+            try {
+                if (Storage::disk('minio_assets')->exists($path)) {
+                    return Storage::disk('minio_assets')->temporaryUrl($path, now()->addMinutes($minutes));
+                }
+            } catch (\Throwable) {
+                // Credencial/rede MinIO indisponível: não derrubar request.
+            }
         }
 
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($this->professional_photo_path, '/');
+        return rtrim((string) config('app.url'), '/').'/storage/'.ltrim($path, '/');
     }
 
     public function getSpecialtiesList(): array

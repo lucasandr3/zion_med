@@ -24,11 +24,13 @@ class PlatformConfigService
         $minioConfig = app(MinioConfigService::class);
         $resendConfig = app(ResendConfigService::class);
         $formImportConfig = app(FormImportConfigService::class);
+        $webPushConfig = app(WebPushConfigService::class);
 
         $asaasConfig->mergeIntoConfig();
         $minioConfig->applyFilesystemConfig();
         $resendConfig->mergeIntoConfig();
         $formImportConfig->mergeIntoConfig();
+        $webPushConfig->mergeIntoConfig();
 
         if (! Schema::hasTable('plans')) {
             return;

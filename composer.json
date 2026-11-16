@@ -14,6 +14,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.25",
+        "minishlink/web-push": "^11.0",
         "opcodesio/log-viewer": "^3.0",
         "resend/resend-laravel": "^1.3",
         "setasign/fpdf": "^1.9",

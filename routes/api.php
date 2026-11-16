@@ -16,12 +16,14 @@ use App\Http\Controllers\Api\V1\MeDataExportController;
 use App\Http\Controllers\Api\V1\MeAppearanceController;
 use App\Http\Controllers\Api\V1\MeElectronicSignatureController;
 use App\Http\Controllers\Api\V1\MeController;
+use App\Http\Controllers\Api\V1\MobileToolsController;
 use App\Http\Controllers\Api\V1\OrganizationPresenceController;
 use App\Http\Controllers\Api\V1\OrganizationRoleController;
 use App\Http\Controllers\Api\V1\PermissionCatalogController;
 use App\Http\Controllers\Api\V1\FeedbackController;
 use App\Http\Controllers\Api\V1\GoAssistantController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PushSubscriptionController;
 use App\Http\Controllers\Api\V1\OnboardingController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ProtocolController;
@@ -65,6 +67,10 @@ use App\Http\Controllers\Api\V1\Platform\OrganizationPresenceController as Platf
 use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Models\DocumentSend;
 use App\Models\FormSubmission;
+use App\Models\MobileToolFollowup;
+use App\Models\MobileToolMessageTemplate;
+use App\Models\MobileToolPackage;
+use App\Models\MobileToolStockItem;
 use App\Support\OrganizationScopedRouteBinding;
 use Illuminate\Support\Facades\Route;
 
@@ -161,6 +167,10 @@ Route::prefix('v1/conector')->middleware(['business_hub.connector', 'throttle:ap
 
 Route::bind('protocol', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(FormSubmission::class, $value));
 Route::bind('documentSend', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(DocumentSend::class, $value));
+Route::bind('mobileMessageTemplate', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(MobileToolMessageTemplate::class, $value));
+Route::bind('mobilePackage', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(MobileToolPackage::class, $value));
+Route::bind('mobileStockItem', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(MobileToolStockItem::class, $value));
+Route::bind('mobileFollowup', fn ($value) => app(OrganizationScopedRouteBinding::class)->resolve(MobileToolFollowup::class, $value));
 
 // Rotas que qualquer usuário autenticado pode acessar (incl. platform_admin): logout, me, notificações
 Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 'throttle:api'])->group(function () {
@@ -179,6 +189,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::post('/notificacoes/marcar-todas', [NotificationController::class, 'markAllAsRead'])->name('api.v1.notificacoes.read.all');
     Route::delete('/notificacoes/limpar-tudo', [NotificationController::class, 'destroyAll'])->name('api.v1.notificacoes.destroy.all');
     Route::delete('/notificacoes/{id}', [NotificationController::class, 'destroy'])->name('api.v1.notificacoes.destroy');
+    Route::get('/me/push/config', [PushSubscriptionController::class, 'config'])->name('api.v1.me.push.config');
+    Route::get('/me/push/status', [PushSubscriptionController::class, 'status'])->name('api.v1.me.push.status');
+    Route::post('/me/push/subscribe', [PushSubscriptionController::class, 'store'])->name('api.v1.me.push.subscribe');
+    Route::delete('/me/push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('api.v1.me.push.unsubscribe');
     Route::get('/release-notes', [ReleaseNotesController::class, 'index'])->name('api.v1.release-notes.index');
     Route::get('/release-notes/latest', [ReleaseNotesController::class, 'latest'])->name('api.v1.release-notes.latest');
 
@@ -212,6 +226,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
         Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('api.v1.platform.settings.index');
         Route::put('/settings', [PlatformSettingsController::class, 'update'])->name('api.v1.platform.settings.update');
         Route::post('/settings/email-branding/upload', [PlatformSettingsController::class, 'uploadEmailBranding'])->name('api.v1.platform.settings.email-branding.upload');
+        Route::post('/settings/webpush/generate-vapid', [PlatformSettingsController::class, 'generateWebPushVapid'])->name('api.v1.platform.settings.webpush.generate-vapid');
         Route::get('/integrations', [PlatformIntegrationsController::class, 'index'])->name('api.v1.platform.integrations.index');
         Route::get('/integrations/business-hub', [PlatformIntegrationsController::class, 'showBusinessHub'])->name('api.v1.platform.integrations.business-hub.show');
         Route::put('/integrations/business-hub', [PlatformIntegrationsController::class, 'updateBusinessHub'])->name('api.v1.platform.integrations.business-hub.update');
@@ -241,6 +256,31 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
 // Rotas de clínica: apenas usuários de clínica (tenant) com e-mail verificado. Dono da plataforma recebe 403.
 Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 'verified', 'tenant', 'tenant.billing', 'throttle:api'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('api.v1.dashboard');
+
+    // Gestgo Mobile — ferramentas (tenant)
+    Route::get('/mobile/tools', [MobileToolsController::class, 'catalog'])->name('api.v1.mobile.tools.catalog');
+    Route::post('/mobile/tools/price', [MobileToolsController::class, 'calculatePrice'])->name('api.v1.mobile.tools.price');
+    Route::get('/mobile/tools/quotes', [MobileToolsController::class, 'quotesIndex'])->name('api.v1.mobile.tools.quotes.index');
+    Route::post('/mobile/tools/quotes', [MobileToolsController::class, 'previewQuote'])->name('api.v1.mobile.tools.quotes');
+    Route::post('/mobile/tools/card', [MobileToolsController::class, 'calculateCard'])->name('api.v1.mobile.tools.card');
+    Route::get('/mobile/tools/messages', [MobileToolsController::class, 'messagesIndex'])->name('api.v1.mobile.tools.messages.index');
+    Route::put('/mobile/tools/messages/{mobileMessageTemplate}', [MobileToolsController::class, 'messagesUpdate'])->name('api.v1.mobile.tools.messages.update');
+    Route::get('/mobile/tools/checklist', [MobileToolsController::class, 'checklistShow'])->name('api.v1.mobile.tools.checklist.show');
+    Route::put('/mobile/tools/checklist', [MobileToolsController::class, 'checklistUpdate'])->name('api.v1.mobile.tools.checklist.update');
+    Route::post('/mobile/tools/checklist/reset', [MobileToolsController::class, 'checklistReset'])->name('api.v1.mobile.tools.checklist.reset');
+    Route::get('/mobile/tools/packages', [MobileToolsController::class, 'packagesIndex'])->name('api.v1.mobile.tools.packages.index');
+    Route::post('/mobile/tools/packages', [MobileToolsController::class, 'packagesStore'])->name('api.v1.mobile.tools.packages.store');
+    Route::post('/mobile/tools/packages/{mobilePackage}/sessions', [MobileToolsController::class, 'packagesRegisterSession'])->name('api.v1.mobile.tools.packages.session');
+    Route::delete('/mobile/tools/packages/{mobilePackage}', [MobileToolsController::class, 'packagesDestroy'])->name('api.v1.mobile.tools.packages.destroy');
+    Route::get('/mobile/tools/stock', [MobileToolsController::class, 'stockIndex'])->name('api.v1.mobile.tools.stock.index');
+    Route::post('/mobile/tools/stock', [MobileToolsController::class, 'stockStore'])->name('api.v1.mobile.tools.stock.store');
+    Route::put('/mobile/tools/stock/{mobileStockItem}', [MobileToolsController::class, 'stockUpdate'])->name('api.v1.mobile.tools.stock.update');
+    Route::delete('/mobile/tools/stock/{mobileStockItem}', [MobileToolsController::class, 'stockDestroy'])->name('api.v1.mobile.tools.stock.destroy');
+    Route::get('/mobile/tools/followups', [MobileToolsController::class, 'followupsIndex'])->name('api.v1.mobile.tools.followups.index');
+    Route::post('/mobile/tools/followups', [MobileToolsController::class, 'followupsStore'])->name('api.v1.mobile.tools.followups.store');
+    Route::post('/mobile/tools/followups/{mobileFollowup}/toggle', [MobileToolsController::class, 'followupsToggle'])->name('api.v1.mobile.tools.followups.toggle');
+    Route::delete('/mobile/tools/followups/{mobileFollowup}', [MobileToolsController::class, 'followupsDestroy'])->name('api.v1.mobile.tools.followups.destroy');
+
     Route::get('/compliance/relatorio', ComplianceReportController::class)->name('api.v1.compliance.relatorio');
     Route::get('/permissions/catalog', PermissionCatalogController::class)->name('api.v1.permissions.catalog');
     Route::get('/organization-roles', [OrganizationRoleController::class, 'index'])->name('api.v1.organization-roles.index');

@@ -11,6 +11,7 @@ use App\Services\MinioConfigService;
 use App\Services\PlatformConfigService;
 use App\Services\PlatformEmailBrandingService;
 use App\Services\ResendConfigService;
+use App\Services\WebPushConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,6 +22,7 @@ class SettingsController extends Controller
         private readonly MinioConfigService $minioConfig,
         private readonly ResendConfigService $resendConfig,
         private readonly FormImportConfigService $formImportConfig,
+        private readonly WebPushConfigService $webPushConfig,
         private readonly PlatformEmailBrandingService $emailBranding,
     ) {}
 
@@ -44,6 +46,7 @@ class SettingsController extends Controller
             'minio' => $this->minioConfig->toSettingsPayload(),
             'resend' => $this->resendConfig->toSettingsPayload(),
             'form_import' => $this->formImportConfig->toSettingsPayload(),
+            'webpush' => $this->webPushConfig->toSettingsPayload(),
         ];
 
         return response()->json(['data' => $data]);
@@ -96,14 +99,45 @@ class SettingsController extends Controller
             'retention_days' => $request->input('form_import_retention_days'),
         ]);
 
+        if ($request->exists('vapid_subject')) {
+            $this->webPushConfig->update([
+                'subject' => $request->input('vapid_subject'),
+            ]);
+        }
+
         $this->asaasConfig->mergeIntoConfig();
         $this->minioConfig->applyFilesystemConfig();
         $this->resendConfig->mergeIntoConfig();
         $this->formImportConfig->mergeIntoConfig();
+        $this->webPushConfig->mergeIntoConfig();
 
         return response()->json([
             'message' => 'Configurações salvas.',
             'data' => $this->buildResponseData($request),
+        ]);
+    }
+
+    public function generateWebPushVapid(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'subject' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $keys = $this->webPushConfig->generateAndStore($validated['subject'] ?? null);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Não foi possível gerar as chaves VAPID.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Chaves VAPID geradas. Assinaturas de push anteriores foram invalidadas.',
+            'data' => [
+                'webpush' => $this->webPushConfig->toSettingsPayload(),
+                'public_key' => $keys['publicKey'],
+                'private_key' => $keys['privateKey'],
+            ],
         ]);
     }
 
@@ -159,6 +193,7 @@ class SettingsController extends Controller
             'minio' => $this->minioConfig->toSettingsPayload(),
             'resend' => $this->resendConfig->toSettingsPayload(),
             'form_import' => $this->formImportConfig->toSettingsPayload(),
+            'webpush' => $this->webPushConfig->toSettingsPayload(),
         ];
     }
 }

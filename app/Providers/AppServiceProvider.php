@@ -24,7 +24,10 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
+use App\Listeners\SendWebPushOnDatabaseNotification;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -60,6 +63,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Listener AuditEvent → LogAuditListener registrado apenas por descoberta automática (app/Listeners)
+        Event::listen(NotificationSent::class, SendWebPushOnDatabaseNotification::class);
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());

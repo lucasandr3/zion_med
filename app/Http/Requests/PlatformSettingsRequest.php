@@ -46,6 +46,7 @@ class PlatformSettingsRequest extends FormRequest
             'form_import_openai_model' => ['nullable', 'string', 'max:128'],
             'openai_base_url' => ['nullable', 'url', 'max:255'],
             'form_import_retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'vapid_subject' => ['nullable', 'string', 'max:255'],
         ];
     }
 
