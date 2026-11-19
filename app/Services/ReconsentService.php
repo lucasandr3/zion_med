@@ -32,29 +32,46 @@ class ReconsentService
         }
 
         $resolvedChannel = $this->resolveChannel($person, $channel);
-        $send = $this->dispatchSend($protocol->template, $person, $resolvedChannel);
+        $dispatched = $this->dispatchSend($protocol->template, $person, $resolvedChannel);
+        $send = $dispatched['send'];
+        $manual = $dispatched['manual'];
 
         SubmissionEvent::create([
             'form_submission_id' => $protocol->id,
             'type' => 'reconsent_requested',
             'user_id' => $user->id,
-            'body' => 'Reconsentimento solicitado — link enviado ao paciente.',
+            'body' => $manual
+                ? 'Reconsentimento solicitado — link pronto para compartilhamento manual no WhatsApp.'
+                : 'Reconsentimento solicitado — link enviado ao paciente.',
             'meta_json' => [
                 'document_send_id' => $send->id,
                 'channel' => $resolvedChannel,
+                'delivery_mode' => $manual ? 'manual' : 'auto',
                 'template_id' => $protocol->template_id,
                 'person_id' => $person->id,
             ],
         ]);
 
-        return [
+        $result = [
             'send_id' => $send->id,
             'channel' => $resolvedChannel,
-            'message' => $resolvedChannel === 'whatsapp'
-                ? 'Link de reconsentimento enviado por WhatsApp.'
-                : 'Link de reconsentimento enviado por e-mail.',
-            'sent_at' => $send->sent_at?->toIso8601String() ?? now()->toIso8601String(),
+            'message' => $manual
+                ? 'Link pronto para compartilhar no WhatsApp.'
+                : ($resolvedChannel === 'whatsapp'
+                    ? 'Link de reconsentimento enviado por WhatsApp.'
+                    : 'Link de reconsentimento enviado por e-mail.'),
+            'sent_at' => $send->sent_at?->toIso8601String(),
         ];
+
+        if ($manual) {
+            $result['delivery_mode'] = 'manual';
+            $result['delivery_status'] = 'aguardando_envio_manual';
+            $result['public_url'] = $manual['public_url'];
+            $result['share_message'] = $manual['share_message'];
+            $result['recipient_phone'] = $send->recipient_phone;
+        }
+
+        return $result;
     }
 
     /**
@@ -149,7 +166,10 @@ class ReconsentService
         ]);
     }
 
-    private function dispatchSend($template, Person $person, string $channel)
+    /**
+     * @return array{send: \App\Models\DocumentSend, manual: ?array{send: \App\Models\DocumentSend, public_url: string, share_message: string}}
+     */
+    private function dispatchSend($template, Person $person, string $channel): array
     {
         if ($channel === 'whatsapp') {
             $phone = trim((string) ($person->phone ?? $person->phone_alt ?? ''));
@@ -160,16 +180,23 @@ class ReconsentService
                 $person->id,
                 $person->name,
             );
-            if (! $send) {
-                throw ValidationException::withMessages([
-                    'channel' => ['WhatsApp não configurado para esta clínica ou número inválido.'],
-                ]);
+            if ($send) {
+                return ['send' => $send, 'manual' => null];
             }
 
-            return $send;
+            // MSG-03A — fallback manual (wa.me) quando Evolution não está disponível.
+            $manual = $this->documentSendService->createManualWhatsAppShare(
+                $template,
+                $phone,
+                null,
+                $person->id,
+                $person->name,
+            );
+
+            return ['send' => $manual['send'], 'manual' => $manual];
         }
 
-        return $this->documentSendService->sendByEmail(
+        $send = $this->documentSendService->sendByEmail(
             $template,
             trim((string) $person->email),
             $person->phone ? trim((string) $person->phone) : null,
@@ -177,5 +204,7 @@ class ReconsentService
             $person->id,
             $person->name,
         );
+
+        return ['send' => $send, 'manual' => null];
     }
 }

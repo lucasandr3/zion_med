@@ -401,6 +401,35 @@ class TemplateController extends Controller
     }
 
     /**
+     * PDF-01B — detecção determinística de campos no PDF fonte (AcroForm / metadados).
+     * Não altera print_layout; sugestões exigem revisão no editor.
+     */
+    public function detectPrintLayout(
+        FormTemplate $template,
+        \App\Services\PrintLayoutDetectService $detectService,
+    ): JsonResponse {
+        $this->authorize('update-template', $template);
+
+        return response()->json([
+            'data' => $detectService->detect($template),
+        ]);
+    }
+
+    /**
+     * PDF-01C — detecção assistida por IA (flag/stub). Não altera print_layout.
+     */
+    public function detectPrintLayoutAi(
+        FormTemplate $template,
+        \App\Services\PrintLayoutAiDetectService $detectService,
+    ): JsonResponse {
+        $this->authorize('update-template', $template);
+
+        return response()->json([
+            'data' => $detectService->detect($template),
+        ]);
+    }
+
+    /**
      * Salva só o mapa de aparência do PDF (print_layout), sem passar pelo update geral do modelo.
      */
     public function updatePrintLayout(Request $request, FormTemplate $template): JsonResponse

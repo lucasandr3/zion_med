@@ -163,6 +163,49 @@ class DocumentSendService
         return true;
     }
 
+    /**
+     * MSG-03A — cria envio WhatsApp para compartilhamento manual (wa.me).
+     * Não marca como entregue; não chama Evolution.
+     *
+     * @return array{send: DocumentSend, public_url: string, share_message: string}
+     */
+    public function createManualWhatsAppShare(
+        FormTemplate $template,
+        string $recipientPhone,
+        ?\DateTimeInterface $expiresAt = null,
+        ?int $personId = null,
+        ?string $recipientName = null
+    ): array {
+        if (! $template->public_token || ! $template->public_enabled) {
+            $this->publicLinkService->generateToken($template);
+            $template->refresh();
+        }
+
+        $expiresAt = $expiresAt ?? $template->public_token_expires_at?->toDateTimeImmutable();
+        $send = DocumentSend::create([
+            'organization_id' => $template->organization_id ?? $template->clinic_id,
+            'person_id' => $personId,
+            'form_template_id' => $template->id,
+            'recipient_name' => $recipientName,
+            'recipient_phone' => $recipientPhone,
+            'channel' => 'whatsapp',
+            'sent_at' => null,
+            'expires_at' => $expiresAt,
+            'public_token' => $template->public_token,
+        ]);
+
+        $url = $this->publicUrlForSend($template, $send);
+        $organizationName = $template->organization?->name ?? 'a clínica';
+        $templateName = $template->name ?: 'documento';
+        $shareMessage = "Olá! Você tem um documento para preencher para {$organizationName}: {$templateName}. Acesse o link seguro: {$url}";
+
+        return [
+            'send' => $send,
+            'public_url' => $url,
+            'share_message' => $shareMessage,
+        ];
+    }
+
     /** Envia o link por WhatsApp usando a integração Evolution Go da organização. */
     public function sendByWhatsApp(
         FormTemplate $template,

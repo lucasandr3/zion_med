@@ -61,7 +61,9 @@ class DocumentSendController extends Controller
 
         return response()->json(
             ApiPagination::wrap($paginator, $paginator->map(fn (DocumentSend $s) => [
-                'delivery_status' => $s->sent_at ? 'enviado' : 'nao_enviado',
+                'delivery_status' => $s->sent_at
+                    ? 'enviado'
+                    : ($s->channel === 'whatsapp' ? 'aguardando_envio_manual' : 'nao_enviado'),
                 'signature_status' => $s->form_submission_id ? 'assinado' : ($s->isCancelled() ? 'cancelado' : ($s->isExpired() ? 'expirado' : 'aguardando_assinatura')),
                 'id' => $s->id,
                 'form_template_id' => $s->form_template_id,
@@ -97,6 +99,8 @@ class DocumentSendController extends Controller
         $validated = $request->validate([
             'template_id' => ['required', 'exists:form_templates,id'],
             'channel' => ['required', 'string', 'in:email,whatsapp'],
+            /** MSG-03A: manual = wa.me (sem Evolution); omitido/auto tenta Evolution. */
+            'delivery_mode' => ['nullable', 'string', 'in:manual,auto'],
             'person_id' => ['nullable', 'integer', 'exists:people,id'],
             'recipient_email' => ['nullable', 'email'],
             'recipient_phone' => ['nullable', 'string', 'max:50'],
@@ -129,6 +133,33 @@ class DocumentSendController extends Controller
             if (! $phone || trim((string) $phone) === '') {
                 return response()->json(['message' => 'Informe o telefone ou selecione uma pessoa com telefone cadastrado.'], 422);
             }
+
+            $deliveryMode = $validated['delivery_mode'] ?? 'manual';
+            if ($deliveryMode === 'manual') {
+                $manual = $this->documentSendService->createManualWhatsAppShare(
+                    $template,
+                    trim((string) $phone),
+                    $expiresAt?->toDateTimeImmutable(),
+                    $person?->id,
+                    $recipientName
+                );
+                $send = $manual['send'];
+                $this->recordFirstFormShared($request, (int) $orgId, (int) $send->id);
+
+                return response()->json([
+                    'data' => [
+                        'message' => 'Link pronto para compartilhar no WhatsApp.',
+                        'id' => $send->id,
+                        'sent_at' => null,
+                        'delivery_mode' => 'manual',
+                        'delivery_status' => 'aguardando_envio_manual',
+                        'public_url' => $manual['public_url'],
+                        'share_message' => $manual['share_message'],
+                        'recipient_phone' => $send->recipient_phone,
+                    ],
+                ], 201);
+            }
+
             $send = $this->documentSendService->sendByWhatsApp(
                 $template,
                 trim((string) $phone),
@@ -144,7 +175,8 @@ class DocumentSendController extends Controller
                 'data' => [
                     'message' => 'Link enviado por WhatsApp.',
                     'id' => $send->id,
-                    'sent_at' => $send->sent_at->toIso8601String(),
+                    'sent_at' => $send->sent_at?->toIso8601String(),
+                    'delivery_mode' => 'auto',
                 ],
             ], 201);
         }

@@ -52,15 +52,16 @@ class SourcePdfFillService
     }
 
     /**
-     * Aparência atual do modelo tem prioridade. Snapshot vazio/`[]` NÃO pode bloquear o mapa vivo
-     * (o operador `??` do PHP não faz fallback quando a chave existe com array vazio).
+     * DOC-02 — prioriza print_layout congelado no document_snapshot (histórico imutável).
+     * Só cai no mapa vivo do modelo se o snapshot não tiver placements utilizáveis
+     * (ex.: protocolos antigos sem mapa no snapshot).
      *
      * @return array{version:int,placements:list<array<string,mixed>>}|null
      */
     private function resolvePrintLayout(FormSubmission $submission, FormTemplate $template): ?array
     {
-        return $this->normalizeLayout($template->print_layout ?? null)
-            ?? $this->normalizeLayout($submission->document_snapshot['print_layout'] ?? null);
+        return $this->normalizeLayout($submission->document_snapshot['print_layout'] ?? null)
+            ?? $this->normalizeLayout($template->print_layout ?? null);
     }
 
     /**
@@ -114,8 +115,7 @@ class SourcePdfFillService
 
                     $kind = (string) ($placement['kind'] ?? 'text');
                     $fontSize = (float) ($placement['font_size'] ?? max(7, min(10, $h * 0.72)));
-                    $align = strtoupper((string) ($placement['align'] ?? 'L'));
-                    $align = in_array($align, ['L', 'C', 'R'], true) ? $align : 'L';
+                    $align = $this->normalizeAlign((string) ($placement['align'] ?? 'left'));
 
                     if ($kind === 'signature' || $kind === 'image') {
                         $img = $this->resolvePlacementImage(
@@ -848,5 +848,84 @@ class SourcePdfFillService
         }
 
         return preg_replace('/[^\x20-\x7E\n\r\t]/', '?', $text) ?? $text;
+    }
+
+    /**
+     * Aceita align do editor (`left`/`center`/`right`) e do FPDI (`L`/`C`/`R`).
+     */
+    private function normalizeAlign(string $align): string
+    {
+        $raw = strtolower(trim($align));
+
+        return match ($raw) {
+            'c', 'center' => 'C',
+            'r', 'right' => 'R',
+            default => 'L',
+        };
+    }
+
+    /**
+     * Diagnóstico leve de print_layout (DOC-02) — não bloqueia publicação.
+     *
+     * @param  array{version?:int,placements?:list<array<string,mixed>>}|null  $layout
+     * @return list<array{code:string,message:string,name_key?:string}>
+     */
+    public function diagnoseLayout(?array $layout): array
+    {
+        $normalized = $this->normalizeLayout($layout);
+        if ($normalized === null) {
+            return [[
+                'code' => 'empty_layout',
+                'message' => 'Nenhuma área mapeada utilizável.',
+            ]];
+        }
+
+        $warnings = [];
+        $placements = $normalized['placements'];
+        foreach ($placements as $placement) {
+            $nameKey = (string) ($placement['name_key'] ?? '');
+            $x = (float) $placement['x'];
+            $y = (float) $placement['y'];
+            $w = (float) $placement['w'];
+            $h = (float) $placement['h'];
+            if ($x + $w > 1.002 || $y + $h > 1.002 || $x < 0 || $y < 0) {
+                $warnings[] = [
+                    'code' => 'out_of_page',
+                    'message' => "Área \"{$nameKey}\" ultrapassa a página.",
+                    'name_key' => $nameKey,
+                ];
+            }
+            if ($w < 0.01 || $h < 0.008) {
+                $warnings[] = [
+                    'code' => 'too_small',
+                    'message' => "Área \"{$nameKey}\" está muito pequena.",
+                    'name_key' => $nameKey,
+                ];
+            }
+        }
+
+        $count = count($placements);
+        for ($i = 0; $i < $count; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                $a = $placements[$i];
+                $b = $placements[$j];
+                if ((int) $a['page'] !== (int) $b['page']) {
+                    continue;
+                }
+                $overlapW = max(0.0, min($a['x'] + $a['w'], $b['x'] + $b['w']) - max($a['x'], $b['x']));
+                $overlapH = max(0.0, min($a['y'] + $a['h'], $b['y'] + $b['h']) - max($a['y'], $b['y']));
+                $area = $overlapW * $overlapH;
+                $minArea = min($a['w'] * $a['h'], $b['w'] * $b['h']);
+                if ($minArea > 0 && $area > $minArea * 0.35) {
+                    $warnings[] = [
+                        'code' => 'overlap',
+                        'message' => "Sobreposição entre \"{$a['name_key']}\" e \"{$b['name_key']}\".",
+                        'name_key' => (string) $a['name_key'],
+                    ];
+                }
+            }
+        }
+
+        return $warnings;
     }
 }

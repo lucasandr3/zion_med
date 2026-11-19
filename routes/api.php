@@ -268,6 +268,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
     Route::get('/templates/{template}', [TemplateController::class, 'show'])->name('api.v1.templates.show');
     Route::put('/templates/{template}', [TemplateController::class, 'update'])->name('api.v1.templates.update');
     Route::put('/templates/{template}/print-layout', [TemplateController::class, 'updatePrintLayout'])->name('api.v1.templates.print-layout.update');
+    Route::post('/templates/{template}/print-layout/detect', [TemplateController::class, 'detectPrintLayout'])->name('api.v1.templates.print-layout.detect');
+    Route::post('/templates/{template}/print-layout/detect-ai', [TemplateController::class, 'detectPrintLayoutAi'])->name('api.v1.templates.print-layout.detect-ai');
     Route::post('/templates/{template}/source-document', [TemplateController::class, 'uploadSourceDocument'])->name('api.v1.templates.source-document.upload');
     Route::get('/templates/{template}/source-document', [TemplateController::class, 'downloadSourceDocument'])->name('api.v1.templates.source-document.download');
     Route::delete('/templates/{template}/source-document', [TemplateController::class, 'destroySourceDocument'])->name('api.v1.templates.source-document.destroy');

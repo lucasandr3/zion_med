@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Support\EsteticaStaffFieldRegistry;
+use App\Support\PdfGenerationStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,7 @@ class ProtocolDetailResource extends JsonResource
     public function toArray(Request $request): array
     {
         $base = (new ProtocolResource($this->resource))->toArray($request);
+        $base['pdf_generation_status'] = PdfGenerationStatus::resolve($this->resource, checkQueues: true);
 
         return array_merge($base, [
             'staff_fields' => EsteticaStaffFieldRegistry::definitions($this->template?->name ?? null),

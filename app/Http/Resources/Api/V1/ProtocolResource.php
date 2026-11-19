@@ -14,6 +14,11 @@ class ProtocolResource extends JsonResource
             'protocol_number' => $this->protocol_number,
             'document_hash' => $this->document_hash,
             'document_snapshot_hash' => $this->document_snapshot_hash,
+            'pdf_sha256' => $this->pdf_sha256,
+            'pdf_generated_at' => $this->pdf_generated_at?->toIso8601String(),
+            'pdf_ready' => filled($this->pdf_disk_path) && filled($this->pdf_sha256),
+            // Listagem: sem consultar filas (evita N+1). Detalhe enriquece em ProtocolDetailResource.
+            'pdf_generation_status' => \App\Support\PdfGenerationStatus::resolve($this->resource, checkQueues: false),
             'template_version_id' => $this->template_version_id,
             'status' => $this->status->value,
             'template_id' => $this->template_id,
