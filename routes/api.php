@@ -309,6 +309,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'reject.spa_bearer', 'active', 
 
     Route::get('/links-publicos', [LinksPublicosController::class, 'index'])->name('api.v1.links-publicos.index');
 
+    // Catálogo compartilhado de serviços/procedimentos (agenda, orçamento, mensagens, pacotes).
+    Route::get('/servicos', [AppointmentController::class, 'servicesIndex'])->name('api.v1.servicos.index');
+    Route::post('/servicos', [AppointmentController::class, 'servicesStore'])->name('api.v1.servicos.store');
+    Route::put('/servicos/{service}', [AppointmentController::class, 'servicesUpdate'])->name('api.v1.servicos.update');
+    Route::post('/servicos/{service}/foto', [AppointmentController::class, 'servicesUploadPhoto'])->name('api.v1.servicos.photo');
+    Route::delete('/servicos/{service}/foto', [AppointmentController::class, 'servicesDeletePhoto'])->name('api.v1.servicos.photo.destroy');
+    Route::delete('/servicos/{service}', [AppointmentController::class, 'servicesDestroy'])->name('api.v1.servicos.destroy');
+
+    // Alias de compatibilidade — preferir /servicos.
     Route::get('/agenda/servicos', [AppointmentController::class, 'servicesIndex'])->name('api.v1.agenda.services.index');
     Route::post('/agenda/servicos', [AppointmentController::class, 'servicesStore'])->name('api.v1.agenda.services.store');
     Route::put('/agenda/servicos/{service}', [AppointmentController::class, 'servicesUpdate'])->name('api.v1.agenda.services.update');
